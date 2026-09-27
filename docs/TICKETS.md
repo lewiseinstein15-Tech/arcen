@@ -100,7 +100,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** executes one step, emits command + command.done
 
 ### [T-010] TEMPER verifier
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-009
 - **Deliverable:** src/arcen/agents/temper.py
 - **Test:** `pytest tests/test_temper.py`
