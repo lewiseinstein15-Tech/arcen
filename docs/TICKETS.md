@@ -164,7 +164,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** parsed correctly
 
 ### [T-018] MCP client
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-005
 - **Deliverable:** src/arcen/mcp/client.py
 - **Test:** `pytest tests/test_mcp.py`
