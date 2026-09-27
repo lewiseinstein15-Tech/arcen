@@ -156,7 +156,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** decay + consolidation work
 
 ### [T-017] Skills loader
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-001
 - **Deliverable:** src/arcen/skills/loader.py
 - **Test:** `pytest tests/test_skills.py`
