@@ -108,7 +108,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** adversarial check works, emits step.fail on bad work
 
 ### [T-011] Sub-agent spawner
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-010
 - **Deliverable:** src/arcen/subagents/agent.py
 - **Test:** `pytest tests/test_subagents.py`
