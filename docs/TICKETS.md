@@ -36,7 +36,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** directories exist, pyproject.toml is valid TOML
 
 ### [T-002] Design tokens (frontend)
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-001
 - **Deliverable:** src/styles/tokens.css with all CSS variables from frontend spec Part 3.1
 - **Test:** `npm run build` succeeds
