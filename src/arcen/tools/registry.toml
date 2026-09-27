@@ -1,0 +1,252 @@
+# ARCEN — built-in tool manifest (BACKEND-SPEC Part 3).
+# v0.1 ships exactly 40 core tools. The registry validates every entry:
+# unique names, no mcp.* shadowing, schema generation, Protocol satisfied.
+
+[[tool]]
+name = "bash"
+module = "arcen.tools.bash"
+class = "BashTool"
+danger = "sandboxed"
+
+# --- file (10) ---
+[[tool]]
+name = "file.read"
+module = "arcen.tools.file"
+class = "FileRead"
+danger = "safe"
+
+[[tool]]
+name = "file.write"
+module = "arcen.tools.file"
+class = "FileWrite"
+danger = "sandboxed"
+
+[[tool]]
+name = "file.edit"
+module = "arcen.tools.file"
+class = "FileEdit"
+danger = "sandboxed"
+
+[[tool]]
+name = "file.append"
+module = "arcen.tools.file"
+class = "FileAppend"
+danger = "sandboxed"
+
+[[tool]]
+name = "file.delete"
+module = "arcen.tools.file"
+class = "FileDelete"
+danger = "escalate"
+
+[[tool]]
+name = "file.copy"
+module = "arcen.tools.file"
+class = "FileCopy"
+danger = "sandboxed"
+
+[[tool]]
+name = "file.move"
+module = "arcen.tools.file"
+class = "FileMove"
+danger = "sandboxed"
+
+[[tool]]
+name = "file.list"
+module = "arcen.tools.file"
+class = "FileList"
+danger = "safe"
+
+[[tool]]
+name = "file.glob"
+module = "arcen.tools.file"
+class = "FileGlob"
+danger = "safe"
+
+[[tool]]
+name = "file.mkdir"
+module = "arcen.tools.file"
+class = "FileMkdir"
+danger = "sandboxed"
+
+# --- search (4) ---
+[[tool]]
+name = "search.text"
+module = "arcen.tools.search"
+class = "SearchText"
+danger = "safe"
+
+[[tool]]
+name = "search.files"
+module = "arcen.tools.search"
+class = "SearchFiles"
+danger = "safe"
+
+[[tool]]
+name = "search.symbols"
+module = "arcen.tools.search"
+class = "SearchSymbols"
+danger = "safe"
+
+[[tool]]
+name = "search.replace"
+module = "arcen.tools.search"
+class = "SearchReplace"
+danger = "sandboxed"
+
+# --- code (5) ---
+[[tool]]
+name = "code.run"
+module = "arcen.tools.code"
+class = "CodeRun"
+danger = "sandboxed"
+
+[[tool]]
+name = "code.eval_expr"
+module = "arcen.tools.code"
+class = "CodeEval"
+danger = "safe"
+
+[[tool]]
+name = "code.format"
+module = "arcen.tools.code"
+class = "CodeFormat"
+danger = "safe"
+
+[[tool]]
+name = "code.outline"
+module = "arcen.tools.code"
+class = "CodeOutline"
+danger = "safe"
+
+[[tool]]
+name = "code.diff"
+module = "arcen.tools.code"
+class = "CodeDiff"
+danger = "safe"
+
+# --- text (5) ---
+[[tool]]
+name = "text.count"
+module = "arcen.tools.text"
+class = "TextCount"
+danger = "safe"
+
+[[tool]]
+name = "text.hash"
+module = "arcen.tools.text"
+class = "TextHash"
+danger = "safe"
+
+[[tool]]
+name = "text.replace"
+module = "arcen.tools.text"
+class = "TextReplace"
+danger = "safe"
+
+[[tool]]
+name = "text.slice"
+module = "arcen.tools.text"
+class = "TextSlice"
+danger = "safe"
+
+[[tool]]
+name = "text.wrap"
+module = "arcen.tools.text"
+class = "TextWrap"
+danger = "safe"
+
+# --- http (3) ---
+[[tool]]
+name = "http.get"
+module = "arcen.tools.http"
+class = "HttpGet"
+danger = "sandboxed"
+
+[[tool]]
+name = "http.post"
+module = "arcen.tools.http"
+class = "HttpPost"
+danger = "sandboxed"
+
+[[tool]]
+name = "http.head"
+module = "arcen.tools.http"
+class = "HttpHead"
+danger = "sandboxed"
+
+# --- data (5) ---
+[[tool]]
+name = "data.json"
+module = "arcen.tools.data"
+class = "DataJson"
+danger = "safe"
+
+[[tool]]
+name = "data.jsonl"
+module = "arcen.tools.data"
+class = "DataJsonl"
+danger = "safe"
+
+[[tool]]
+name = "data.yaml"
+module = "arcen.tools.data"
+class = "DataYaml"
+danger = "safe"
+
+[[tool]]
+name = "data.toml"
+module = "arcen.tools.data"
+class = "DataToml"
+danger = "safe"
+
+[[tool]]
+name = "data.csv"
+module = "arcen.tools.data"
+class = "DataCsv"
+danger = "safe"
+
+# --- proc (3) ---
+[[tool]]
+name = "proc.env"
+module = "arcen.tools.proc"
+class = "ProcEnv"
+danger = "sandboxed"
+
+[[tool]]
+name = "proc.cwd"
+module = "arcen.tools.proc"
+class = "ProcCwd"
+danger = "safe"
+
+[[tool]]
+name = "proc.time"
+module = "arcen.tools.proc"
+class = "ProcTime"
+danger = "safe"
+
+# --- math (3) ---
+[[tool]]
+name = "math.eval"
+module = "arcen.tools.math"
+class = "MathEval"
+danger = "safe"
+
+[[tool]]
+name = "math.stats"
+module = "arcen.tools.math"
+class = "MathStats"
+danger = "safe"
+
+[[tool]]
+name = "math.convert"
+module = "arcen.tools.math"
+class = "MathConvert"
+danger = "safe"
+
+# --- system (1) ---
+[[tool]]
+name = "system.info"
+module = "arcen.tools.system"
+class = "SystemInfo"
+danger = "safe"
