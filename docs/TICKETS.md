@@ -84,7 +84,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** content matches
 
 ### [T-008] DRAFT planner
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-004, T-006
 - **Deliverable:** src/arcen/agents/draft.py
 - **Test:** `pytest tests/test_draft.py`
