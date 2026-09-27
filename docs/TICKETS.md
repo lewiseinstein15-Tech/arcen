@@ -140,7 +140,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** /api/health returns 200
 
 ### [T-015] Session store
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-013
 - **Deliverable:** src/arcen/session/store.py
 - **Test:** `pytest tests/test_session.py`
