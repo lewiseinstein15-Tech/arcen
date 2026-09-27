@@ -212,7 +212,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** state toggles
 
 ### [T-024] Auto-scroll + pill
-- **Status:** [ ] todo
+- **Status:** [x] done — verified
 - **Depends on:** T-022
 - **Deliverable:** src/stream/useAutoScroll.ts + ScrollPill.tsx
 - **Test:** F-06, F-07, F-08
