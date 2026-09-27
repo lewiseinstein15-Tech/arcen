@@ -236,7 +236,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** send / newline
 
 ### [T-027] Session store + persistence
-- **Status:** [ ] todo
+- **Status:** [x] done — verified
 - **Depends on:** T-022
 - **Deliverable:** src/state/sessionStore.ts + localStorage
 - **Test:** F-12
