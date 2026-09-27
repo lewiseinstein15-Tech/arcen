@@ -29,6 +29,7 @@ from arcen.agents.draft import DraftPlanner
 from arcen.agents.forge import ForgeExecutor
 from arcen.agents.temper import TemperVerifier
 from arcen.config import ArcenConfig, load_config
+from arcen.session.store import SessionStore
 from arcen.stream.emitter import StreamEmitter
 from arcen.stream.events import (
     Answer,
@@ -49,6 +50,7 @@ class ServerState:
     def __init__(self, config: ArcenConfig | None = None) -> None:
         self.config = config or load_config()
         self.registry = load_builtin()
+        self.store = SessionStore(self.config.session.dir)
         self.emitters: dict[str, StreamEmitter] = {}
         self.sessions_meta: dict[str, dict] = {}
         self.run_flags: dict[str, threading.Event] = {}
@@ -100,6 +102,7 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
     def emit(event) -> None:
         wire = emitter.emit(event)
         state.note_event(session_id, wire)
+        state.store.append(session_id, wire)
 
     try:
         emit(RunStart(seq=0, run_id=run_id, goal=goal, depth=0, ts=0.0))
@@ -263,9 +266,11 @@ def list_sessions() -> list[dict]:
 
 @app.get("/api/sessions/{session_id}/events")
 def session_events(session_id: str) -> list[dict]:
-    if session_id not in STATE.emitters:
-        raise HTTPException(status_code=404, detail="unknown session")
-    return STATE.emitters[session_id].replay(0)
+    if session_id in STATE.emitters:
+        return STATE.emitters[session_id].replay(0)
+    if STATE.store.exists(session_id):
+        return STATE.store.read(session_id)  # restart recovery: replay from disk
+    raise HTTPException(status_code=404, detail="unknown session")
 
 
 def main() -> None:
