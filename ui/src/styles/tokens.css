@@ -1,0 +1,36 @@
+/* ARCEN — design tokens. Frozen for v0.1 (FRONTEND-SPEC Part 3.1).
+   21 tokens, exact values, no derivatives. Token names are the API —
+   components never hard-code hex values. Dark-only in v0.1. */
+
+:root {
+  /* surfaces */
+  --bg:             #0A0B0D;
+  --surface:        #111316;
+  --elevated:       #181B20;
+  --sunken:         #060709;
+
+  /* borders */
+  --border-subtle:  #1E2126;
+  --border:         #2A2E35;
+  --border-strong:  #3A3F48;
+
+  /* text */
+  --text:           #E6E8EB;
+  --text-2:         #9BA1A9;
+  --text-3:         #6A7079;
+
+  /* accents & status */
+  --accent:         #FF6B5C;  /* coral */
+  --accent-hi:      #FF8878;
+  --accent-lo:      #D9534A;
+  --success:        #4ADE80;  /* mint */
+  --warn:           #FBBF24;  /* amber */
+  --danger:         #F87171;  /* soft red */
+  --info:           #60A5FA;  /* sky */
+  --memory:         #A78BFA;  /* violet */
+  --browse:         #2DD4BF;  /* teal */
+
+  /* type */
+  --font-mono:      'JetBrains Mono', 'Geist Mono', 'SF Mono', Menlo, monospace;
+  --font-sans:      'Inter', system-ui, sans-serif;
+}
