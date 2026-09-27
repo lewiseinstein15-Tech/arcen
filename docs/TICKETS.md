@@ -68,7 +68,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** 40 tools registered
 
 ### [T-006] Bash tool
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-005
 - **Deliverable:** src/arcen/tools/bash.py
 - **Test:** `pytest tests/test_tools.py::test_bash`
