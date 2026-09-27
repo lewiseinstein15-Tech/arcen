@@ -228,7 +228,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** all render
 
 ### [T-026] Composer + keyboard
-- **Status:** [ ] todo
+- **Status:** [x] done — verified
 - **Depends on:** T-021
 - **Deliverable:** src/components/Composer.tsx
 - **Test:** F-10
