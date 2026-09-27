@@ -4,32 +4,24 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
 dist/
 build/
-*.egg
 
 # Node
 node_modules/
-.vite/
+ui/dist/
 *.tsbuildinfo
-coverage/
 
-# Env & secrets — never commit
+# Environment / secrets - NEVER commit
 .env
 .env.*
-.secrets/
 *.secret
-secret*
 
-# ARCEN runtime data
-.arcen/
+# Test / tooling caches
+.pytest_cache/
+.ruff_cache/
+.coverage
 
-# Editors / OS
+# Editors
 .DS_Store
-Thumbs.db
-.idea/
-.vscode/
 *.swp
