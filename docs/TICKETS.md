@@ -52,7 +52,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** all 17 types importable
 
 ### [T-004] LLM bridge
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-003
 - **Deliverable:** src/arcen/llm/client.py wrapping LiteLLM
 - **Test:** `pytest tests/test_llm.py` (mocked)
