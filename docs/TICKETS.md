@@ -76,7 +76,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** returns {ok: True, result: {stdout: 'hi\n', exit: 0}}
 
 ### [T-007] File tools (read, write, edit)
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-005
 - **Deliverable:** src/arcen/tools/file.py
 - **Test:** `pytest tests/test_tools.py::test_file`
