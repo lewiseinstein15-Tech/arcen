@@ -92,7 +92,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** emits think + plan events
 
 ### [T-009] FORGE executor
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-008
 - **Deliverable:** src/arcen/agents/forge.py
 - **Test:** `pytest tests/test_forge.py`
