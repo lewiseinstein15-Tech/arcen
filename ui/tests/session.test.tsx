@@ -1,7 +1,7 @@
 // F-12 — reload mid-session: replay restores events in seq order; composer
 // draft restored from localStorage (FRONTEND-SPEC Part 8).
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatView } from '../src/components/ChatView';
 import { useStreamStore } from '../src/state/streamStore';
