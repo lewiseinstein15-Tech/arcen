@@ -180,7 +180,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** hook fires
 
 ### [T-020] End-to-end integration
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-001 through T-019
 - **Deliverable:** full pipeline works
 - **Test:** `python scripts/e2e.py`
