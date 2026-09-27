@@ -116,7 +116,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** {ok, calls, duration} returned, depth cap enforced
 
 ### [T-012] Sandbox runtime
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-006
 - **Deliverable:** src/arcen/sandbox/runtime.py
 - **Test:** `pytest tests/test_sandbox.py`
