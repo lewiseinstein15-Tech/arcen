@@ -60,7 +60,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** class imports, identity block present
 
 ### [T-005] Tool schema + registry
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-003
 - **Deliverable:** src/arcen/tools/registry.py with Tool Protocol
 - **Test:** `pytest tests/test_registry.py`
