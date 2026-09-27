@@ -252,7 +252,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** drawer slides, sessions list
 
 ### [T-029] Full E2E (backend + frontend)
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-020, T-028
 - **Deliverable:** complete working system
 - **Test:** all F-01 through F-12 × 3
