@@ -73,8 +73,15 @@ def test_file_read_slice(tmp_path) -> None:
     p = tmp_path / "y.txt"
     p.write_text("\n".join(f"l{i}" for i in range(100)))
     out = FileRead().execute({"path": str(p), "offset_line": 10, "limit_lines": 5})
-    assert out["result"]["content"] == "l10\nl11\nl12\nl13\nl14"
+    assert out["result"]["content"] == "l10\nl11\nl12\nl13\nl14\n"
     assert out["result"]["truncated"] is True
+
+
+def test_file_read_preserves_trailing_newline(tmp_path) -> None:
+    p = tmp_path / "z.txt"
+    p.write_text("alpha\nbeta\n")
+    out = FileRead().execute({"path": str(p)})
+    assert out["result"]["content"] == "alpha\nbeta\n"  # byte-for-byte
 
 
 def test_file_append_list_glob_mkdir_move(tmp_path) -> None:

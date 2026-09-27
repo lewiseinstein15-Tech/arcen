@@ -43,12 +43,13 @@ class FileRead(BaseTool):
             raw = fh.read(MAX_BYTES + 1)
         if len(raw) > MAX_BYTES:
             raise ValueError(f"file larger than {MAX_BYTES} bytes; read a slice instead")
-        lines = raw.decode("utf-8", errors="replace").splitlines()
+        # keepends preserves the trailing newline — reads are byte-faithful
+        lines = raw.decode("utf-8", errors="replace").splitlines(keepends=True)
         picked = lines[a.offset_line : a.offset_line + a.limit_lines]
         return {
             "path": a.path,
             "total_lines": len(lines),
-            "content": "\n".join(picked),
+            "content": "".join(picked),
             "truncated": len(lines) > a.offset_line + a.limit_lines,
         }
 
