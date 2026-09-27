@@ -124,7 +124,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** isolation proven
 
 ### [T-013] NDJSON streaming emitter
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-003
 - **Deliverable:** src/arcen/stream/emitter.py
 - **Test:** `pytest tests/test_stream.py`
