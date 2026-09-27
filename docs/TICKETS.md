@@ -44,7 +44,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** 20+ CSS variables present
 
 ### [T-003] Event schema (backend)
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-001
 - **Deliverable:** src/arcen/stream/events.py with all 17 event types as dataclasses
 - **Test:** `pytest tests/test_events.py`
