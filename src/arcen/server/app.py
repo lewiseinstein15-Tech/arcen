@@ -29,6 +29,7 @@ from arcen.agents.draft import DraftPlanner
 from arcen.agents.forge import ForgeExecutor
 from arcen.agents.temper import TemperVerifier
 from arcen.config import ArcenConfig, load_config
+from arcen.plugins.loader import PluginLoader
 from arcen.session.store import SessionStore
 from arcen.stream.emitter import StreamEmitter
 from arcen.stream.events import (
@@ -51,6 +52,9 @@ class ServerState:
         self.config = config or load_config()
         self.registry = load_builtin()
         self.store = SessionStore(self.config.session.dir)
+        self.plugin_loader = _boot_plugins(self.config)
+        if self.plugin_loader.active("after_tool") or self.plugin_loader.active("before_tool"):
+            self.registry = HookedRegistry(self.registry, self.plugin_loader)
         self.emitters: dict[str, StreamEmitter] = {}
         self.sessions_meta: dict[str, dict] = {}
         self.run_flags: dict[str, threading.Event] = {}
@@ -75,6 +79,50 @@ class ServerState:
         if meta:
             meta["events"] += 1
             meta["last_seq"] = wire["seq"]
+
+
+class HookedRegistry:
+    """Registry proxy that runs the plugin chain around every dispatch.
+
+    before_tool fails closed (safety hooks); after_tool fails open and
+    may mutate results (redaction, metering).
+    """
+
+    def __init__(self, inner, loader: PluginLoader) -> None:
+        self._inner = inner
+        self._loader = loader
+
+    def __getattr__(self, name: str):  # delegate the rest of the Registry API
+        return getattr(self._inner, name)
+
+    def dispatch(self, name: str, args: dict) -> dict:
+        checked, _ = self._loader.fire(
+            "before_tool", {"tool": name, "args": args}, fail_closed=True
+        )
+        out = self._inner.dispatch(name, checked.get("args", args))
+        event, _ = self._loader.fire(
+            "after_tool", {"tool": name, "args": args, "result": out.get("result")}
+        )
+        if event.get("result") is not None:
+            out["result"] = event["result"]
+        return out
+
+
+def _boot_plugins(config: ArcenConfig) -> PluginLoader:
+    """Boot step 8: load enabled plugins, fire on_boot. Fail-open."""
+    loader = PluginLoader(enabled=config.plugins.enabled, paths=config.plugins.paths)
+    from arcen.plugins.redact_secrets import RedactSecrets
+
+    if "redact-secrets" in config.plugins.enabled and "redact-secrets" not in loader.plugins:
+        instance = RedactSecrets()
+        loader.plugins[instance.name] = instance
+        loader._wire(instance)
+    loader.load()
+    try:
+        loader.fire("on_boot", config.model_dump())
+    except Exception:  # noqa: BLE001 — fail-closed hooks may raise; boot continues
+        pass
+    return loader
 
 
 STATE = ServerState()
