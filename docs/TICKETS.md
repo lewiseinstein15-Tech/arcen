@@ -196,7 +196,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** page renders
 
 ### [T-022] Stream reader + event renderer
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-021, T-013
 - **Deliverable:** src/stream/reader.ts + all 17 event components
 - **Test:** F-04
