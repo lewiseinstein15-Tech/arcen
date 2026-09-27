@@ -172,7 +172,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** tools listed, callable
 
 ### [T-019] Plugin loader
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-014
 - **Deliverable:** src/arcen/plugins/loader.py
 - **Test:** `pytest tests/test_plugins.py`
