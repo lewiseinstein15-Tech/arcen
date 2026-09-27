@@ -220,7 +220,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** pinning works both ways
 
 ### [T-025] Markdown / math / code / mermaid
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-022
 - **Deliverable:** src/markdown/*
 - **Test:** F-09
