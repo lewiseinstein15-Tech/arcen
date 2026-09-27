@@ -204,7 +204,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** all event types render
 
 ### [T-023] Panel state machine
-- **Status:** [ ] todo
+- **Status:** [x] done — verified
 - **Depends on:** T-022
 - **Deliverable:** src/state/panelStore.ts
 - **Test:** F-05
