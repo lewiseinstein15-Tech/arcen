@@ -77,12 +77,12 @@ export const usePanelStore = create<PanelStore>((set) => ({
   panels: initialPanels,
   badges: initialBadges,
   set: (kind, state) => set((s) => ({ panels: { ...s.panels, [kind]: state } })),
+  // chevron cycle (Part 4): auto → open → closed → open …
   toggle: (kind) =>
     set((s) => ({
       panels: {
         ...s.panels,
-        [kind]:
-          s.panels[kind] === 'open' || s.panels[kind] === 'auto' ? 'closed' : 'open',
+        [kind]: s.panels[kind] === 'auto' ? 'open' : s.panels[kind] === 'open' ? 'closed' : 'open',
       },
     })),
   onEvent: (kind) =>
