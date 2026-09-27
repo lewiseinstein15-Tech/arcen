@@ -244,7 +244,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** session replays
 
 ### [T-028] Mobile drawer
-- **Status:** [ ] todo
+- **Status:** [x] done — verified
 - **Depends on:** T-021
 - **Deliverable:** src/components/Drawer.tsx
 - **Test:** F-11
