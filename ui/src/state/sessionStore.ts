@@ -25,8 +25,12 @@ export const useSessionStore = create<SessionStore>((set) => ({
   sessions: [],
   activeId: null,
   list: async () => {
-    const res = await fetch('/api/sessions');
-    if (res.ok) set({ sessions: (await res.json()) as SessionMeta[] });
+    try {
+      const res = await fetch('/api/sessions');
+      if (res.ok) set({ sessions: (await res.json()) as SessionMeta[] });
+    } catch {
+      // offline / mid-reload: keep the previous list, never crash the UI
+    }
   },
   open: (id) => {
     set({ activeId: id });

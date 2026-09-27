@@ -1,0 +1,143 @@
+/* ARCEN — mobile drawer + responsive layout (FRONTEND-SPEC Part 11).
+   < 768px mobile · 768–1279 tablet · ≥1280 desktop (centered, max 880px). */
+
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 60%);
+}
+
+.drawer-content {
+  position: fixed;
+  inset-block: 0;
+  left: 0;
+  width: min(85vw, 360px);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 12px 0 12px;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+
+.drawer-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  margin: 0 auto 12px;
+}
+
+.drawer-title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  color: var(--text-2);
+  padding: 0 16px 8px;
+}
+
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.session-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-left: 3px solid transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.session-row.is-active {
+  border-left-color: var(--accent);
+  background: var(--elevated);
+}
+
+.session-empty {
+  padding: 12px 16px;
+}
+
+.drawer-close {
+  min-height: 44px;
+  min-width: 44px;
+  margin: 8px 16px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-2);
+}
+
+/* breakpoints (Part 11) */
+.chat-view {
+  max-width: none;
+  margin: 0;
+}
+
+@media (min-width: 1280px) {
+  .chat-view {
+    max-width: 880px;
+    margin: 0 auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .stream {
+    padding: 12px 8px 8px;
+  }
+}
+
+/* scroll pill (Part 6) */
+.scroll-pill {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 84px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  min-height: 36px;
+  border-radius: 999px;
+  background: var(--elevated);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  animation: pill-fade 120ms ease-in;
+  z-index: 20;
+}
+
+.pill-arrow {
+  color: var(--accent);
+}
+
+@keyframes pill-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-pill {
+    animation: none;
+  }
+}
