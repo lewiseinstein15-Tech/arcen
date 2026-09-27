@@ -152,7 +152,7 @@ class DraftPlanner:
             "This is the deterministic offline plan (no provider configured)."
         )
         steps = [
-            {"id": 1, "title": f"read context relevant to: {goal}", "tool": "file.read"},
+            {"id": 1, "title": f"survey the working directory", "tool": "file.list"},
             {"id": 2, "title": goal, "tool": "bash"},
             {"id": 3, "title": "verify the result", "tool": "bash"},
         ]

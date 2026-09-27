@@ -38,10 +38,22 @@ class StreamEmitter:
         with self._lock:
             return self._seq
 
-    def subscribe(self, fn: Callable[[dict], None]) -> None:
-        """Register a live listener. Receives every event from now on."""
+    @property
+    def oldest_seq(self) -> int:
+        """Oldest buffered seq — a Last-Event-ID below this is compacted (409)."""
+        with self._lock:
+            return self._buffer[0]["seq"] if self._buffer else self._seq
+
+    def subscribe(self, fn: Callable[[dict], None]) -> Callable[[], None]:
+        """Register a live listener. Returns an unsubscribe callable."""
         with self._lock:
             self._subs.append(fn)
+            return lambda: self.unsubscribe(fn)
+
+    def unsubscribe(self, fn: Callable[[dict], None]) -> None:
+        with self._lock:
+            if fn in self._subs:
+                self._subs.remove(fn)
 
     def emit(self, event: Event) -> dict:
         """Stamp, buffer, notify. Returns the canonical wire dict."""
