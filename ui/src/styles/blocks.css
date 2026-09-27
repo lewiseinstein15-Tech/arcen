@@ -1,0 +1,152 @@
+/* ARCEN — stream blocks: glyphs, heads, steps, results (Part 3). */
+
+.block {
+  display: block;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  border-left: 2px solid transparent;
+}
+
+.block-head {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  text-align: left;
+  color: var(--text);
+}
+
+.glyph {
+  display: inline-block;
+  width: 1.2em;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.who {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.meta {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.preview,
+.goal,
+.task,
+.path,
+.args {
+  color: var(--text-2);
+}
+
+.body {
+  margin: 4px 0 4px 1.2em;
+  white-space: pre-wrap;
+  color: var(--text);
+}
+
+/* plan */
+.plan-steps {
+  margin: 4px 0 4px 1.6em;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-step {
+  color: var(--text);
+}
+
+.plan.is-update {
+  border-left-color: var(--warn);
+}
+
+/* command result */
+.result pre {
+  margin: 4px 0 4px 1.2em;
+  padding: 8px;
+  background: var(--sunken);
+  border: 1px solid var(--border-subtle);
+  color: var(--text);
+  overflow-x: auto;
+}
+
+.is-running .tool::after {
+  content: '…';
+  color: var(--text-3);
+}
+
+/* diff */
+.diff {
+  margin: 4px 0 4px 1.2em;
+  padding: 8px;
+  background: var(--sunken);
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* answer: the only Inter prose on the page (Part 3.2) */
+.answer-prose {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  display: inline-block;
+  max-width: 72ch;
+}
+
+/* verify */
+.is-fail {
+  border-left-color: var(--danger);
+}
+
+.is-pass .who {
+  color: var(--success);
+}
+
+/* error banner */
+.run-error {
+  background: var(--elevated);
+}
+
+/* footer */
+.stream-footer {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 8px;
+}
+
+.status {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.status.ok {
+  color: var(--success);
+}
+
+.status.failed {
+  color: var(--danger);
+}
+
+.status.interrupted {
+  color: var(--warn);
+}
+
+/* empty + error */
+.stream-error {
+  padding: 6px 12px;
+  background: var(--elevated);
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
