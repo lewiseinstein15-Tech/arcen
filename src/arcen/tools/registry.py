@@ -123,9 +123,10 @@ class Registry:
 
     def register(self, tool: Tool) -> None:
         """Register one tool, enforcing every Part 3 validation."""
-        if "schema" in type(tool).__dict__:
+        if issubclass(type(tool), BaseTool) and "schema" in type(tool).__dict__:
             # BaseTool.schema is inherited, never redefined — a class that
-            # ships its own schema() is hand-writing JSON Schema.
+            # ships its own schema() is hand-writing JSON Schema. MCP-bridged
+            # tools are exempt: their schema is declared by the remote server.
             raise SchemaRejected(
                 f"{getattr(tool, 'name', '?')}: hand-written schema rejected — "
                 "schemas are auto-generated from type hints (Part 3)"
@@ -135,7 +136,8 @@ class Registry:
         name = tool.name
         if not name or name != name.strip().lower() or " " in name:
             raise RegistryError(f"tool name {name!r} must be lowercase dotted, no spaces")
-        if name.startswith("mcp."):
+        if name.startswith("mcp.") and issubclass(type(tool), BaseTool):
+            # core tools never tenant the MCP namespace — bridged tools do
             raise RegistryError(f"tool name {name!r} shadows the MCP namespace mcp.<server>.<tool>")
         if name in self._tools:
             raise RegistryError(f"duplicate tool name {name!r}")
