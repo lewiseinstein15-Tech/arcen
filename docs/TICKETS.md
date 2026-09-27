@@ -132,7 +132,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** 17 event types emit correctly
 
 ### [T-014] FastAPI server
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-013
 - **Deliverable:** src/arcen/server/app.py
 - **Test:** `pytest tests/test_server.py`
