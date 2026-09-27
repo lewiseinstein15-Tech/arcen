@@ -148,7 +148,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** jsonl format correct
 
 ### [T-016] Memory store
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-001
 - **Deliverable:** src/arcen/memory/store.py + graph.py
 - **Test:** `pytest tests/test_memory.py`
