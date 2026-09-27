@@ -260,7 +260,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** 12/12 pass 3× back-to-back
 
 ### [T-030] Documentation complete
-- **Status:** [ ] todo
+- **Status:** [x] done — verified
 - **Depends on:** all tickets
 - **Deliverable:** README + all docs/ files
 - **Test:** `ls docs/`
