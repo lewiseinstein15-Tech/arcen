@@ -188,7 +188,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** all 12 tests pass 3× back-to-back
 
 ### [T-021] Frontend bootstrap
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-001
 - **Deliverable:** Vite project + tokens.css + App.tsx
 - **Test:** `npm run dev` starts
