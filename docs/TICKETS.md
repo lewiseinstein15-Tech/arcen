@@ -28,7 +28,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 ---
 
 ### [T-001] Repository bootstrap
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** none
 - **Deliverable:** repo cloned, src/ and tests/ exist, pyproject.toml
 - **Test:** `python -m pytest --collect-only` runs without error
