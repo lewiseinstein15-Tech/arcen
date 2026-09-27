@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="ARCEN logo">
+  <rect width="120" height="120" rx="24" fill="#0A0B0D"/>
+  <rect x="1.5" y="1.5" width="117" height="117" rx="22.5" fill="none" stroke="#2A2E35" stroke-width="1.5"/>
+  <path d="M60 24 L94 94 H80.5 L60 51 L39.5 94 H26 Z" fill="#FF6B5C"/>
+  <rect x="47" y="72" width="26" height="7" rx="2" fill="#E6E8EB"/>
+  <circle cx="60" cy="36" r="3" fill="#E6E8EB"/>
+</svg>

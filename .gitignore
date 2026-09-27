@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg
+
+# Node
+node_modules/
+.vite/
+*.tsbuildinfo
+coverage/
+
+# Env & secrets — never commit
+.env
+.env.*
+.secrets/
+*.secret
+secret*
+
+# ARCEN runtime data
+.arcen/
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
