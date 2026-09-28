@@ -122,6 +122,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Test:** `pytest tests/test_sandbox.py`
 - **Command:** run bash in container, verify host untouched
 - **Verification:** isolation proven
+- **Note:** Fixed environment mismatch — falls back to process when docker image missing (daemon alone no longer selects the docker backend; missing image → one trusted auto-pull attempt, then quarantined process backend with `degraded=true`; image shipped via `docker/sandbox/Dockerfile` + GHCR workflow)
 
 ### [T-013] NDJSON streaming emitter
 - **Status:** [x] done — verified
@@ -170,6 +171,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Test:** `pytest tests/test_mcp.py`
 - **Command:** connect to a test MCP server
 - **Verification:** tools listed, callable
+- **Note:** MCP tests now hermetic — no npx/uvx dependency (test server is stdlib-only JSON-RPC over stdio, spawned via `sys.executable`; MCP Python SDK promoted to core dependency)
 
 ### [T-019] Plugin loader
 - **Status:** [x] done — verified
