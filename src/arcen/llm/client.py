@@ -102,16 +102,20 @@ class Client:
         role: str,
         messages: list[dict[str, str]],
         temperature: float = 0.2,
+        identity: str | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         """One completion for a fixed role, identity block prepended.
 
-        Retries transient failures; meters tokens and cost from the
-        provider response. Never mutates the caller's message list.
+        ``identity`` overrides the role's default identity block — used by
+        the DIRECT conversational path so answers speak as ARCEN itself
+        ("You are ARCEN. Answer concisely and directly.") instead of the
+        planning persona. Retries transient failures; meters tokens and
+        cost from the provider response. Never mutates the caller's list.
         """
         model = self.model_for(role)
         prepped = [
-            {"role": "system", "content": identity_block(role)},
+            {"role": "system", "content": identity if identity is not None else identity_block(role)},
             *messages,
         ]
         last_exc: Exception | None = None

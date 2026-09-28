@@ -32,6 +32,7 @@ from arcen.agents.draft import DraftPlanner
 from arcen.agents.forge import ForgeExecutor
 from arcen.agents.temper import TemperVerifier
 from arcen.config import ArcenConfig, load_config
+from arcen.llm.bridge import build_llm_client
 from arcen.plugins.loader import PluginLoader
 from arcen.session.store import SessionStore
 from arcen.stream.emitter import StreamEmitter
@@ -53,6 +54,7 @@ class ServerState:
 
     def __init__(self, config: ArcenConfig | None = None) -> None:
         self.config = config or load_config()
+        self.llm = build_llm_client(self.config)  # None → offline mode
         self.registry = load_builtin()
         self.store = SessionStore(self.config.session.dir)
         self.plugin_loader = _boot_plugins(self.config)
@@ -199,8 +201,9 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
     try:
         emit(RunStart(seq=0, run_id=run_id, goal=goal, depth=0, ts=0.0))
 
-        # DRAFT opens the turn
-        draft = DraftPlanner(llm=None, emit=emit)
+        # DRAFT opens the turn — with the configured provider when one
+        # resolves, the deterministic fallback otherwise (never blocks)
+        draft = DraftPlanner(llm=state.llm, emit=emit)
         plan_events = draft.open_turn(goal)
         if plan_events and plan_events[-1].TYPE == "answer":
             # conversational short-circuit: the greeting got its warm reply
