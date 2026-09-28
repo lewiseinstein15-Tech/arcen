@@ -142,3 +142,41 @@ describe('T-032: generating indicator', () => {
     expect(screen.queryByTestId('generating')).not.toBeInTheDocument();
   });
 });
+
+describe('T-033: chronological turn order (newest at bottom)', () => {
+  it('three turns applied across replays + live appends stay 1,2,3 top-to-bottom', () => {
+    const s = useStreamStore.getState();
+    // turn 1 lands live
+    s.apply(ev({ type: 'run.start', seq: 1, run_id: 'r-1', goal: 'first', depth: 0 }));
+    s.apply(ev({ type: 'answer', seq: 2, text: 'a1' }));
+    s.apply(ev({ type: 'run.done', seq: 3, status: 'ok', steps: 0, duration_s: 1 }));
+    // turn 2 arrives via the post-POST replay (hydrate replaces everything)
+    s.hydrate([
+      ev({ type: 'run.start', seq: 1, run_id: 'r-1', goal: 'first', depth: 0 }),
+      ev({ type: 'answer', seq: 2, text: 'a1' }),
+      ev({ type: 'run.done', seq: 3, status: 'ok', steps: 0, duration_s: 1 }),
+      ev({ type: 'run.start', seq: 4, run_id: 'r-2', goal: 'second', depth: 0 }),
+      ev({ type: 'answer', seq: 5, text: 'a2' }),
+      ev({ type: 'run.done', seq: 6, status: 'ok', steps: 0, duration_s: 1 }),
+    ]);
+    expect(useStreamStore.getState().events.map((e) => e.seq)).toEqual([1, 2, 3, 4, 5, 6]);
+    // turn 3 lands live on top of the replay
+    s.apply(ev({ type: 'run.start', seq: 7, run_id: 'r-3', goal: 'third', depth: 0 }));
+    s.apply(ev({ type: 'answer', seq: 8, text: 'a3' }));
+    const goals = useStreamStore
+      .getState()
+      .events.filter((e) => e.type === 'run.start')
+      .map((e) => (e as unknown as { goal: string }).goal);
+    expect(goals).toEqual(['first', 'second', 'third']); // chronological
+    expect(useStreamStore.getState().events[useStreamStore.getState().events.length - 1].seq).toBe(8);
+  });
+
+  it('hydrate sorts an out-of-order replay ascending (defensive)', () => {
+    const s = useStreamStore.getState();
+    s.hydrate([
+      ev({ type: 'answer', seq: 2, text: 'a1' }),
+      ev({ type: 'run.start', seq: 1, run_id: 'r-1', goal: 'first', depth: 0 }),
+    ]);
+    expect(useStreamStore.getState().events.map((e) => e.seq)).toEqual([1, 2]);
+  });
+});

@@ -292,7 +292,8 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** user quote — "i cant see when is thinking when i sent the question i have to find where it is"
 
 ### [T-033] Turn order (new turns at bottom)
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
+- **Note:** audit found no unshift/reverse — the visible 'turn at top' bug was the missing optimistic render (T-032) + unsorted replay; hydrate now sorts ascending defensively. Live 4/4: 3 turns stack top→bottom, newest last, order survives reload.
 - **Depends on:** T-027
 - **Deliverable:** strictly chronological stream — session replay loads ascending seq, new events append to the end, defensive seq-sort on hydrate, no unshift/reverse anywhere
 - **Test:** `npx vitest run` — 3-turn chronological order test
@@ -300,7 +301,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** user quote — "it should not go on the top"
 
 ### [T-034] Auto-scroll (make it actually work)
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-024
 - **Deliverable:** useAutoScroll + ScrollPill actually mounted in ChatView — smooth follow while pinned (≤100px from bottom), no yank while browsing, floating "↓ jump to latest" pill when scrolled up, click → smooth scroll + re-pin
 - **Test:** `npx vitest run` — hook + pill behavior tests
