@@ -357,8 +357,8 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** v0.1 final report P7 — "theme is dark-only per v0.2 spec"
 
 ### [T-040] /api/sessions sorts wrong
-- **Status:** [~] in progress
-- **Note:** the endpoint returns id-sorted sessions; the drawer re-sorts newest-first client-side. Every API consumer has to know the sort is wrong.
+- **Status:** [x] done — verified
+- **Note:** DONE — GET /api/sessions returns created_at DESC (newest first); the client re-sort removed from Drawer.tsx (it never lived in sessionStore.ts — the store is a thin API mirror). Live verify: alpha→beta→gamma created in order, API returns gamma/beta/alpha descending.
 - **Deliverable:** GET /api/sessions returns sessions sorted by created_at DESC (newest first); the client-side sort in the session store is removed — single source of truth
 - **Test:** `pytest tests/test_server.py` — endpoint order test; `npx vitest run`
 - **Verification:** `curl http://localhost:3002/api/sessions | jq '.[].created_at'` → descending; drawer still shows newest first with no client sort in ui/src/state/sessionStore.ts
