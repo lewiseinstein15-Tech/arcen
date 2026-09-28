@@ -158,6 +158,12 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
         # DRAFT opens the turn
         draft = DraftPlanner(llm=None, emit=emit)
         plan_events = draft.open_turn(goal)
+        if plan_events and plan_events[-1].TYPE == "answer":
+            # conversational short-circuit: the greeting got its warm reply
+            # on the stream — no plan, no tools, no verification (BUG 2 fix)
+            emit(RunDone(seq=0, status="ok", steps=0,
+                         duration_s=round(time.time() - turn_start, 4), ts=0.0))
+            return
         steps = plan_events[-1].steps
 
         # FORGE executes, one step at a time

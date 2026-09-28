@@ -15,6 +15,11 @@ emits ``plan.update`` with the reason and the corrected steps.
 Offline mode: with ``llm=None`` (or when the provider errors) DRAFT falls
 back to a deterministic inspect → act → verify decomposition, so planning
 never blocks on a provider.
+
+Conversational short-circuit: greetings and pleasantries ("hello",
+"hi there", "how are you") get a warm 1-2 sentence reply — never a
+plan, never a tool call. Planning a bash run for "hello" (exit 127)
+was the BUG 2 failure this guards against.
 """
 
 from __future__ import annotations
@@ -24,7 +29,7 @@ import sys
 from collections.abc import Callable
 
 from arcen.llm.client import Client
-from arcen.stream.events import Event, Plan, PlanUpdate, Think, to_line
+from arcen.stream.events import Answer, Event, Plan, PlanUpdate, Think, to_line
 
 SYSTEM_HINT = """Return ONLY a JSON array of 1-6 steps for this goal, shaped:
 [{"title": "imperative step", "tool": "bash|file.read|file.edit|file.write|search.text|..."}]
@@ -56,6 +61,59 @@ KNOWN_TOOLS = {
     "http.head",
 }
 
+# -- the conversational short-circuit (BUG 2 fix) ----------------------------
+
+# single pleasantries — the whole (punctuation-stripped) message
+_CONVERSATIONAL_WORDS = frozenset(
+    {"hello", "hi", "hey", "yo", "thanks", "thank", "bye", "goodbye", "ok", "okay", "sup", "greetings"}
+)
+
+# short social questions — matched as full (punctuation-stripped) messages
+_CONVERSATIONAL_PHRASES = frozenset(
+    {
+        "how are you",
+        "who are you",
+        "what's up",
+        "whats up",
+        "what is up",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "good night",
+        "nice to meet you",
+        "are you there",
+        "can you hear me",
+        "long time no see",
+        "what can you do",
+    }
+)
+
+# the offline warm reply (no provider configured) — 1-2 sentences, on-brand
+CONVERSATIONAL_REPLY = (
+    "Hello! I'm ARCEN — DRAFT plans, FORGE executes, TEMPER verifies, and every "
+    "step lands live on the stream. Give me a coding task and I'll get to work."
+)
+
+
+def is_conversational(text: str) -> bool:
+    """True for greetings/pleasantries that deserve a reply, not a plan.
+
+    Matches single words ("hello", "hi!", "yo."), greetings with small
+    trailing words ("hi there", "hey arcen"), and short social questions
+    ("how are you", "who are you", "what's up"). Real tasks — even short
+    ones like "what is 2+2" or "build me a calculator" — are NOT
+    conversational and go through the normal planning pipeline.
+    """
+    stripped = text.strip().lower().rstrip("!.?,;: ")
+    if not stripped:
+        return False
+    if stripped in _CONVERSATIONAL_WORDS or stripped in _CONVERSATIONAL_PHRASES:
+        return True
+    words = stripped.split()
+    # "hi there" / "hey arcen" / "thanks again" — a greeting plus at most
+    # two trailing words. "ok now build the app" (5 words) stays a task.
+    return bool(words) and words[0] in _CONVERSATIONAL_WORDS and len(words) <= 3
+
 
 class DraftPlanner:
     """The planner agent. Opens every turn; re-plans on failure."""
@@ -80,12 +138,30 @@ class DraftPlanner:
 
     # -- the Aider architect loop, reduced ---------------------------------
     def open_turn(self, goal: str, depth: int = 0) -> list[Event]:
-        """Goal in → ``think`` + ``plan`` events out."""
+        """Goal in → ``think`` + ``plan`` events out — or ``think`` + ``answer``
+        for conversational input (no plan, no tools; BUG 2 fix)."""
+        if is_conversational(goal):
+            return self._conversational(goal)
         think_text, steps = self._decompose(goal, depth)
         events: list[Event] = [
             Think(seq=0, agent="DRAFT", text=think_text, ts=0.0),
             Plan(seq=0, agent="DRAFT", steps=steps, ts=0.0),
         ]
+        return self._emit_all(events)
+
+    def _conversational(self, goal: str) -> list[Event]:
+        """Greeting in → warm 1-2 sentence reply out. NEVER a plan."""
+        events: list[Event] = [
+            Think(seq=0, agent="DRAFT", text="the user is greeting me. responding directly.", ts=0.0)
+        ]
+        reply = CONVERSATIONAL_REPLY
+        if self.llm is not None:
+            try:
+                resp = self.llm.complete("planner", [{"role": "user", "content": goal}])
+                reply = resp.text.strip() or reply
+            except Exception:  # noqa: BLE001 — provider down → the warm offline reply
+                pass
+        events.append(Answer(seq=0, text=reply, ts=0.0))
         return self._emit_all(events)
 
     def replan(self, goal: str, reason: str, failed_step: dict | None = None) -> list[Event]:
