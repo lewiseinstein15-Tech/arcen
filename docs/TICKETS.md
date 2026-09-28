@@ -372,3 +372,36 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** README shows the note; `git status` clean of .venv
 - **Evidence:** v0.1 final report P7 — ".venv is gitignored — CI/GHCR unaffected by local provisioning"
 
+---
+
+## v0.1.2 — "noticed while fixing" follow-ups (flagged in the v0.1.1 report)
+
+Non-issues from the v0.1.1 report, recorded here so they are never re-litigated (do not action):
+- T-037 sort location — the client sort lived in Drawer.tsx, not sessionStore.ts; informational, no fix needed (T-040 landed the server-side order).
+- Tooling flake during verify — environment, not code.
+
+### [T-042] replan() never continues the loop (real bug, high priority)
+- **Status:** [~] in progress
+- **Note:** the Aider-style replan was decorative — on step failure app.py emitted plan.update then broke; corrected steps were never executed and the turn died "Turn failed" even with a provider. Every nontrivial task failed on the first hiccup.
+- **Deliverable:** in src/arcen/server/app.py — on step failure call draft.replan, REPLACE the remaining steps with the corrected plan, and CONTINUE the loop. Every replan emits plan.update (live in the UI). Bounded: max 2 replans per turn; a replan that returns nothing useful (empty, or the same failing step) is terminal; the same step failing twice with the same error is terminal — never an infinite loop. Second replan still failing → turn.failed with "replanned twice, still failing: <reason>".
+- **Test:** `pytest tests/test_draft.py` — mock a step that fails on attempt 1 and succeeds on attempt 2 (loop completes ok, plan.update events emitted); mock a step that always fails (exactly 2 replans, then turn.failed with the summary); the full suite × 3
+- **Verification:** forced step failure (bad args) → the loop replans and executes the new steps; terminal case ends with a clear summary, not a hang
+- **Evidence:** v0.1.1 report — "replan() never continues the loop — on step failure app.py emits plan.update then break; corrected steps are never executed and the turn ends 'Turn failed' even with a provider. Honest, but the Aider-style replan is decorative."
+
+### [T-043] No-docker case needs a documented, visible fallback
+- **Status:** [ ] pending
+- **Note:** environment limit, not a code bug — but a docker-less machine must be explicit and honest, not a silent fallback.
+- **Deliverable:** boot logs the detected sandbox state ([sandbox] docker daemon / image / backend selected / reason); Settings → SANDBOX shows the same state; backend="docker" with no daemon → red chip + /api/run refuses cleanly before planning ("Sandbox backend is set to docker, but no docker daemon is reachable. Either start docker or change the backend in Settings → Sandbox."), never a silent fallback; backend="auto" with no daemon → process backend + amber chip; documented in docs/BACKEND-SPEC.md (sandbox section)
+- **Test:** `pytest tests/test_server.py tests/test_sandbox.py` + `npx vitest run`
+- **Verification:** docker-present machine → green "docker ready" state; docker-less machine → amber "process mode" (auto) or red "docker required" (docker); a task with backend="docker" on a docker-less host → clean refusal, not a 500
+- **Evidence:** v0.1.1 report — "No real docker daemon on this host — the docker-forced happy path is proven via fake-client unit tests + live error-path; a true docker run needs your machine."
+
+### [T-044] Document the mock-provider contract (doc-only)
+- **Status:** [ ] pending
+- **Note:** the mock provider had the same no-args bug (bare-label plans) — fixed in T-037; document so it never regresses.
+- **Deliverable:** header comment in scripts/mock_provider.py ("This mock must model a REAL planner: plans must carry tool args (cmd, path, code), not just step labels. A regression here means tests pass but live runs fail."); a note in docs/BACKEND-SPEC.md Part 11 under the mock-provider material ("The mock provider must always emit tool args. Bare-label plans hide arg-derivation bugs from the test suite.")
+- **Test:** none (doc-only)
+- **Verification:** both texts present; no code change
+- **Evidence:** v0.1.1 report — "Mock provider had the same no-args bug — its plans carried no args, so it now models a real planner (this would have bitten your laptop testing too)."
+
+
