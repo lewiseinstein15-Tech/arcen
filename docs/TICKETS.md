@@ -327,3 +327,47 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Verification:** live — open Settings, configure the custom provider, Test Connection shows green, Save, "hello" answers through the new provider
 - **Evidence:** user quote — "in settings it should have place for model providers you can set from there"
 
+---
+
+## v0.1.1 — "noticed but not fixed" follow-ups (flagged in the v0.1 final report)
+
+### [T-037] CODE turns fail without a provider (real bug)
+- **Status:** [~] in progress
+- **Note:** the offline arg-derivation hack feeds the raw goal text to bash (`{"cmd": goal}`), so a no-provider CODE turn plans, runs the goal as a shell command, fails, re-plans, and dies with "Turn failed" — for a legitimate task. Offline ARCEN must refuse cleanly instead; a configured provider must yield a real plan with real args.
+- **Deliverable:** in src/arcen/agents/draft.py — at the top of the plan path check `has_provider = self.llm is not None and self.llm.is_available()`; without one yield think + answer ("I need a model provider to plan and execute tasks. Open Settings → Provider, add a key, and try again.") and return — no fake plan, no bash attempts. With a provider, an empty/malformed plan retries once with a stricter prompt, then answers "I couldn't plan this" — never "run the goal text as a bash command". Delete the offline arg-derivation hack entirely (draft heuristic decomposition + server `_derive_args`); LLM plans now carry tool args.
+- **Test:** `pytest tests/test_draft.py` — no-provider refusal, retry-then-refuse on malformed plans, args parsed from LLM plans
+- **Verification:** unset provider → "build a calculator" → clean configure-a-provider message, no bash attempts, no "command not found"; set provider → same message → a real plan with real args
+- **Evidence:** v0.1 final report P7 — "CODE-turn offline arg derivation runs the goal text as a literal shell command (fails → replan → honest 'Turn failed' answer)"
+
+### [T-038] Sandbox backend is not configurable
+- **Status:** [ ]
+- **Note:** Settings shows the backend but it is read-only "auto". Users on docker-less machines cannot force "process"; users needing isolation cannot force "docker".
+- **Deliverable:** src/arcen/sandbox/runtime.py accepts `backend`: "auto" | "docker" | "process" — auto keeps current behavior, docker requires docker (clear error, no silent fallback), process always uses the quarantined process backend; config gains `sandbox.backend` (default "auto"); the Settings dropdown becomes editable (auto/docker/process) with a warning when docker is selected but the image is missing; boot logs a warning when backend="docker" and the image is absent
+- **Test:** `pytest tests/test_sandbox.py tests/test_config.py` + `npx vitest run` — backend pinning tests
+- **Verification:** backend=process → task runs in process mode (log confirms); backend=docker → runs in docker; backend=docker without docker → clean error, no silent fallback; backend=auto → unchanged
+- **Evidence:** v0.1 final report P7 — "SANDBOX backend select is read-only 'auto'"
+
+### [T-039] Light theme is stubbed
+- **Status:** [ ]
+- **Note:** the Settings theme toggle does nothing — worse than no toggle. Option A (implement light) vs Option B (remove the stub); choice + justification go in the report. Given v0.1 pressure the recommendation is B unless A is provably cheap and fully tested.
+- **Deliverable:** either a real `[data-theme="light"]` palette in tokens.css wired to the toggle and contrast-tested panel-by-panel, or the toggle removed from SettingsView (dark-only, honestly)
+- **Test:** `npx vitest run` — settings renders without the dead control (B) or with a working theme switch (A)
+- **Verification:** (B) open Settings → no theme toggle visible, no console warnings; (A) every panel renders with correct contrast on light
+- **Evidence:** v0.1 final report P7 — "theme is dark-only per v0.2 spec"
+
+### [T-040] /api/sessions sorts wrong
+- **Status:** [ ]
+- **Note:** the endpoint returns id-sorted sessions; the drawer re-sorts newest-first client-side. Every API consumer has to know the sort is wrong.
+- **Deliverable:** GET /api/sessions returns sessions sorted by created_at DESC (newest first); the client-side sort in the session store is removed — single source of truth
+- **Test:** `pytest tests/test_server.py` — endpoint order test; `npx vitest run`
+- **Verification:** `curl http://localhost:3002/api/sessions | jq '.[].created_at'` → descending; drawer still shows newest first with no client sort in ui/src/state/sessionStore.ts
+- **Evidence:** v0.1 final report P7 — "/api/sessions still returns id-sorted; the drawer sorts newest-first client-side"
+
+### [T-041] .venv gitignore — document, don't change
+- **Status:** [ ]
+- **Note:** .venv is gitignored, correctly; CI/GHCR are unaffected. Do NOT add it to the repo — document it.
+- **Deliverable:** a note in README.md under "Contributing": the .venv directory is gitignored; create it with `python -m venv .venv && source .venv/bin/activate`
+- **Test:** none (doc-only)
+- **Verification:** README shows the note; `git status` clean of .venv
+- **Evidence:** v0.1 final report P7 — ".venv is gitignored — CI/GHCR unaffected by local provisioning"
+
