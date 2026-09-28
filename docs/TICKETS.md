@@ -301,7 +301,8 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** user quote — "it should not go on the top"
 
 ### [T-034] Auto-scroll (make it actually work)
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
+- **Note:** root cause: useAutoScroll + ScrollPill existed but were never mounted in ChatView. Hook rewritten direction-based (growth/catch-up scroll down, only a user scrolls up — no settle timers, no yank); streaming follow is instant per Part 6, the pill jump is smooth per ticket. Live 8/8: max distance 0px while following, full pill lifecycle green.
 - **Depends on:** T-024
 - **Deliverable:** useAutoScroll + ScrollPill actually mounted in ChatView — smooth follow while pinned (≤100px from bottom), no yank while browsing, floating "↓ jump to latest" pill when scrolled up, click → smooth scroll + re-pin
 - **Test:** `npx vitest run` — hook + pill behavior tests
@@ -309,7 +310,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** user quote — "the auto scroll is not ther" (hook + pill existed but were never mounted)
 
 ### [T-035] "+ New chat" button
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-021
 - **Deliverable:** "+ New chat" button below the logo block in the sidebar (plus icon in coral, 40px, hairline coral border) + compact "+" in the top bar; click → save current session to history, fresh session id, clear stream, focus composer; no-op when the current session has 0 messages
 - **Test:** `npx vitest run` — new-chat behavior tests

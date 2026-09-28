@@ -44,3 +44,10 @@ if (typeof globalThis !== 'undefined' && !('ResizeObserver' in globalThis)) {
 
 // quiet the fetch noise: tests drive stores/components directly
 (globalThis as Record<string, unknown>).fetch ??= (() => Promise.resolve(new Response('{}', { status: 200 })));
+
+// jsdom has no scrolling — the auto-scroll hook calls scrollTo with options
+if (typeof Element !== 'undefined' && !Element.prototype.scrollTo) {
+  Element.prototype.scrollTo = function scrollTo() {
+    /* no-op: tests stub geometry via property defines where needed */
+  };
+}

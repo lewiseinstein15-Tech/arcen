@@ -2,10 +2,13 @@
 // jsdom has no layout, so the DOM-free tracker carries the logic and the
 // hook/element wiring is exercised through mocks of the geometry.
 
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createScrollTracker, useAutoScroll } from '../src/stream/useAutoScroll';
 import { ScrollPill } from '../src/components/ScrollPill';
+import App from '../src/App';
+import { useDrawerStore } from '../src/state/drawerStore';
+import { useStreamStore } from '../src/state/streamStore';
 
 function resetDom() {
   document.body.innerHTML = '';
@@ -54,9 +57,11 @@ describe('scroll tracker logic', () => {
 });
 
 describe('ScrollPill', () => {
-  it('hidden while pinned (count 0)', () => {
+  it('shows the jump-to-latest label; ChatView mounts it only while browsing', () => {
+    // T-034 contract: the pill offers the jump regardless of pending count;
+    // visibility is decided by the hook's pinned state in ChatView
     render(<ScrollPill count={0} onClick={() => {}} />);
-    expect(screen.queryByTestId('scroll-pill')).toBeNull();
+    expect(screen.getByTestId('scroll-pill')).toHaveTextContent('jump to latest');
   });
 
   it('shows the pending count, singular and plural', () => {
@@ -83,7 +88,11 @@ describe('useAutoScroll DOM wiring', () => {
       return (
         <div
           ref={(el) => {
-            if (!el) return;
+            if (!el || el.dataset.wired) {
+              ref.current = el ?? ref.current;
+              return;
+            }
+            el.dataset.wired = '1'; // ref callbacks re-run per render — wire once
             let scrollTop = 0;
             Object.defineProperty(el, 'scrollTop', {
               get: () => scrollTop,
@@ -114,5 +123,45 @@ describe('useAutoScroll DOM wiring', () => {
     fireEvent.click(screen.getByTestId('pin'));
     expect(scroller).toBeInTheDocument();
     void pinned;
+  });
+});
+
+// -- T-034: the hook is actually mounted in ChatView, pill = jump to latest --
+describe('T-034: auto-scroll mounted in ChatView', () => {
+  it('renders the scroll pill only while browsing, with the jump label', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response('[]', { status: 200 })),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    useStreamStore.getState().reset();
+    useDrawerStore.getState().setOpen(false);
+
+    // user is at the bottom → pinned → no pill
+    const { container } = render(<App />);
+    expect(screen.queryByTestId('scroll-pill')).toBeNull();
+    void container;
+
+    // browse up: simulate the hook's unpinned state through the store-backed UI
+    // (the pill renders whenever pinned === false)
+    const scroller = screen.getByTestId('stream');
+    // geometry: 4000 content, 500 viewport → bottom is scrollTop 3500
+    let scrollTop = 3500;
+    Object.defineProperty(scroller, 'scrollTop', { get: () => scrollTop, set: (v) => (scrollTop = v) });
+    Object.defineProperty(scroller, 'scrollHeight', { get: () => 4000 });
+    Object.defineProperty(scroller, 'clientHeight', { get: () => 500 });
+    fireEvent.scroll(scroller); // at the bottom: dist 0, stays pinned
+    expect(screen.queryByTestId('scroll-pill')).toBeNull();
+    scrollTop = 2000; // ...the user scrolled up 1500px (scrollTop decreases)
+    fireEvent.scroll(scroller);
+    await waitFor(() => {
+      expect(screen.getByTestId('scroll-pill')).toBeInTheDocument();
+      expect(screen.getByTestId('scroll-pill')).toHaveTextContent('jump to latest');
+    });
+
+    // clicking the pill re-pins → pill disappears
+    fireEvent.click(screen.getByTestId('scroll-pill'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('scroll-pill')).toBeNull();
+    });
   });
 });

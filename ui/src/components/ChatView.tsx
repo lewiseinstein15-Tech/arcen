@@ -16,11 +16,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStreamStore } from '../state/streamStore';
 import { foldEvents } from '../stream/fold';
 import { consumeStream, submitRun } from '../stream/reader';
+import { useAutoScroll } from '../stream/useAutoScroll';
 import { loadDraft, saveDraft, saveLastSeq } from '../state/persist';
 import { BlockFor } from '../events';
 import { fmtTime } from '../events/render';
 import type { ArcenEvent } from '../types/events';
 import { Composer } from './Composer';
+import { ScrollPill } from './ScrollPill';
 
 const BACKOFF_MS = [500, 1000, 2000, 5000]; // delay before retry N (attempt 1 is immediate)
 const MAX_FAILURES = 5; // stop retrying after 5 consecutive failures
@@ -151,6 +153,11 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
 
   const folded = useMemo(() => foldEvents(events), [events]);
 
+  // T-034: auto-scroll actually mounted — ref on the scroll container,
+  // effect keyed on the visible-content growth, pill while browsing
+  const scrollDep = `${events.length}-${pendingTurn ? 1 : 0}`;
+  const { ref: streamRef, onScroll: handleScroll, pinned, pendingCount, scrollToBottom } = useAutoScroll(scrollDep);
+
   const send = (text: string) => {
     if (!text.trim()) return;
     // T-032: the message and the DRAFT skeleton show the instant Send is
@@ -206,7 +213,15 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
 
   return (
     <main className="chat-view" data-testid="chat-view">
-      <div className="stream" role="log" aria-live="polite" data-testid="stream" tabIndex={0}>
+      <div
+        className="stream"
+        role="log"
+        aria-live="polite"
+        data-testid="stream"
+        tabIndex={0}
+        ref={streamRef}
+        onScroll={handleScroll}
+      >
         {events.length === 0 && (
           <div className="stream-empty" data-testid="stream-empty">
             <span className="empty-mark" aria-hidden="true">
@@ -259,6 +274,9 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
           <span className="gen-dot" aria-hidden="true" />
           <span className="gen-label">{pendingTurn ? 'DRAFT is thinking…' : workingPhrase}</span>
         </div>
+      )}
+      {!pinned && (
+        <ScrollPill count={pendingCount} onClick={scrollToBottom} />
       )}
       {error && (
         <div className="stream-error" role="alert" data-testid="stream-error">
