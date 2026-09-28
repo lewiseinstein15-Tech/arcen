@@ -35,6 +35,46 @@ arcen "fix the failing test in tests/test_pay.py"
 
 Every step DRAFT plans, FORGE runs, and TEMPER checks streams to your terminal as one JSON object per line. When TEMPER fails the work, DRAFT re-plans — you watch it happen.
 
+### Running the dev stack (backend + UI)
+
+The UI proxies `/api/*` to the backend on port **3002** — so the backend must be up FIRST, or Vite spams `ECONNREFUSED`. Two shells:
+
+```bash
+# Shell 1 — backend first (health check: http://localhost:3002/api/health → {"ok": true})
+python -m uvicorn arcen.server.app:app --port 3002
+
+# Shell 2 — then the frontend
+cd ui && npm install && npm run dev      # UI at :5173
+```
+
+Or start both cleanly with one command — the script backgrounds the backend, traps it on exit, and brings up the UI:
+
+```bash
+./scripts/dev.sh
+```
+
+npm shortcuts are wired at the repo root too: `npm run dev:backend`, `npm run dev:frontend`, `npm run dev` (both).
+
+## The Sandbox: Docker or Honest Fallback
+
+ARCEN executes FORGE's commands inside a sandbox — one per session, zero host binds, network off, resources capped. Two backends, selected automatically at session start:
+
+- **docker** — used when a docker daemon is reachable **and** the pinned sandbox image is present locally:
+
+  ```bash
+  docker pull ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0   # required for the docker backend
+  ```
+
+- **process** (degraded fallback) — when there is no daemon, or the image is absent. Commands run in a per-session quarantine root (`/tmp/arcen-s-<id>`), file-tool paths are resolved against that root, escapes are refused, the environment is scrubbed. Honest about the limit: this is confinement, not isolation — the runtime reports `degraded: true` and the UI never overclaims.
+
+The image is built and pushed to GHCR by `.github/workflows/sandbox-image.yml` on every push to `main`. To build it locally instead:
+
+```bash
+docker build -t ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0 docker/sandbox
+```
+
+Only known-good references (ARCEN's own pinned GHCR repo, or an explicit `ARCEN_SANDBOX_IMAGE=<ref>` override) are ever auto-pulled, at most once per boot; anything else falls back to the process backend with zero network attempts. A container-create failure mid-session degrades the session to the process backend instead of crashing it.
+
 ## Features
 
 - **Narrated execution** — every thought, command, and result is one NDJSON event on the stream
@@ -44,7 +84,7 @@ Every step DRAFT plans, FORGE runs, and TEMPER checks streams to your terminal a
 - **1,000+ tools** — bash, file, search, browse, code; schema-generated, sandboxed
 - **300+ MCPs** — Model Context Protocol servers, connected lazily
 - **100+ plugins** — hooks at every point in the loop: `before_tool`, `after_tool`, `on_spawn`, `on_error`
-- **Sandboxed execution** — one Docker container per session; the host is never touched
+- **Sandboxed execution** — one Docker container per session when the sandbox image is present; otherwise a quarantined process backend that reports `degraded: true`. The host is never touched
 - **Persistent memory** — entity graph in a single SQLite file with decay and consolidation
 - **Multi-provider** — one LiteLLM bridge: Anthropic, OpenAI, Groq, local models
 - **NDJSON streaming** — 17 frozen event types; resume with `Last-Event-ID`
@@ -142,7 +182,7 @@ docker run --rm -it \
   ghcr.io/lewiseinstein15-tech/arcen:0.1.0 "run pytest and fix failures"
 ```
 
-The Docker socket is mounted so ARCEN can create per-session sandboxes. Omit it to run without sandboxing.
+The Docker socket is mounted so ARCEN can create per-session sandboxes. Omit it to run without sandboxing. The sandbox itself needs the pinned image: `docker pull ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0` (see [The Sandbox](#the-sandbox-docker-or-honest-fallback)) — without it, ARCEN degrades to the quarantined process backend.
 
 </details>
 
@@ -290,8 +330,9 @@ Available hooks: `on_boot`, `before_tool`, `after_tool`, `on_spawn`, `on_error`,
 git clone https://github.com/lewiseinstein15-Tech/arcen
 cd arcen
 pip install -e ".[dev]"
-pytest -q                      # 12 backend tests, must pass 3x back-to-back
-cd ui && npm install && npm run dev   # frontend at :5173
+pytest -q                      # full backend suite, must pass 3x back-to-back
+./scripts/dev.sh               # backend on :3002 + UI on :5173
+cd ui && npm install && npm run test   # frontend suite
 ```
 
 Read [docs/BACKEND-SPEC.md](docs/BACKEND-SPEC.md) and [docs/FRONTEND-SPEC.md](docs/FRONTEND-SPEC.md) before your first PR. Pick a ticket from [docs/TICKETS.md](docs/TICKETS.md), follow its verification loop, and commit against it.

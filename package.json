@@ -1,0 +1,14 @@
+{
+  "name": "arcen-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agentic reasoning. Code. Engineer. Root task runner — the backend lives in src/arcen (Python), the UI in ui/.",
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "dev:backend": "python -m uvicorn arcen.server.app:app --port 3002",
+    "dev:frontend": "npm --prefix ui run dev",
+    "test:backend": "pytest -q",
+    "test:frontend": "npm --prefix ui run test",
+    "build:frontend": "npm --prefix ui run build"
+  }
+}
