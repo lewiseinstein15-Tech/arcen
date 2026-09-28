@@ -274,7 +274,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 ## v0.1 release blockers (laptop-tested, real API key)
 
 ### [T-031] Intent classifier (CRITICAL)
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-008
 - **Deliverable:** `classify_intent(text)` in src/arcen/agents/draft.py — LLM-driven routing into DIRECT / RESEARCH / CODE (UNKNOWN falls through to CODE); DIRECT skips the plan and answers with the ARCEN identity; server wires a real LLM client built from config
 - **Test:** `pytest tests/test_draft.py` — classifier matrix (hello/hi/2+2/what is 2+2?/what is your name/who built you?/explain closures → DIRECT; weather/search → RESEARCH; calculator/list files/python script → CODE)
