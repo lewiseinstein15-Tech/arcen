@@ -389,7 +389,7 @@ Non-issues from the v0.1.1 report, recorded here so they are never re-litigated 
 - **Evidence:** v0.1.1 report — "replan() never continues the loop — on step failure app.py emits plan.update then break; corrected steps are never executed and the turn ends 'Turn failed' even with a provider. Honest, but the Aider-style replan is decorative."
 
 ### [T-043] No-docker case needs a documented, visible fallback
-- **Status:** [ ] pending
+- **Status:** [~] in progress
 - **Note:** environment limit, not a code bug — but a docker-less machine must be explicit and honest, not a silent fallback.
 - **Deliverable:** boot logs the detected sandbox state ([sandbox] docker daemon / image / backend selected / reason); Settings → SANDBOX shows the same state; backend="docker" with no daemon → red chip + /api/run refuses cleanly before planning ("Sandbox backend is set to docker, but no docker daemon is reachable. Either start docker or change the backend in Settings → Sandbox."), never a silent fallback; backend="auto" with no daemon → process backend + amber chip; documented in docs/BACKEND-SPEC.md (sandbox section)
 - **Test:** `pytest tests/test_server.py tests/test_sandbox.py` + `npx vitest run`
