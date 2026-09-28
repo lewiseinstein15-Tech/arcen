@@ -274,7 +274,8 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 ## v0.1 release blockers (laptop-tested, real API key)
 
 ### [T-031] Intent classifier (CRITICAL)
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
+- **Note:** classify_intent (LLM-first, heuristic fallback) + provider bridge (llm/bridge.py) + server wiring; live-verified 10/10 via mock provider — "2+2"→"4" direct, name→ARCEN, closures prose, calculator/search route to plans. Test fixture made hermetic while re-verifying.
 - **Depends on:** T-008
 - **Deliverable:** `classify_intent(text)` in src/arcen/agents/draft.py — LLM-driven routing into DIRECT / RESEARCH / CODE (UNKNOWN falls through to CODE); DIRECT skips the plan and answers with the ARCEN identity; server wires a real LLM client built from config
 - **Test:** `pytest tests/test_draft.py` — classifier matrix (hello/hi/2+2/what is 2+2?/what is your name/who built you?/explain closures → DIRECT; weather/search → RESEARCH; calculator/list files/python script → CODE)
@@ -282,7 +283,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** "2+2" was planned as a bash task and failed (`bash: 2+2: command not found`); same for "what is you name"
 
 ### [T-032] Live streaming visibility
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-022, T-027
 - **Deliverable:** optimistic user pill + "◆ DRAFT" skeleton block on send; events stream into it in seq order; "generating" indicator (pulse dot + "DRAFT is thinking…" / "FORGE is working…") near the composer; out-of-order events wait for the gap
 - **Test:** `npx vitest run` — optimistic pill + skeleton + indicator tests
