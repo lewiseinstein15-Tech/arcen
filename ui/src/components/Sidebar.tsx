@@ -9,18 +9,21 @@
 import { LogoMark } from './LogoMark';
 import { ChatIcon, FolderIcon, GearIcon, PlusIcon, WrenchIcon } from './Icons';
 import { useSidebarStore } from '../state/sidebarStore';
+import { useUiStore } from '../state/uiStore';
 import { newChat } from '../state/chatActions';
 
 const NAV_ITEMS = [
-  { label: 'Chat', Icon: ChatIcon, active: true },
-  { label: 'Projects', Icon: FolderIcon, active: false },
-  { label: 'Tools', Icon: WrenchIcon, active: false },
-  { label: 'Settings', Icon: GearIcon, active: false },
+  { label: 'Chat', Icon: ChatIcon, view: 'chat' as const },
+  { label: 'Projects', Icon: FolderIcon, view: null }, // v0.2
+  { label: 'Tools', Icon: WrenchIcon, view: null }, // v0.2
+  { label: 'Settings', Icon: GearIcon, view: 'settings' as const },
 ];
 
 export function Sidebar() {
   const open = useSidebarStore((s) => s.open);
   const setOpen = useSidebarStore((s) => s.setOpen);
+  const view = useUiStore((s) => s.view);
+  const setView = useUiStore((s) => s.setView);
   return (
     <>
       {open && (
@@ -60,17 +63,25 @@ export function Sidebar() {
           </button>
 
           <nav className="side-nav" aria-label="primary">
-            {NAV_ITEMS.map(({ label, Icon, active }) => (
-              <button
-                key={label}
-                className={`nav-item ${active ? 'is-active' : ''}`}
-                aria-current={active ? 'page' : undefined}
-                onClick={() => setOpen(false)}
-              >
-                <Icon size={20} className="nav-icon" />
-                <span>{label}</span>
-              </button>
-            ))}
+            {NAV_ITEMS.map(({ label, Icon, view: itemView }) => {
+              const active = itemView === view;
+              return (
+                <button
+                  key={label}
+                  className={`nav-item ${active ? 'is-active' : ''}`}
+                  aria-current={active ? 'page' : undefined}
+                  disabled={itemView === null}
+                  data-testid={`nav-${label.toLowerCase()}`}
+                  onClick={() => {
+                    if (itemView) setView(itemView);
+                    if (window.innerWidth < 900) setOpen(false);
+                  }}
+                >
+                  <Icon size={20} className="nav-icon" />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
           </nav>
 
           <div className="sidebar-spacer" />

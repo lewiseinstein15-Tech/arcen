@@ -23,6 +23,7 @@ import { fmtTime } from '../events/render';
 import type { ArcenEvent } from '../types/events';
 import { Composer } from './Composer';
 import { ScrollPill } from './ScrollPill';
+import { autoScrollPreference } from './SettingsView';
 
 const BACKOFF_MS = [500, 1000, 2000, 5000]; // delay before retry N (attempt 1 is immediate)
 const MAX_FAILURES = 5; // stop retrying after 5 consecutive failures
@@ -156,9 +157,16 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
   const folded = useMemo(() => foldEvents(events), [events]);
 
   // T-034: auto-scroll actually mounted — ref on the scroll container,
-  // effect keyed on the visible-content growth, pill while browsing
-  const scrollDep = `${events.length}-${pendingTurn ? 1 : 0}`;
-  const { ref: streamRef, onScroll: handleScroll, pinned, pendingCount, scrollToBottom } = useAutoScroll(scrollDep);
+  // effect keyed on the visible-content growth, pill while browsing.
+  // T-036: the General section can turn pinning off (localStorage pref).
+  const [scrollEnabled, setScrollEnabled] = useState(autoScrollPreference());
+  useEffect(() => {
+    const onWinFocus = () => setScrollEnabled(autoScrollPreference());
+    window.addEventListener('focus', onWinFocus);
+    return () => window.removeEventListener('focus', onWinFocus);
+  }, []);
+  const scrollDep = `${events.length}-${pendingTurn ? 1 : 0}-${scrollEnabled ? 1 : 0}`;
+  const { ref: streamRef, onScroll: handleScroll, pinned, pendingCount, scrollToBottom } = useAutoScroll(scrollDep, scrollEnabled);
 
   const send = (text: string) => {
     if (!text.trim()) return;

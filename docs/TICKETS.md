@@ -319,7 +319,8 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** reference image requires the button; user asked for it
 
 ### [T-036] Settings view with model providers
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
+- **Note:** SettingsView (PROVIDER/AGENTS/SANDBOX/GENERAL) from the sidebar; PUT /api/config persists to ~/.arcen/config.yaml (chmod 600) + reloads the provider bridge in-memory; POST /api/config/test probes with key sanitization; '<redacted>' round-trip never wipes a stored key; auto-scroll preference wired to ChatView. Live 12/12: Test Connection green, Save persists, '2+2' answered via the saved provider.
 - **Depends on:** T-014, T-004
 - **Deliverable:** SettingsView (PROVIDER / AGENTS / SANDBOX / GENERAL sections) reachable from the sidebar; backend GET/PUT /api/config persisting to ~/.arcen/config.yaml + POST /api/config/test provider probe; PUT reloads the provider bridge in-memory
 - **Test:** `pytest tests/test_server.py` (config round-trip, masked keys, test endpoint mocked) + `npx vitest run`

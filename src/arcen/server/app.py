@@ -31,7 +31,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from arcen.agents.draft import DraftPlanner
 from arcen.agents.forge import ForgeExecutor
 from arcen.agents.temper import TemperVerifier
-from arcen.config import ArcenConfig, load_config
+from arcen.config import ArcenConfig, default_config_path, load_config, resolve_secrets, save_config
 from arcen.llm.bridge import build_llm_client
 from arcen.plugins.loader import PluginLoader
 from arcen.session.store import SessionStore
@@ -53,6 +53,7 @@ class ServerState:
     """Everything the server owns. One per process."""
 
     def __init__(self, config: ArcenConfig | None = None) -> None:
+        self.config_path = default_config_path()
         self.config = config or load_config()
         self.llm = build_llm_client(self.config)  # None → offline mode
         self.registry = load_builtin()
@@ -392,9 +393,80 @@ def get_config() -> dict:
 
 @app.put("/api/config")
 def put_config(payload: dict = Body(...)) -> dict:
-    updated = ArcenConfig.model_validate(payload)
+    """Update the config (T-036 Settings → Save).
+
+    - '<redacted>' api-key values are substituted with the live config's
+      stored value — a redacted GET round-trip never wipes a key;
+    - the result is persisted to the user's config.yaml (chmod 600);
+    - the provider bridge reloads in-memory so the next turn uses the
+      new provider immediately (no restart).
+    """
+    incoming = dict(payload)
+    incoming.setdefault("provider", {})
+    if isinstance(incoming.get("provider"), dict):
+        incoming_provider = dict(incoming["provider"])
+        keys = dict(incoming_provider.get("api_keys") or {})
+        for name, value in keys.items():
+            if value == "<redacted>":
+                keys[name] = STATE.config.provider.api_keys.get(name, "")
+        incoming_provider["api_keys"] = keys
+        incoming["provider"] = incoming_provider
+    updated = ArcenConfig.model_validate(incoming)
     STATE.config = updated
+    save_config(STATE.config_path, updated)
+    STATE.llm = build_llm_client(updated)  # reload the provider bridge
     return STATE.config.redacted()
+
+
+PROVIDERS = frozenset({"custom", "groq", "deepseek", "openai", "anthropic", "ollama"})
+
+
+@app.post("/api/config/test")
+def test_config(payload: dict = Body(...)) -> dict:
+    """Probe a provider connection (T-036 Test Connection).
+
+    Accepts {provider, model?, base_url?, api_key?}. A missing key falls
+    back to the live config's stored credential (the UI sends the
+    redacted placeholder when the field is untouched). The reply never
+    echoes the key — errors are sanitized before returning.
+    """
+    import litellm
+
+    from arcen.llm.bridge import LITELLM_PREFIX, KEYLESS_PROVIDERS
+
+    provider = str(payload.get("provider", "")).strip().lower()
+    if provider not in PROVIDERS:
+        raise HTTPException(status_code=422, detail=f"unknown provider {provider!r}")
+    model = str(payload.get("model", "")).strip()
+    base_url = str(payload.get("base_url", "")).strip() or None
+    api_key = str(payload.get("api_key", "")).strip()
+    if api_key in ("", "<redacted>"):
+        resolved, _missing = resolve_secrets({"api_keys": STATE.config.provider.api_keys})
+        api_key = str((resolved.get("api_keys") or {}).get(provider, "") or "")
+    if not api_key and provider not in KEYLESS_PROVIDERS:
+        return {"ok": False, "error": "no API key configured for this provider"}
+
+    prefix = LITELLM_PREFIX.get(provider, "")
+    full_model = model if "/" in model else prefix + (model or {"anthropic": "claude-haiku-4-5", "openai": "gpt-4o-mini"}.get(provider, "default"))
+    kwargs: dict = {
+        "model": full_model,
+        "messages": [{"role": "user", "content": "reply with the word: pong"}],
+        "max_tokens": 8,
+        "timeout": 15,
+    }
+    if api_key:
+        kwargs["api_key"] = api_key
+    if base_url:
+        kwargs["api_base"] = base_url
+    try:
+        resp = litellm.completion(**kwargs)
+        text = (resp.choices[0].message.content or "").strip()
+        return {"ok": True, "model": full_model, "sample": text[:40]}
+    except Exception as exc:  # noqa: BLE001 — report, never crash
+        message = str(exc)
+        if api_key:
+            message = message.replace(api_key, "<redacted>")  # never echo the key
+        return {"ok": False, "error": message[:300]}
 
 
 @app.get("/api/sessions")

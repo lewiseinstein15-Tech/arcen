@@ -48,10 +48,12 @@ export function createScrollTracker(threshold: number = BOTTOM_THRESHOLD): Scrol
   };
 }
 
-export function useAutoScroll(dep: unknown) {
+export function useAutoScroll(dep: unknown, enabled: boolean = true) {
   const ref = useRef<HTMLDivElement>(null);
   const tracker = useRef<ScrollTracker>(createScrollTracker());
   const prev = useRef<{ top: number; height: number } | null>(null);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled; // T-036: General → Auto-scroll off stops the follow
   const [ui, setUi] = useState({ pinned: true, pending: 0 });
 
   const sync = useCallback(() => {
@@ -75,7 +77,7 @@ export function useAutoScroll(dep: unknown) {
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || !enabledRef.current) return;
     if (tracker.current.onAppend()) {
       // instant follow (Part 6: streaming appends never animate — a smooth
       // animation per event lags the stream and reads as unpinned); the

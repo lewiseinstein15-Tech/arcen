@@ -6,20 +6,23 @@
 import { ChatView } from './components/ChatView';
 import { DrawerNav } from './components/Drawer';
 import { Header } from './components/Header';
+import { SettingsView } from './components/SettingsView';
 import { Sidebar } from './components/Sidebar';
 import { useSessionStore } from './state/sessionStore';
 import { useSidebarStore } from './state/sidebarStore';
+import { useUiStore } from './state/uiStore';
 
 export default function App() {
   const sidebarOpen = useSidebarStore((s) => s.open);
   const activeId = useSessionStore((s) => s.activeId);
+  const view = useUiStore((s) => s.view);
   const sessionId = activeId ?? 's-ui';
   return (
     <div className={`app ${sidebarOpen ? 'sidebar-open' : ''}`}>
       <Sidebar />
       <div className="main">
         <Header />
-        <ChatView key={sessionId} sessionId={sessionId} />
+        {view === 'settings' ? <SettingsView key="settings" /> : <ChatView key={sessionId} sessionId={sessionId} />}
       </div>
       <DrawerNav />
     </div>

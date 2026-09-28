@@ -174,7 +174,7 @@ def load_config(path: str | Path | None = None) -> ArcenConfig:
 
     Missing file → defaults with a CONFIG_DEFAULTED warning (Part 10, step 1).
     """
-    candidates = [Path(path)] if path else [Path.home() / ".arcen" / "config.yaml"]
+    candidates = [Path(path)] if path else [default_config_path()]
     file = next((c for c in candidates if c.exists()), None)
     if file is None:
         warnings.warn("config file not found; using defaults", UserWarning, stacklevel=2)
@@ -183,6 +183,29 @@ def load_config(path: str | Path | None = None) -> ArcenConfig:
     if not isinstance(raw, dict):
         raise ValueError(f"config {file} must be a YAML mapping")
     return ArcenConfig.model_validate(deep_merge(DEFAULT_CONFIG, raw))
+
+
+def default_config_path() -> Path:
+    """Where the user config lives. ARCEN_CONFIG_PATH overrides (tests)."""
+    env = os.environ.get("ARCEN_CONFIG_PATH")
+    if env:
+        return Path(env).expanduser()
+    return Path.home() / ".arcen" / "config.yaml"
+
+
+def save_config(path: str | Path, config: ArcenConfig) -> None:
+    """Persist the validated config as YAML (T-036 Settings → Save).
+
+    The file is user-local and chmod 600 — it may hold the API key the
+    user typed in Settings. The API never returns that value (redacted).
+    """
+    file = Path(path).expanduser()
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text(
+        yaml.safe_dump(config.model_dump(), sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    file.chmod(0o600)
 
 
 def resolve_secrets(config: dict) -> tuple[dict, list[str]]:
