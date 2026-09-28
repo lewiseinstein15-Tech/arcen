@@ -349,8 +349,8 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** v0.1 final report P7 — "SANDBOX backend select is read-only 'auto'"
 
 ### [T-039] Light theme is stubbed
-- **Status:** [ ]
-- **Note:** the Settings theme toggle does nothing — worse than no toggle. Option A (implement light) vs Option B (remove the stub); choice + justification go in the report. Given v0.1 pressure the recommendation is B unless A is provably cheap and fully tested.
+- **Status:** [x] done — verified (Option B: stub removed)
+- **Note:** OPTION B. The dead toggle is gone; Settings GENERAL keeps verbosity + auto-scroll. Justification: a working light theme is not a palette diff — the ticket demands a contrast audit of every panel, which cannot be fully proven under v0.1 pressure, and a half-shipped light mode is exactly the 'looks broken' outcome the ticket flags; dark-first is fine for a developer tool (v0.2 owns theming).
 - **Deliverable:** either a real `[data-theme="light"]` palette in tokens.css wired to the toggle and contrast-tested panel-by-panel, or the toggle removed from SettingsView (dark-only, honestly)
 - **Test:** `npx vitest run` — settings renders without the dead control (B) or with a working theme switch (A)
 - **Verification:** (B) open Settings → no theme toggle visible, no console warnings; (A) every panel renders with correct contrast on light
