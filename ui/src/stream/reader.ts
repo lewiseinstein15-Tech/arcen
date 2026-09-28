@@ -1,6 +1,8 @@
 // ARCEN — stream consumption (FRONTEND-SPEC Part 7).
 // One partial-line buffer: a command.done split across TCP chunks is never
 // half-rendered. Malformed JSON logs + toasts; the stream itself does not die.
+// The server closes each stream with a {"type":"stream.done"} transport
+// frame after a terminal event — seeing it (or clean EOF) ends the read.
 
 import type { ArcenEvent } from '../types/events';
 
@@ -10,6 +12,10 @@ export class StreamError extends Error {
     super(`stream failed with ${status}`);
     this.status = status;
   }
+}
+
+function isDoneFrame(parsed: unknown): boolean {
+  return (parsed as { type?: string } | null)?.type === 'stream.done';
 }
 
 export async function consumeStream(
@@ -24,6 +30,8 @@ export async function consumeStream(
   // 404 = the session has no live emitter yet — the boot state before the
   // first /api/run. That is not an error: wait quietly and attach as soon
   // as the session goes live (the UI must not spam a reconnect banner).
+  // The server now also replays disk-backed sessions, so this only spins
+  // for sessions that exist nowhere at all.
   let res: Response;
   for (;;) {
     res = await fetch(`/api/stream?session=${sessionId}`, { signal, headers });
@@ -46,16 +54,21 @@ export async function consumeStream(
     buffer = lines.pop() ?? ''; // keep the partial line
     for (const line of lines) {
       if (!line.trim()) continue;
+      let parsed: ArcenEvent;
       try {
-        onEvent(JSON.parse(line) as ArcenEvent);
+        parsed = JSON.parse(line) as ArcenEvent;
       } catch (err) {
         console.error('malformed stream line', err); // the stream does not die
+        continue;
       }
+      if (isDoneFrame(parsed)) return; // clean close — the turn is over
+      onEvent(parsed);
     }
   }
   if (buffer.trim()) {
     try {
-      onEvent(JSON.parse(buffer) as ArcenEvent);
+      const tail = JSON.parse(buffer) as ArcenEvent;
+      if (!isDoneFrame(tail)) onEvent(tail);
     } catch (err) {
       console.error('malformed stream tail', err);
     }

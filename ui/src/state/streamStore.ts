@@ -21,7 +21,12 @@ export const useStreamStore = create<StreamStore>((set) => ({
   lastSeq: 0,
   apply: (e) =>
     set((s) => {
-      if (e.seq <= s.lastSeq) return s; // duplicates dropped (Part 7)
+      if ((e as { type?: string }).type === 'stream.done') {
+        // transport frame (not one of the 17 events) — the server closed
+        // the stream cleanly after a terminal event
+        return { status: 'done' };
+      }
+      if (typeof e.seq !== 'number' || e.seq <= s.lastSeq) return s; // duplicates dropped (Part 7)
       const status: StreamStatus =
         e.type === 'run.done' || e.type === 'run.error' ? 'done' : 'streaming';
       return { events: [...s.events, e], lastSeq: e.seq, status };
