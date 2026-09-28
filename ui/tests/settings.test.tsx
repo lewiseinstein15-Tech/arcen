@@ -274,3 +274,29 @@ describe('T-038: sandbox backend', () => {
     });
   });
 });
+
+// T-039 (Option B) — dark-only is honest: the dead theme stub is gone.
+describe('T-039: theme stub removed', () => {
+  it('Settings renders no theme toggle at all', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/sandbox/status')) {
+        return Promise.resolve(new Response(JSON.stringify(sandboxStatus()), { status: 200 }));
+      }
+      if (String(url).includes('/api/config')) {
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+    expect(screen.queryByTestId('theme-select')).not.toBeInTheDocument();
+    expect(screen.queryByText('Theme')).not.toBeInTheDocument();
+    // the general section keeps its live controls
+    expect(screen.getByTestId('settings-general')).toBeInTheDocument();
+    expect(screen.getByTestId('verbosity-select')).toBeInTheDocument();
+    expect(screen.getByTestId('autoscroll-select')).toBeInTheDocument();
+  });
+});

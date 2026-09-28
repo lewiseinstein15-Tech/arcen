@@ -366,16 +366,11 @@ export function SettingsView() {
         </label>
       </fieldset>
 
-      {/* -- 4. GENERAL --------------------------------------------------- */}
+      {/* -- 4. GENERAL ---------------------------------------------------
+           Theme: dark-only in v0.1 (T-039) — the dead "light — v0.2" stub
+           was removed; a half-audited light palette ships visual bugs. */}
       <fieldset className="settings-block" data-testid="settings-general">
         <legend>GENERAL</legend>
-        <label className="field">
-          <span className="field-label">Theme</span>
-          <select value="dark" disabled data-testid="theme-select">
-            <option value="dark">dark</option>
-            <option value="light">light — v0.2</option>
-          </select>
-        </label>
         <label className="field">
           <span className="field-label">Stream verbosity</span>
           <select data-testid="verbosity-select" value={verbosity}
