@@ -97,6 +97,17 @@ class Client:
             raise ValueError(f"unknown role {role!r}; expected one of {sorted(ROLE_AGENTS)}")
         return self.models[role]
 
+    def is_available(self) -> bool:
+        """True when a usable provider credential was resolved (T-037).
+
+        The bridge (llm/bridge.py) only constructs a Client after an api
+        key resolves from config/env — or for a keyless local runtime
+        (ollama). Construction therefore implies availability. Kept as a
+        method so future liveness probes (e.g. pinging an ollama host)
+        slot in without touching callers.
+        """
+        return True
+
     def complete(
         self,
         role: str,

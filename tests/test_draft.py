@@ -1,9 +1,11 @@
-"""T-008 / T-031 / Test-plan T-07 — DRAFT planner (BACKEND-SPEC Part 1).
+"""T-008 / T-031 / T-037 / Test-plan T-07 — DRAFT planner (BACKEND-SPEC Part 1).
 
-Proves: goal in → think + plan events out; failure triggers plan.update;
-LLM path parses JSON steps; offline fallback never blocks; the T-031
-intent classifier routes DIRECT/RESEARCH/CODE (LLM-first, heuristic
-fallback) so "2+2" and "what is your name" never become bash plans.
+Proves: goal in → think + plan events out (from the provider, with real
+args); failure triggers plan.update; the T-031 intent classifier routes
+DIRECT/RESEARCH/CODE so "2+2" and "what is your name" never become bash
+plans; and the T-037 honest-refusal contract — a real task without a
+provider refuses cleanly (no fake plan, no goal-as-bash), a malformed
+plan retries once with a stricter prompt then refuses.
 """
 
 import pytest
@@ -13,7 +15,12 @@ from arcen.agents.draft import (
     CODE,
     DIRECT,
     DIRECT_IDENTITY,
+    DIRECT_NO_PROVIDER_ANSWER,
+    NO_PLAN_ANSWER,
+    NO_PROVIDER_ANSWER,
+    NO_PROVIDER_THINK,
     RESEARCH,
+    STRICT_PLAN_HINT,
     UNKNOWN,
     DraftPlanner,
     classify_intent,
@@ -29,7 +36,7 @@ def _collect():
 
 def test_goal_in_think_and_plan_out() -> None:
     sink = _collect()
-    planner = DraftPlanner(llm=None, emit=sink.append)
+    planner = DraftPlanner(llm=_FakeLLM(), emit=sink.append)
     events = planner.open_turn("fix the failing test in tests/")
     types = [type(e) for e in events]
     assert types == [Think, Plan]
@@ -42,14 +49,14 @@ def test_goal_in_think_and_plan_out() -> None:
 
 
 def test_plan_steps_are_sequential_ids() -> None:
-    planner = DraftPlanner(llm=None)
+    planner = DraftPlanner(llm=_FakeLLM())
     events = planner.open_turn("run the test suite and fix failures")
     ids = [s["id"] for s in events[1].steps]
     assert ids == list(range(1, len(ids) + 1))
 
 
 def test_failure_triggers_plan_update() -> None:
-    planner = DraftPlanner(llm=None)
+    planner = DraftPlanner(llm=_FakeLLM())
     events = planner.replan(
         goal="fix the failing test",
         reason="test bug found; fix the assertion",
@@ -58,14 +65,14 @@ def test_failure_triggers_plan_update() -> None:
     kinds = [type(e) for e in events]
     assert kinds == [Think, PlanUpdate]
     assert events[1].reason == "test bug found; fix the assertion"
-    assert any("diagnose" in s["title"] for s in events[1].steps)
+    assert events[1].steps, "the corrected plan has steps"
 
 
 def test_events_serialize_on_frozen_schema() -> None:
     planner = DraftPlanner(llm=None)
-    for event in planner.open_turn("run the test suite and fix failures"):
+    for event in planner.open_turn("hello"):
         line = to_line(event)
-        assert '"type":"think"' in line or '"type":"plan"' in line
+        assert '"type":"think"' in line or '"type":"answer"' in line
 
 
 class _FakeLLM:
@@ -108,16 +115,28 @@ def test_llm_mode_unknown_tool_nulled() -> None:
     assert events[1].steps[0]["tool"] is None
 
 
-def test_llm_failure_degrades_to_heuristic() -> None:
+def test_provider_failure_after_strict_retry_refuses() -> None:
+    """T-037: provider down/malformed → ONE strict retry → honest refusal.
+
+    Never a heuristic plan, never a bash step built from the goal text.
+    """
+
     class _BrokenLLM:
+        def __init__(self):
+            self.calls = 0
+
         def complete(self, role, messages, **kwargs):
+            self.calls += 1
             raise RuntimeError("provider down")
 
-    planner = DraftPlanner(llm=_BrokenLLM())
-    events = planner.open_turn("run the test suite and fix failures")
-    # still a valid turn: think + plan, offline shape
-    assert [type(e) for e in events] == [Think, Plan]
-    assert events[1].steps
+    broken = _BrokenLLM()
+    planner = DraftPlanner(llm=broken)
+    events = planner.open_turn("build me a calculator")
+    assert [type(e) for e in events] == [Think, Answer]
+    assert not any(isinstance(e, Plan) for e in events)
+    assert "couldn't plan" in events[1].text
+    # 1 classify (→ heuristic fallback) + 2 decompose attempts (retry once)
+    assert broken.calls == 3
 
 
 def test_max_steps_cap() -> None:
@@ -312,11 +331,151 @@ def test_research_intent_plans_web_tools():
     assert "search.text" in tools and "http.get" in tools
 
 
-def test_research_offline_heuristic_plan():
+def test_research_offline_refuses_cleanly():
+    """T-037: a RESEARCH task with no provider refuses — no fake web plan."""
     events = DraftPlanner(llm=None).open_turn("what is the weather")
+    assert [type(e) for e in events] == [Think, Answer]
+    assert not any(isinstance(e, Plan) for e in events)
+    assert NO_PROVIDER_ANSWER in events[1].text
+
+
+def test_code_task_without_provider_refuses_cleanly():
+    """THE T-037 contract: "build me a calculator" with no provider →
+    a clean configure-a-provider message. No plan, no bash attempts,
+    no "command not found" — the exact laptop failure mode, dead."""
+    sink: list = []
+    planner = DraftPlanner(llm=None, emit=sink.append)
+    events = planner.open_turn("build me a calculator")
+    assert [type(e) for e in events] == [Think, Answer]
+    assert events[0].text == NO_PROVIDER_THINK
+    assert events[1].text == NO_PROVIDER_ANSWER
+    assert "Open Settings → Provider" in events[1].text
+    assert not any(isinstance(e, Plan) for e in events)
+    assert not any(isinstance(e, PlanUpdate) for e in events)
+    assert len(sink) == 2  # both events reached the stream
+
+
+def test_code_task_without_provider_never_runs_bash():
+    """The refusal turn contains no command event — nothing executes."""
+    from arcen.stream.events import Command
+
+    sink: list = []
+    planner = DraftPlanner(llm=None, emit=sink.append)
+    planner.open_turn("list files in this dir")
+    assert not any(isinstance(e, Command) for e in sink)
+
+
+def test_direct_without_provider_refuses_honestly():
+    """A non-greeting DIRECT question without a provider can't be answered
+    from a model — the old text claimed coding still worked offline; the
+    new one points at Settings."""
+    events = DraftPlanner(llm=None).open_turn("what is 2+2")
+    assert [type(e) for e in events] == [Think, Answer]
+    assert events[1].text == DIRECT_NO_PROVIDER_ANSWER
+
+
+def test_malformed_plan_retries_stricter_then_refuses():
+    """Provider up but the plan is garbage twice → refusal, and the retry
+    prompt carries the strict hint."""
+
+    class _GarbageLLM:
+        def __init__(self):
+            self.decompose_prompts: list[str] = []
+
+        def complete(self, role, messages, **kwargs):
+            content = messages[-1]["content"]
+            if "Return ONLY the word" in content:
+                return LLMResponse(text=CODE, model="m")
+            self.decompose_prompts.append(content)
+            return LLMResponse(text="I think a calculator needs buttons.", model="m")
+
+    llm = _GarbageLLM()
+    events = DraftPlanner(llm=llm).open_turn("build me a calculator")
+    assert [type(e) for e in events] == [Think, Answer]
+    assert not any(isinstance(e, Plan) for e in events)
+    assert NO_PLAN_ANSWER in events[1].text
+    assert len(llm.decompose_prompts) == 2  # exactly one strict retry
+    assert STRICT_PLAN_HINT in llm.decompose_prompts[1]
+    assert STRICT_PLAN_HINT not in llm.decompose_prompts[0]
+
+
+def test_malformed_plan_recovers_on_strict_retry():
+    """First plan garbage, strict retry returns a real plan → the turn
+    plans normally (the retry is a second chance, not a dead end)."""
+
+    class _FlakyLLM:
+        def __init__(self):
+            self.n = 0
+
+        def complete(self, role, messages, **kwargs):
+            content = messages[-1]["content"]
+            if "Return ONLY the word" in content:
+                return LLMResponse(text=CODE, model="m")
+            self.n += 1
+            if self.n == 1:
+                return LLMResponse(text="oops", model="m")
+            return LLMResponse(
+                text='[{"title": "write calc.py", "tool": "file.write", '
+                '"args": {"path": "calc.py", "content": "print(2+2)"}}]',
+                model="m",
+            )
+
+    events = DraftPlanner(llm=_FlakyLLM()).open_turn("build me a calculator")
     assert [type(e) for e in events] == [Think, Plan]
-    tools = [s["tool"] for s in events[1].steps]
-    assert "search.text" in tools and "http.get" in tools
+    assert events[1].steps[0]["tool"] == "file.write"
+
+
+def test_llm_plan_parses_real_tool_args():
+    """T-037: the plan carries the LLM's tool args — the executor runs
+    the planned command, never the raw goal text."""
+
+    class _ArgsLLM:
+        def complete(self, role, messages, **kwargs):
+            content = messages[-1]["content"]
+            if "Return ONLY the word" in content:
+                return LLMResponse(text=CODE, model="m")
+            return LLMResponse(
+                text='[{"title": "run the suite", "tool": "bash", '
+                '"args": {"cmd": "pytest -q"}}]',
+                model="m",
+            )
+
+    events = DraftPlanner(llm=_ArgsLLM()).open_turn("run the test suite")
+    step = events[1].steps[0]
+    assert step["args"] == {"cmd": "pytest -q"}
+    assert step["args"]["cmd"] != "run the test suite"
+
+
+def test_empty_llm_plan_counts_as_malformed():
+    """An empty JSON array is not a plan — same retry-then-refuse path."""
+
+    class _EmptyPlanLLM:
+        def complete(self, role, messages, **kwargs):
+            content = messages[-1]["content"]
+            if "Return ONLY the word" in content:
+                return LLMResponse(text=CODE, model="m")
+            return LLMResponse(text="[]", model="m")
+
+    events = DraftPlanner(llm=_EmptyPlanLLM()).open_turn("build me a calculator")
+    assert [type(e) for e in events] == [Think, Answer]
+    assert "couldn't plan" in events[1].text
+
+
+def test_replan_without_usable_plan_refuses():
+    """Provider dies mid-turn → replan refuses honestly, no fake steps."""
+
+    class _DiedMidTurn:
+        def complete(self, role, messages, **kwargs):
+            raise RuntimeError("provider died")
+
+    events = DraftPlanner(llm=_DiedMidTurn()).replan(
+        goal="fix the failing test",
+        reason="step 2 failed",
+        failed_step={"id": 2, "title": "run pytest -q", "tool": "bash"},
+    )
+    assert [type(e) for e in events] == [Think, Answer]
+    assert "couldn't plan" in events[1].text
+    assert not any(isinstance(e, PlanUpdate) for e in events)
 
 
 def test_greeting_still_gets_warm_offline_reply():
@@ -343,8 +502,9 @@ def test_open_turn_greeting_with_llm_uses_provider_reply() -> None:
     assert events[1].text.startswith("Hey Lewis")
 
 
-def test_code_task_still_plans_normally() -> None:
-    planner = DraftPlanner(llm=None)
+def test_code_task_with_provider_plans_normally():
+    """The provider path is untouched: a real task gets a real plan."""
+    planner = DraftPlanner(llm=_FakeLLM())
     events = planner.open_turn("build me a calculator")
     assert [type(e) for e in events] == [Think, Plan]
     assert events[1].steps, "real tasks still get a plan"

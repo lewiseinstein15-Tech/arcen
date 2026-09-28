@@ -17,10 +17,39 @@ import uvicorn
 
 import arcen.server.app as server_app
 from arcen.config import ArcenConfig
+from arcen.llm.client import LLMResponse
 from arcen.server.app import ServerState, app
 
 PORT = 3179
 BASE = f"http://127.0.0.1:{PORT}"
+
+
+class _StubProviderLLM:
+    """Stand-in provider for the server tests (T-037).
+
+    Classifies CODE and turns the goal into a real bash command with
+    real args — exactly what a real planner LLM does. Server tests must
+    exercise the provider path: since T-037 the no-provider path refuses
+    cleanly instead of planning.
+    """
+
+    def is_available(self) -> bool:
+        return True
+
+    def complete(self, role, messages, **kwargs):
+        content = messages[-1]["content"]
+        if "Return ONLY the word" in content:
+            return LLMResponse(text="CODE", model="stub", tokens={"input": 1, "output": 1})
+        goal_line = next((ln for ln in content.splitlines() if ln.startswith("Goal: ")), "")
+        goal = goal_line[len("Goal: "):].strip() or "true"
+        plan = json.dumps(
+            [
+                {"title": f"run: {goal[:40]}", "tool": "bash", "args": {"cmd": goal}},
+                {"title": "checkpoint", "tool": "bash", "args": {"cmd": "true"}},
+                {"title": "checkpoint 2", "tool": "bash", "args": {"cmd": "true"}},
+            ]
+        )
+        return LLMResponse(text=plan, model="stub", tokens={"input": 8, "output": 8})
 
 
 class _Server:
@@ -28,6 +57,9 @@ class _Server:
         # explicit defaults — the suite must not depend on a real
         # ~/.arcen/config.yaml (a dev machine may configure any provider)
         server_app.STATE = ServerState(config=ArcenConfig())
+        # T-037: with no provider a real task refuses cleanly, so the
+        # server tests run against a stub provider (the provider path)
+        server_app.STATE.llm = _StubProviderLLM()
         config = uvicorn.Config(app, host="127.0.0.1", port=PORT, log_level="error")
         self.server = uvicorn.Server(config)
 
@@ -169,6 +201,7 @@ def test_stream_disk_seed_after_restart(client, server) -> None:
 
     old_state = server_app.STATE
     server_app.STATE = ServerState(config=old_state.config)
+    server_app.STATE.llm = _StubProviderLLM()  # keep the provider path alive
     try:
         assert session not in server_app.STATE.emitters  # memory wiped
         resp = client.get(f"/api/stream?session={session}")
@@ -216,6 +249,25 @@ def test_sessions_listed_and_replayable(client) -> None:
 def test_run_requires_goal(client) -> None:
     resp = client.post("/api/run", json={"goal": ""})
     assert resp.status_code == 422
+
+
+def test_run_without_provider_refuses_cleanly(client) -> None:
+    """T-037 over HTTP: a real task with no provider → a clean refusal
+    on the stream. No plan, no command events, no bash, no replan —
+    the laptop's "Turn failed" failure mode is dead."""
+    server_app.STATE.llm = None  # simulate an unconfigured provider
+    try:
+        session = _new_session(client, "build a calculator")
+        events = _stream_until(client, session)
+    finally:
+        server_app.STATE.llm = _StubProviderLLM()
+    kinds = [e["type"] for e in events]
+    assert kinds[0] == "run.start"
+    assert "think" in kinds and "answer" in kinds
+    assert "plan" not in kinds and "command" not in kinds
+    answer = next(e for e in events if e["type"] == "answer")
+    assert "model provider" in answer["text"] and "Settings" in answer["text"]
+    assert events[-1]["type"] == "run.done" and events[-1]["status"] == "ok"
 
 
 def test_interrupt_run(client) -> None:

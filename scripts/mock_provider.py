@@ -73,19 +73,41 @@ def direct_answer(text: str) -> str:
 
 
 def plan_for(text: str, research: bool) -> str:
+    # T-037: plans carry real tool args — a planner that returns steps
+    # without args gets them rejected, so the mock models a real one.
     if research:
         return json.dumps(
             [
-                {"title": f"search the web for: {text}", "tool": "search.text"},
-                {"title": "fetch the most relevant result", "tool": "http.get"},
+                {
+                    "title": f"search the web for: {text}",
+                    "tool": "search.text",
+                    "args": {"query": text},
+                },
+                {
+                    "title": "fetch the most relevant result",
+                    "tool": "http.get",
+                    "args": {"url": "https://example.com/"},
+                },
                 {"title": "summarize the findings", "tool": None},
             ]
         )
     return json.dumps(
         [
-            {"title": "survey the working directory", "tool": "file.list"},
-            {"title": f"do the work: {text}", "tool": "bash"},
-            {"title": "verify the result", "tool": "bash"},
+            {
+                "title": "survey the working directory",
+                "tool": "file.list",
+                "args": {"path": "."},
+            },
+            {
+                "title": f"do the work: {text}",
+                "tool": "bash",
+                "args": {"cmd": f"echo mock-work: {text}"},
+            },
+            {
+                "title": "verify the result",
+                "tool": "bash",
+                "args": {"cmd": "true"},
+            },
         ]
     )
 

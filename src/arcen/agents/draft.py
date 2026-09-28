@@ -12,9 +12,13 @@ DRAFT opens every turn: goal in → narrated reasoning + a step list out.
 Every step is {id, title, tool}. When TEMPER fails the work, ``replan``
 emits ``plan.update`` with the reason and the corrected steps.
 
-Offline mode: with ``llm=None`` (or when the provider errors) DRAFT falls
-back to a deterministic inspect → act → verify decomposition, so planning
-never blocks on a provider.
+Offline mode (T-037): with no provider configured, greetings still get
+the warm reply and DIRECT questions get an honest refusal — but a
+RESEARCH/CODE task refuses cleanly ("I need a model provider...")
+instead of planning a fake bash step that runs the goal text as a shell
+command. A configured provider that returns an empty/malformed plan gets
+one strict retry, then an honest "I couldn't plan this" — never the
+goal-as-bash hack.
 
 Intent classification (T-031): the old hardcoded greeting list sent
 everything else — "2+2", "what is your name", "explain closures" — into
@@ -29,7 +33,7 @@ classifies EVERY goal with the LLM:
 - UNKNOWN  — classifier unparseable/unavailable → CODE (the old default).
 
 With ``llm=None`` a deterministic heuristic classifier keeps offline mode
-honest: greetings still get the warm reply, real tasks still get plans.
+honest: greetings still get the warm reply, real tasks refuse cleanly.
 """
 
 from __future__ import annotations
@@ -43,12 +47,25 @@ from arcen.llm.client import Client
 from arcen.stream.events import Answer, Event, Plan, PlanUpdate, Think, to_line
 
 SYSTEM_HINT = """Return ONLY a JSON array of 1-6 steps for this goal, shaped:
-[{"title": "imperative step", "tool": "bash|file.read|file.edit|file.write|search.text|..."}]
+[{"title": "imperative step", "tool": "bash|file.read|file.edit|file.write|search.text|...", "args": {}}]
+"args" carries the tool's arguments and is REQUIRED on every step:
+- bash → {"cmd": "the exact shell command"}
+- file.read / file.write / file.edit → {"path": "..."} (file.write adds "content")
+- search.text → {"query": "..."};  http.get → {"url": "..."}
+- only tools that truly take no arguments (e.g. file.list) get {}
 No prose, no markdown fences."""
 
 RESEARCH_HINT = """Return ONLY a JSON array of 1-4 steps to RESEARCH this goal, shaped:
-[{"title": "imperative step", "tool": "search.text|http.get|http.post|file.read|file.write"}]
-Prefer search.text for queries and http.get for specific URLs. No prose, no markdown fences."""
+[{"title": "imperative step", "tool": "search.text|http.get|http.post|file.read|file.write", "args": {}}]
+Prefer search.text ({"query": "..."}) for queries and http.get ({"url": "..."})
+for specific URLs. Every step carries its args. No prose, no markdown fences."""
+
+# the strict retry prompt (T-037): one second chance, then refuse
+STRICT_PLAN_HINT = (
+    "Your previous reply was not a valid plan. Respond with ONLY the JSON "
+    "array — no prose, no markdown fences, no commentary. Every step MUST "
+    "carry its tool args (e.g. bash → {\"cmd\": \"...\"})."
+)
 
 CLASSIFY_HINT = """Classify this user message into one of:
 DIRECT    — answerable by you directly, no tools needed
@@ -87,7 +104,7 @@ KNOWN_TOOLS = {
     "http.head",
 }
 
-# web tools available to RESEARCH plans (offline heuristic uses these)
+# web tools available to RESEARCH plans (the RESEARCH_HINT plans with these)
 RESEARCH_TOOLS = ("search.text", "http.get")
 
 # Intent is one of the four frozen values (UNKNOWN included).
@@ -145,6 +162,23 @@ _ARITH_CORE = re.compile(r"\d")
 CONVERSATIONAL_REPLY = (
     "Hello! I'm ARCEN — DRAFT plans, FORGE executes, TEMPER verifies, and every "
     "step lands live on the stream. Give me a coding task and I'll get to work."
+)
+
+# T-037 honest refusals — a task without a provider (or with a provider
+# that cannot produce a usable plan) dies cleanly. Never a fake bash plan.
+NO_PROVIDER_THINK = "no model provider is configured. I can't plan a real task without one."
+NO_PROVIDER_ANSWER = (
+    "I need a model provider to plan and execute tasks. "
+    "Open Settings → Provider, add a key, and try again."
+)
+DIRECT_NO_PROVIDER_ANSWER = (
+    "I need a model provider to answer from a model. "
+    "Open Settings → Provider, add a key, and try again."
+)
+NO_PLAN_THINK = "I couldn't produce a usable plan for this goal."
+NO_PLAN_ANSWER = (
+    "I couldn't plan this task — the model didn't return a usable plan. "
+    "Try rephrasing the goal, or check Settings → Provider."
 )
 
 
@@ -252,19 +286,36 @@ class DraftPlanner:
         intent = classify_intent(goal, self.llm)
         if intent == DIRECT:
             return self._direct_reply(goal)
+        if not self._has_provider():
+            # T-037: a real task with no provider refuses cleanly — no fake
+            # plan, no goal-text-as-bash attempts, no "command not found".
+            return self._refusal(NO_PROVIDER_THINK, NO_PROVIDER_ANSWER)
         if intent == RESEARCH:
             return self._research_turn(goal, depth)
         return self._code_turn(goal, depth)
+
+    # -- provider check ------------------------------------------------------
+    def _has_provider(self) -> bool:
+        """True when a model provider is configured and claims availability."""
+        if self.llm is None:
+            return False
+        check = getattr(self.llm, "is_available", None)
+        return bool(check()) if callable(check) else True
+
+    def _refusal(self, think_text: str, answer_text: str) -> list[Event]:
+        """think + answer, no plan — the honest dead end (T-037)."""
+        events: list[Event] = [
+            Think(seq=0, agent="DRAFT", text=think_text, ts=0.0),
+            Answer(seq=0, text=answer_text, ts=0.0),
+        ]
+        return self._emit_all(events)
 
     # -- DIRECT: the LLM answers, no plan, no tools ------------------------
     def _direct_reply(self, goal: str) -> list[Event]:
         events: list[Event] = [
             Think(seq=0, agent="DRAFT", text="direct question — answering without tools.", ts=0.0)
         ]
-        reply = CONVERSATIONAL_REPLY if _is_greeting(goal) else (
-            "No provider configured — I can't answer from a model right now, "
-            "but I can still run coding tasks offline."
-        )
+        reply = CONVERSATIONAL_REPLY if _is_greeting(goal) else DIRECT_NO_PROVIDER_ANSWER
         if self.llm is not None:
             try:
                 resp = self.llm.complete(
@@ -280,28 +331,22 @@ class DraftPlanner:
 
     # -- RESEARCH: plan with web tools --------------------------------------
     def _research_turn(self, goal: str, depth: int) -> list[Event]:
-        think_text, steps = self._decompose(goal, depth, hint=RESEARCH_HINT)
-        if steps and any(s.get("tool") in RESEARCH_TOOLS for s in steps):
-            pass  # LLM gave web-shaped steps — use them
-        else:
-            steps = self._research_heuristic(goal)
+        decomposed = self._decompose(goal, depth, hint=RESEARCH_HINT)
+        if decomposed is None:
+            return self._refusal(NO_PLAN_THINK, NO_PLAN_ANSWER)
+        think_text, steps = decomposed
         events: list[Event] = [
             Think(seq=0, agent="DRAFT", text=think_text, ts=0.0),
             Plan(seq=0, agent="DRAFT", steps=steps, ts=0.0),
         ]
         return self._emit_all(events)
 
-    def _research_heuristic(self, goal: str) -> list[dict]:
-        """Deterministic offline research: search → fetch → summarize."""
-        return [
-            {"id": 1, "title": f"search the web for: {goal}", "tool": "search.text"},
-            {"id": 2, "title": "fetch the most relevant result", "tool": "http.get"},
-            {"id": 3, "title": "summarize the findings for the user", "tool": None},
-        ]
-
     # -- CODE: the normal pipeline ------------------------------------------
     def _code_turn(self, goal: str, depth: int) -> list[Event]:
-        think_text, steps = self._decompose(goal, depth)
+        decomposed = self._decompose(goal, depth)
+        if decomposed is None:
+            return self._refusal(NO_PLAN_THINK, NO_PLAN_ANSWER)
+        think_text, steps = decomposed
         events: list[Event] = [
             Think(seq=0, agent="DRAFT", text=think_text, ts=0.0),
             Plan(seq=0, agent="DRAFT", steps=steps, ts=0.0),
@@ -310,27 +355,40 @@ class DraftPlanner:
 
     def replan(self, goal: str, reason: str, failed_step: dict | None = None) -> list[Event]:
         """A step failed → ``think`` + ``plan.update`` with corrected steps."""
-        _, steps = self._decompose(goal, 0, failed_step=failed_step)
+        decomposed = self._decompose(goal, 0, failed_step=failed_step)
+        if decomposed is None:
+            return self._refusal(NO_PLAN_THINK, NO_PLAN_ANSWER)
+        _, steps = decomposed
         events: list[Event] = [
             Think(seq=0, agent="DRAFT", text=f"Re-planning: {reason}", ts=0.0),
             PlanUpdate(seq=0, agent="DRAFT", reason=reason, steps=steps, ts=0.0),
         ]
         return self._emit_all(events)
 
-    # -- decomposition: LLM first, deterministic fallback -------------------
+    # -- decomposition: LLM only, one strict retry, honest refusal ----------
     def _decompose(
         self,
         goal: str,
         depth: int,
         failed_step: dict | None = None,
         hint: str = SYSTEM_HINT,
-    ) -> tuple[str, list[dict]]:
-        if self.llm is not None:
-            try:
-                return self._decompose_llm(goal, depth, failed_step, hint)
-            except Exception:
-                pass  # provider down → degrade, never block the turn
-        return self._decompose_heuristic(goal, failed_step)
+    ) -> tuple[str, list[dict]] | None:
+        """LLM decomposition only — the honest path (T-037).
+
+        An empty or malformed plan gets ONE retry with a stricter prompt;
+        a second failure returns ``None`` and the caller answers honestly.
+        There is no deterministic fallback and no goal-as-bash hack.
+        """
+        if not self._has_provider():
+            return None
+        try:
+            return self._decompose_llm(goal, depth, failed_step, hint)
+        except Exception:  # noqa: BLE001 — malformed/down → one strict retry
+            pass
+        try:
+            return self._decompose_llm(goal, depth, failed_step, f"{hint}\n\n{STRICT_PLAN_HINT}")
+        except Exception:  # noqa: BLE001 — second failure → honest refusal
+            return None
 
     def _decompose_llm(
         self,
@@ -348,45 +406,21 @@ class DraftPlanner:
             [{"role": "user", "content": user + "\n" + hint}],
         )
         parsed = json.loads(resp.text)
-        if not isinstance(parsed, list):
-            raise ValueError("plan is not a JSON array")
+        if not isinstance(parsed, list) or not parsed:
+            raise ValueError("plan is not a non-empty JSON array")
         steps: list[dict] = []
         for i, raw in enumerate(parsed[: self.max_steps], start=1):
             tool = raw.get("tool")
-            steps.append(
-                {
-                    "id": i,
-                    "title": str(raw.get("title", goal))[:200],
-                    "tool": tool if tool in KNOWN_TOOLS else None,
-                }
-            )
+            step: dict = {
+                "id": i,
+                "title": str(raw.get("title", goal))[:200],
+                "tool": tool if tool in KNOWN_TOOLS else None,
+            }
+            args = raw.get("args")
+            if isinstance(args, dict) and args:
+                step["args"] = args  # the LLM's real tool arguments (T-037)
+            steps.append(step)
         think = f"Goal: {goal}. Plan has {len(steps)} step(s)."
-        return think, steps
-
-    def _decompose_heuristic(
-        self,
-        goal: str,
-        failed_step: dict | None,
-    ) -> tuple[str, list[dict]]:
-        """Deterministic inspect → act → verify decomposition."""
-        think = (
-            f"Goal: {goal}. Read the relevant context first, act on it, then verify. "
-            "This is the deterministic offline plan (no provider configured)."
-        )
-        steps = [
-            {"id": 1, "title": f"survey the working directory", "tool": "file.list"},
-            {"id": 2, "title": goal, "tool": "bash"},
-            {"id": 3, "title": "verify the result", "tool": "bash"},
-        ]
-        if failed_step is not None:
-            # the failing step is replaced, not retried blind — Aider's reflect()
-            failed_id = failed_step.get("id")
-            for i, s in enumerate(steps, start=1):
-                s["id"] = i
-            steps.insert(0, {"id": 0, "title": f"diagnose why step {failed_id} failed", "tool": None})
-            steps = steps[: self.max_steps]
-            for i, s in enumerate(steps, start=1):
-                s["id"] = i
         return think, steps
 
 
@@ -400,7 +434,8 @@ def _is_greeting(goal: str) -> bool:
 
 
 def main(argv: list[str]) -> int:
-    """`python -m arcen.agents.draft "goal"` — plan offline, print NDJSON."""
+    """`python -m arcen.agents.draft "goal"` — plan (or refuse honestly
+    without a provider), print NDJSON."""
     goal = argv[1] if len(argv) > 1 else "run the test suite and fix failures"
     planner = DraftPlanner(llm=None)
     for event in planner.open_turn(goal):

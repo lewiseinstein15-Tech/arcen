@@ -14,9 +14,10 @@ Endpoints (Part 10): /api/run, /api/stream, /api/health, /api/config,
 - runs: POST /api/run starts a turn in a worker thread and returns the
   run_id immediately; DELETE /api/run/<id> interrupts between steps.
 
-The offline turn pipeline composes DRAFT → FORGE → TEMPER exactly as the
-architecture draws it; with a provider configured DRAFT plans from the
-LLM bridge, without one it uses the deterministic fallback.
+The turn pipeline composes DRAFT → FORGE → TEMPER exactly as the
+architecture draws it: with a provider configured DRAFT plans from the
+LLM bridge (steps carry real tool args); without one, real tasks refuse
+cleanly (T-037) — no goal-as-bash fallback exists anywhere.
 """
 
 from __future__ import annotations
@@ -170,16 +171,6 @@ STATE = ServerState()
 # ---------------------------------------------------------------------------
 # the turn pipeline: DRAFT → FORGE → TEMPER → answer
 # ---------------------------------------------------------------------------
-def _derive_args(step: dict, goal: str) -> dict:
-    """Offline arg derivation: deterministic, narrated, honest."""
-    tool = step.get("tool")
-    if tool == "bash":
-        return {"cmd": goal}  # the goal IS the command in offline mode
-    if tool == "file.list":
-        return {"path": "."}
-    return {}
-
-
 def _turn_guard(goal: str, session_id: str, run_id: str, state: ServerState) -> None:
     """Decrement the in-flight counter no matter how the turn ends."""
     try:
@@ -189,7 +180,8 @@ def _turn_guard(goal: str, session_id: str, run_id: str, state: ServerState) -> 
 
 
 def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> None:
-    """One narrated turn, offline-first. Every step lands on the stream."""
+    """One narrated turn. DRAFT plans from the provider; without one a
+    real task refuses cleanly (T-037). Every step lands on the stream."""
     turn_start = time.time()
     emitter = state.emitter_for(session_id)
     interrupted = state.run_flags[run_id]
@@ -202,8 +194,8 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
     try:
         emit(RunStart(seq=0, run_id=run_id, goal=goal, depth=0, ts=0.0))
 
-        # DRAFT opens the turn — with the configured provider when one
-        # resolves, the deterministic fallback otherwise (never blocks)
+        # DRAFT opens the turn — plan from the provider, or an honest
+        # refusal when none is configured (never a fake bash plan, T-037)
         draft = DraftPlanner(llm=state.llm, emit=emit)
         plan_events = draft.open_turn(goal)
         if plan_events and plan_events[-1].TYPE == "answer":
@@ -229,7 +221,10 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
         for step in steps:
             if interrupted_done():
                 return
-            args = step.get("args") or _derive_args(step, goal)
+            # args come from the plan (the LLM fills them); a step without
+            # the args its tool needs simply fails and DRAFT re-plans —
+            # the goal text is NEVER run as a command (T-037)
+            args = step.get("args") or {}
             events = forge.execute_step({**step, "args": args})
             executed += 1
             last_ok = events[1].ok
