@@ -21,7 +21,9 @@ capability boots degraded.
 
 from __future__ import annotations
 
+import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -30,11 +32,34 @@ import uuid
 
 from arcen.tools.registry import Registry
 
+log = logging.getLogger("arcen.sandbox")
+
 DEFAULT_IMAGE = "ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0"
 DEFAULT_MEM_LIMIT = "2g"
 DEFAULT_CPUS = 2.0
 
 _FILE_ARGS = {"path", "src", "dst"}
+
+# known-good image references: our own pinned ghcr repo (semver tags only,
+# never :latest). Only these may be auto-pulled when absent locally.
+_KNOWN_GOOD_IMAGE = re.compile(
+    r"^ghcr\.io/lewiseinstein15-tech/arcen-sandbox:v?\d+\.\d+\.\d+$"
+)
+
+# a failed pull is remembered per process — at most one network attempt
+# per image reference, so five sandboxes in one boot never pull five times.
+_PULL_TRIED: set[str] = set()
+
+
+def _env_image_override() -> str | None:
+    """ARCEN_SANDBOX_IMAGE — an explicit, trusted image reference."""
+    ref = os.environ.get("ARCEN_SANDBOX_IMAGE", "").strip()
+    return ref or None
+
+
+def _known_good_image(ref: str) -> bool:
+    """Whitelist (our pinned ghcr repo) or explicit env override."""
+    return bool(_KNOWN_GOOD_IMAGE.match(ref)) or ref == _env_image_override()
 
 
 def _docker_client():
@@ -50,7 +75,20 @@ def _docker_client():
 
 
 class SandboxRuntime:
-    """One sandbox per session. Commands run inside; the host stays out."""
+    """One sandbox per session. Commands run inside; the host stays out.
+
+    Backend selection (the T-012 environment fix):
+      1. no docker daemon            → process backend, degraded
+      2. daemon + image present      → docker backend
+      3. daemon + image absent       → one trusted auto-pull attempt for
+        known-good refs; success → docker, failure → process, degraded
+    The docker path is never selected unless the image is actually
+    usable, and a runtime container-create failure degrades the
+    instance instead of crashing the session.
+
+    Pass ``docker_client=False`` to force the process backend
+    deterministically (tests, or hosts where docker must stay off).
+    """
 
     def __init__(
         self,
@@ -60,25 +98,38 @@ class SandboxRuntime:
     ) -> None:
         config = config or {}
         sandbox_cfg = config.get("sandbox", {})
-        self.image: str = sandbox_cfg.get("image", DEFAULT_IMAGE)
+        self.image: str = (
+            sandbox_cfg.get("image") or _env_image_override() or DEFAULT_IMAGE
+        )
         self.mem_limit: str = sandbox_cfg.get("mem_limit", DEFAULT_MEM_LIMIT)
         self.cpus: float = float(sandbox_cfg.get("cpus", DEFAULT_CPUS))
         self.network: str = sandbox_cfg.get("network", "none")
         self.id: str = f"s-{uuid.uuid4().hex[:8]}"
         self.backend: str = "process"
         self.degraded: bool = True
-        self._client = docker_client if docker_client is not None else _docker_client()
+        if docker_client is False:
+            # explicit opt-out (tests / config) — force the process backend
+            self._client = None
+        else:
+            self._client = (
+                docker_client if docker_client is not None else _docker_client()
+            )
         self._container: object | None = None
         self._root: str | None = None
 
-        if self._client is not None:
+        if self._client is not None and self._image_present():
             self.backend = "docker"
             self.degraded = False
+            log.info(
+                "sandbox %s backend=docker image=%s", self.id, self.image
+            )
         else:
-            # quarantine root for the degraded backend
-            self._root = root or os.path.join(tempfile.gettempdir(), f"arcen-{self.id}")
-            os.makedirs(self._root, exist_ok=True)
-            os.makedirs(os.path.join(self._root, "tmp"), exist_ok=True)
+            reason = (
+                "no docker daemon"
+                if self._client is None
+                else f"image {self.image} not present locally"
+            )
+            self._degrade_to_process(root=root, reason=reason)
 
     @property
     def root(self) -> str:
@@ -86,8 +137,21 @@ class SandboxRuntime:
 
     # -- command execution ---------------------------------------------------
     def run(self, cmd: str, timeout_s: float = 30.0) -> dict:
-        """Run one bash command inside the sandbox. Returns the envelope."""
+        """Run one bash command inside the sandbox. Returns the envelope.
+
+        If container creation fails at runtime (image deleted between
+        init and exec, daemon dying mid-session), the instance degrades
+        to the process backend for the rest of its life instead of
+        crashing — the docker path never fails hard.
+        """
         started = time.monotonic()
+        if self.backend == "docker":
+            try:
+                self._ensure_container()
+            except Exception as exc:  # noqa: BLE001 — fail-soft by design
+                self._degrade_to_process(
+                    reason=f"container create failed: {exc} — falling back to process"
+                )
         if self.backend == "docker":
             out = self._run_docker(cmd, timeout_s)
         else:
@@ -136,6 +200,43 @@ class SandboxRuntime:
         if proc.returncode == 0:
             return {"ok": True, "result": result, "error": None}
         return {"ok": False, "result": result, "error": f"exit {proc.returncode}: {proc.stderr[-300:]}"}
+
+    # -- backend selection & fallback -------------------------------------------
+    def _image_present(self) -> bool:
+        """True iff the pinned image exists locally (or a trusted pull succeeds).
+
+        Never raises. A missing image triggers an auto-pull ONLY for
+        known-good references (our pinned ghcr repo or the explicit
+        ARCEN_SANDBOX_IMAGE override) — pulling an arbitrary ref that
+        was never pushed is what produced the "500 denied" crash.
+        """
+        try:
+            self._client.images.get(self.image)  # type: ignore[union-attr]
+            return True
+        except Exception:  # noqa: BLE001 — ImageNotFound / docker SDK absent
+            pass
+        if not _known_good_image(self.image) or self.image in _PULL_TRIED:
+            return False
+        _PULL_TRIED.add(self.image)  # one network attempt per ref per process
+        log.info("sandbox %s pulling trusted image %s ...", self.id, self.image)
+        try:
+            self._client.images.pull(self.image)  # type: ignore[union-attr]
+            log.info("sandbox %s pull of %s succeeded", self.id, self.image)
+            return True
+        except Exception as exc:  # noqa: BLE001 — absent upstream / no network
+            log.warning("sandbox %s pull of %s failed: %s", self.id, self.image, exc)
+            return False
+
+    def _degrade_to_process(self, root: str | None = None, reason: str = "") -> None:
+        """Select the quarantined process backend. Honest about the limit."""
+        self.backend = "process"
+        self.degraded = True
+        if self._root is None:
+            # unique quarantine root per instance — never shared, never /workspace
+            self._root = root or os.path.join(tempfile.gettempdir(), f"arcen-{self.id}")
+            os.makedirs(self._root, exist_ok=True)
+            os.makedirs(os.path.join(self._root, "tmp"), exist_ok=True)
+        log.warning("sandbox %s backend=process degraded=true (%s)", self.id, reason)
 
     # -- path quarantine -------------------------------------------------------
     def resolve_path(self, path: str) -> str:

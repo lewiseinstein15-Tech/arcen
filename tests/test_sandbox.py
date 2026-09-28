@@ -4,6 +4,12 @@ Proves: bash runs inside the sandbox; the host working tree is
 untouched; path escapes are refused; one sandbox per session; the
 docker lifecycle (create/exec/destroy, pinned image, no binds) is
 exercised through a fake client so it is testable without a daemon.
+
+Environment-mismatch fix (the "9 failing tests" round): backend
+selection now requires the pinned image to be PRESENT — a daemon
+alone is not enough. Every process-backend test forces the backend
+via ``docker_client=False`` so the suite is deterministic on hosts
+with docker, without docker, or with the image pulled.
 """
 
 import os
@@ -12,12 +18,45 @@ from pathlib import Path
 
 import pytest
 
+from arcen.sandbox import runtime as runtime_mod
 from arcen.sandbox.runtime import SandboxRegistry, SandboxRuntime
 from arcen.tools.registry import load_builtin
 
 
-def _fake_docker_client():
-    """A docker client stand-in recording lifecycle calls."""
+@pytest.fixture(autouse=True)
+def _fresh_pull_cache(monkeypatch):
+    """Isolate the once-per-process auto-pull cache between tests."""
+    monkeypatch.setattr(runtime_mod, "_PULL_TRIED", set())
+
+
+def _fake_docker_client(image_present: bool = True, pullable: bool | None = None):
+    """A docker client stand-in recording lifecycle calls.
+
+    ``image_present=False`` simulates the "daemon up, image missing"
+    laptop state that used to crash the docker path with a 500.
+    ``pullable=True`` lets the trusted auto-pull succeed (get raises,
+    pull returns) — the "image lives on ghcr" state.
+    """
+    if pullable is None:
+        pullable = image_present
+
+    class FakeImageRef:
+        pass
+
+    class FakeImages:
+        def __init__(self) -> None:
+            self.pull_calls: list[str] = []
+
+        def get(self, ref):
+            if image_present:
+                return FakeImageRef()
+            raise RuntimeError(f"404 Client Error: ImageNotFound for {ref}")
+
+        def pull(self, ref, **_):
+            self.pull_calls.append(ref)
+            if pullable:
+                return FakeImageRef()
+            raise RuntimeError(f"pull denied — {ref} was never pushed")
 
     class FakeContainer:
         def __init__(self) -> None:
@@ -41,12 +80,15 @@ def _fake_docker_client():
 
         def run(self, **kwargs):
             self.calls.append(kwargs)
+            if not image_present:
+                raise RuntimeError("500 Server Error: denied — image absent")
             self.container = FakeContainer()
             return self.container
 
     class FakeClient:
         def __init__(self) -> None:
             self.containers = FakeContainers()
+            self.images = FakeImages()
 
         def ping(self):
             return True
@@ -55,7 +97,7 @@ def _fake_docker_client():
 
 
 def test_process_backend_runs_and_is_cwd_confined() -> None:
-    rt = SandboxRuntime()  # no docker in the CI path → process backend
+    rt = SandboxRuntime(docker_client=False)  # forced: deterministic everywhere
     assert rt.backend == "process"
     assert rt.degraded is True
     out = rt.run("pwd")
@@ -67,7 +109,7 @@ def test_process_backend_runs_and_is_cwd_confined() -> None:
 def test_host_working_tree_untouched(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)  # simulate the host project tree
     before = sorted(p.name for p in tmp_path.iterdir())
-    rt = SandboxRuntime()
+    rt = SandboxRuntime(docker_client=False)
     rt.run("echo hello > inside.txt")          # writes INSIDE the sandbox root
     rt.run("ls -la / > host_root_listing.txt") # inside too
     after = sorted(p.name for p in tmp_path.iterdir())
@@ -77,7 +119,7 @@ def test_host_working_tree_untouched(tmp_path, monkeypatch) -> None:
 
 
 def test_path_quarantine_refuses_escapes() -> None:
-    rt = SandboxRuntime()
+    rt = SandboxRuntime(docker_client=False)
     with pytest.raises(PermissionError):
         rt.resolve_path("/etc/passwd")
     with pytest.raises(PermissionError):
@@ -89,7 +131,7 @@ def test_path_quarantine_refuses_escapes() -> None:
 
 def test_registry_routing_blocks_escape_via_file_tools() -> None:
     inner = load_builtin()
-    rt = SandboxRuntime()
+    rt = SandboxRuntime(docker_client=False)
     sandboxed = SandboxRegistry(inner, rt)
     out = sandboxed.dispatch("file.read", {"path": "/etc/hostname"})
     assert out["ok"] is False
@@ -102,9 +144,10 @@ def test_registry_routing_blocks_escape_via_file_tools() -> None:
 
 
 def test_one_sandbox_per_session() -> None:
-    a, b = SandboxRuntime(), SandboxRuntime()
+    a, b = SandboxRuntime(docker_client=False), SandboxRuntime(docker_client=False)
     assert a.id != b.id
     assert a.root != b.root
+    assert a.root.startswith("/tmp") and b.root.startswith("/tmp")
     a.destroy()
     b.destroy()
 
@@ -129,15 +172,71 @@ def test_docker_lifecycle_via_fake_client() -> None:
 
 
 def test_destroy_is_idempotent() -> None:
-    rt = SandboxRuntime()
+    rt = SandboxRuntime(docker_client=False)
     rt.destroy()
     rt.destroy()  # second call is a no-op, not a crash
 
 
 def test_sandbox_registry_passthrough_for_non_file_tools() -> None:
     inner = load_builtin()
-    rt = SandboxRuntime()
+    rt = SandboxRuntime(docker_client=False)
     sandboxed = SandboxRegistry(inner, rt)
     out = sandboxed.dispatch("math.eval", {"expr": "6 * 7"})
     assert out["ok"] is True and out["result"]["value"] == 42
+    rt.destroy()
+
+
+# -- the environment-mismatch contract (daemon up, image absent) ----------------
+
+def test_docker_backend_requires_image_present() -> None:
+    """Daemon alive + image absent → process fallback, never a 500 crash.
+
+    This is the user's-laptop scenario, simulated hermetically through
+    the fake client: the old runtime selected docker on daemon presence
+    alone and then died pulling an image that was never pushed.
+    """
+    client = _fake_docker_client(image_present=False)
+    rt = SandboxRuntime(docker_client=client)
+    assert rt.backend == "process"
+    assert rt.degraded is True
+    assert rt.root != "/workspace"  # a real unique quarantine root
+    out = rt.run("pwd")
+    assert out["ok"] is True
+    assert out["result"]["stdout"].strip() == rt.root
+    with pytest.raises(PermissionError):
+        rt.resolve_path("/etc/passwd")
+    assert client.images.pull_calls  # the whitelisted default got ONE pull try
+    rt.destroy()
+
+
+def test_trusted_env_override_pulls_image(monkeypatch) -> None:
+    """ARCEN_SANDBOX_IMAGE marks a ref trusted: pull attempted, docker wins."""
+    monkeypatch.setenv("ARCEN_SANDBOX_IMAGE", "ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.2.0")
+    client = _fake_docker_client(image_present=False, pullable=True)  # absent locally, live on ghcr
+    rt = SandboxRuntime(docker_client=client)
+    assert rt.backend == "docker"  # ...but the trusted pull succeeded
+    assert rt.degraded is False
+    assert client.images.pull_calls == ["ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.2.0"]
+    rt.destroy()
+
+
+def test_untrusted_image_is_never_pulled() -> None:
+    """A ref outside the whitelist/override falls back with ZERO pull attempts."""
+    client = _fake_docker_client(image_present=False)
+    rt = SandboxRuntime(config={"sandbox": {"image": "random/untrusted:latest"}}, docker_client=client)
+    assert rt.backend == "process"
+    assert client.images.pull_calls == []  # no network gamble on unknown refs
+    rt.destroy()
+
+
+def test_runtime_container_failure_degrades_to_process() -> None:
+    """Image present at init, container create failing mid-session → soft
+    degrade on the first run, envelope returned, never a raised 500."""
+    client = _fake_docker_client(image_present=True)
+    rt = SandboxRuntime(docker_client=client)
+    assert rt.backend == "docker"
+    client.containers.run = lambda **kw: (_ for _ in ()).throw(RuntimeError("500 Server Error: denied"))
+    out = rt.run("pwd")
+    assert out["ok"] is True
+    assert rt.backend == "process" and rt.degraded is True
     rt.destroy()
