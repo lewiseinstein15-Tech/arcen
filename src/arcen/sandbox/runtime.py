@@ -111,6 +111,55 @@ def docker_status(image: str | None = None) -> dict:
     }
 
 
+def sandbox_state(backend: str | None = None, image: str | None = None) -> dict:
+    """The full sandbox picture for boot logs and Settings (T-043).
+
+    Extends ``docker_status`` with the configured backend, the backend
+    that would actually be selected, and the reason — the same decision
+    the SandboxRuntime constructor makes, surfaced BEFORE any task runs.
+    Never raises.
+
+    - backend="docker" + daemon  → effective docker (or unavailable without one —
+                                   the /api/run refusal, never a silent fallback)
+    - backend="process"          → always the quarantined process backend
+    - backend="auto"             → docker when the daemon + image allow it,
+                                   process (degraded) otherwise
+    """
+    ref = image or _env_image_override() or DEFAULT_IMAGE
+    status = docker_status(ref)
+    requested = (backend or "auto").lower()
+    daemon = status["docker_available"]
+    if requested == "docker":
+        if daemon:
+            effective = "docker"
+            reason = "backend=docker (forced)"
+            if not status["image_present"]:
+                reason += " — image will be pulled on first use"
+        else:
+            effective = "unavailable"
+            reason = "backend=docker (forced) but no docker daemon — runs will be refused"
+    elif requested == "process":
+        effective = "process"
+        reason = "backend=process (forced) — quarantined confinement, not container isolation"
+    else:  # auto
+        if daemon and status["image_present"]:
+            effective = "docker"
+            reason = "docker daemon and sandbox image present"
+        elif daemon:
+            effective = "docker"
+            reason = f"docker daemon present; image {ref} will be pulled on first use"
+        else:
+            effective = "process"
+            reason = "no docker daemon — degraded to the quarantined process backend"
+    return {
+        **status,
+        "backend": requested,
+        "effective": effective,
+        "reason": reason,
+        "degraded": effective != "docker",
+    }
+
+
 class SandboxRuntime:
     """One sandbox per session. Commands run inside; the host stays out.
 

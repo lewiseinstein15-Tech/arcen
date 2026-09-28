@@ -72,28 +72,36 @@ class ServerState:
         self.run_flags: dict[str, threading.Event] = {}
         self.active_runs: dict[str, int] = {}  # session -> in-flight turns
         self._lock = threading.Lock()
-        self._warn_sandbox_backend()
+        self._log_sandbox_state()
 
-    def _warn_sandbox_backend(self) -> None:
-        """Boot warning for a pinned sandbox backend that cannot serve (T-038)."""
-        if self.config.sandbox.backend != "docker":
-            return
-        from arcen.sandbox.runtime import docker_status
+    def _log_sandbox_state(self) -> None:
+        """Boot log: the detected sandbox state, verbatim for support (T-043).
 
-        status = docker_status(self.config.sandbox.image)
-        if not status["docker_available"]:
+        Four lines, always: daemon / image / backend selected / reason —
+        the same decision SandboxRuntime makes, surfaced before any task.
+        A pinned docker backend that cannot serve additionally warns
+        loudly: it will REFUSE runs at /api/run, not degrade silently.
+        """
+        from arcen.sandbox.runtime import sandbox_state
+
+        st = sandbox_state(self.config.sandbox.backend, self.config.sandbox.image)
+        log.info(
+            "[sandbox] docker daemon: %s", "present" if st["docker_available"] else "absent"
+        )
+        log.info(
+            "[sandbox] image %s: %s",
+            st["image"],
+            "present" if st["image_present"] else "absent",
+        )
+        log.info("[sandbox] backend selected: %s", st["effective"])
+        log.info("[sandbox] reason: %s", st["reason"])
+        if st["backend"] == "docker" and not st["docker_available"]:
             log.warning(
                 "config sandbox.backend='docker' but no docker daemon is "
-                "available — sandboxed tasks will fail with a clear error "
-                "until docker is running (set sandbox.backend=auto|process "
-                "to allow the quarantined process fallback)"
-            )
-        elif not status["image_present"]:
-            log.warning(
-                "config sandbox.backend='docker' but sandbox image %s is not "
-                "present locally — it will be pulled on first use, or the run "
-                "degrades to the process backend",
-                status["image"],
+                "available — sandboxed tasks will be REFUSED at /api/run "
+                "with a clear error until docker is running (set "
+                "sandbox.backend=auto|process in Settings → Sandbox to "
+                "allow the quarantined process backend)"
             )
 
     def emitter_for(self, session_id: str) -> StreamEmitter:
@@ -356,6 +364,21 @@ def post_run(payload: dict = Body(...)) -> dict:
     goal = str(payload.get("goal", "")).strip()
     if not goal:
         raise HTTPException(status_code=422, detail="goal is required")
+    # T-043: a docker-pinned sandbox with no daemon refuses BEFORE planning
+    # — never a silent process fallback, never a 500 mid-turn.
+    if STATE.config.sandbox.backend == "docker":
+        from arcen.sandbox.runtime import docker_status
+
+        st = docker_status(STATE.config.sandbox.image)
+        if not st["docker_available"]:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Sandbox backend is set to docker, but no docker daemon is "
+                    "reachable. Either start docker or change the backend in "
+                    "Settings → Sandbox."
+                ),
+            )
     session_id = payload.get("session") or f"s-{uuid.uuid4().hex[:8]}"
     run_id = f"r-{uuid.uuid4().hex[:6]}"
     STATE.run_flags[run_id] = threading.Event()
@@ -558,10 +581,15 @@ def list_sessions() -> list[dict]:
 
 @app.get("/api/sandbox/status")
 def sandbox_status() -> dict:
-    """Docker/image availability for the Settings backend warning (T-038)."""
-    from arcen.sandbox.runtime import docker_status
+    """The full sandbox picture for Settings (T-038 + T-043).
 
-    return docker_status(STATE.config.sandbox.image)
+    docker_available / image_present / image (T-038) plus the configured
+    backend, the backend actually selected, and the reason (T-043) —
+    the same four lines the boot log prints.
+    """
+    from arcen.sandbox.runtime import sandbox_state
+
+    return sandbox_state(STATE.config.sandbox.backend, STATE.config.sandbox.image)
 
 
 @app.get("/api/sessions/{session_id}/events")

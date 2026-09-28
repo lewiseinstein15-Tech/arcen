@@ -180,3 +180,42 @@ describe('T-033: chronological turn order (newest at bottom)', () => {
     expect(useStreamStore.getState().events.map((e) => e.seq)).toEqual([1, 2]);
   });
 });
+
+// T-043 — a refused run (docker pinned, no daemon) shows the server's
+// fix-it message inline: it is a refusal, not a reconnect, and the
+// optimistic block clears immediately.
+describe('T-043: the docker refusal reaches the chat', () => {
+  it('POST /api/run 409 + detail → submit-error banner with the server message', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/run')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              detail:
+                'Sandbox backend is set to docker, but no docker daemon is reachable. Either start docker or change the backend in Settings → Sandbox.',
+            }),
+            { status: 409 },
+          ),
+        );
+      }
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    const input = screen.getByTestId('composer-input') as HTMLTextAreaElement;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+    setter?.call(input, 'build me a calculator');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    fireEvent.click(screen.getByTestId('send-btn'));
+
+    const banner = await screen.findByTestId('submit-error');
+    expect(banner).toHaveTextContent(
+      'Sandbox backend is set to docker, but no docker daemon is reachable. Either start docker or change the backend in Settings → Sandbox.',
+    );
+    // the optimistic block cleared — nothing is "generating"
+    await waitFor(() => {
+      expect(useStreamStore.getState().pendingTurn).toBeNull();
+    });
+  });
+});

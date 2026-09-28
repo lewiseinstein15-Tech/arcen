@@ -283,12 +283,75 @@ def test_interrupt_run(client) -> None:
 
 # -- T-038: sandbox backend configurability ----------------------------------
 
-def test_sandbox_status_endpoint(client) -> None:
-    """Settings fetches docker/image availability from here; never raises."""
+def test_sandbox_status_endpoint(client, monkeypatch) -> None:
+    """Settings fetches the sandbox picture from here; never raises.
+
+    T-043 extends the T-038 keys with the configured backend, the
+    effective selection, and the reason — the boot-log four-liner.
+    """
+    from arcen.sandbox import runtime as runtime_mod
+
+    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: None)
     status = client.get("/api/sandbox/status").json()
-    assert set(status) == {"docker_available", "image_present", "image"}
-    assert isinstance(status["docker_available"], bool)
-    assert isinstance(status["image_present"], bool)
+    assert {"docker_available", "image_present", "image"} <= set(status)
+    assert {"backend", "effective", "reason", "degraded"} <= set(status)
+    assert status["docker_available"] is False
+    assert status["effective"] == "process"  # auto default, daemon absent
+    assert "no docker daemon" in status["reason"]
+
+
+# -- T-043: the docker-less machine is explicit and honest --------------------
+
+def test_boot_logs_sandbox_state_lines(caplog, monkeypatch) -> None:
+    """Boot prints the four [sandbox] lines — daemon / image / selected /
+    reason — so the docker-less machine says so out loud."""
+    import logging
+
+    from arcen.sandbox import runtime as runtime_mod
+
+    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: None)
+    cfg = ArcenConfig()  # default auto
+    with caplog.at_level(logging.INFO, logger="arcen.server"):
+        ServerState(config=cfg)
+    messages = [r.message for r in caplog.records]
+    assert any("[sandbox] docker daemon: absent" in m for m in messages)
+    assert any("[sandbox] image " in m and ": absent" in m for m in messages)
+    assert any("[sandbox] backend selected: process" in m for m in messages)
+    assert any("[sandbox] reason: no docker daemon" in m for m in messages)
+
+
+def test_run_refuses_when_docker_pinned_but_daemon_absent(client, monkeypatch) -> None:
+    """backend=docker + no daemon → a clean 409 BEFORE planning, with the
+    fix-it message — never a silent process fallback, never a 500."""
+    from arcen.sandbox import runtime as runtime_mod
+
+    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: None)
+    server_app.STATE.config.sandbox.backend = "docker"
+    try:
+        resp = client.post("/api/run", json={"goal": "true", "session": "s-refuse-docker"})
+    finally:
+        server_app.STATE.config.sandbox.backend = "auto"
+    assert resp.status_code == 409, resp.text
+    detail = resp.json()["detail"]
+    assert detail == (
+        "Sandbox backend is set to docker, but no docker daemon is reachable. "
+        "Either start docker or change the backend in Settings → Sandbox."
+    )
+    # nothing was planned: the refusal session has no run events
+    events = client.get("/api/sessions/s-refuse-docker/events")
+    assert events.status_code == 404, "no session was created for a refused run"
+
+
+def test_run_allows_auto_when_daemon_absent(client, monkeypatch) -> None:
+    """backend=auto + no daemon → the run is accepted and the turn
+    executes in the quarantined process backend (the amber path)."""
+    from arcen.sandbox import runtime as runtime_mod
+
+    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: None)
+    assert server_app.STATE.config.sandbox.backend == "auto"
+    resp = client.post("/api/run", json={"goal": "true", "session": "s-auto-process"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["run_id"]
 
 
 def test_boot_warns_when_docker_pinned_but_unavailable(caplog) -> None:

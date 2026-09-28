@@ -309,3 +309,69 @@ def test_docker_status_probe(monkeypatch) -> None:
         "image_present": False,
         "image": "some/image:1.0",
     }
+
+
+# -- T-043: the sandbox state is surfaced honestly (boot log / Settings) ------
+
+def test_sandbox_state_auto_without_daemon_is_process(monkeypatch) -> None:
+    """auto + no daemon → process, degraded, with the honest reason."""
+    from arcen.sandbox import runtime as runtime_mod
+    from arcen.sandbox.runtime import sandbox_state
+
+    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: None)
+    st = sandbox_state("auto")
+    assert st["docker_available"] is False
+    assert st["backend"] == "auto"
+    assert st["effective"] == "process"
+    assert st["degraded"] is True
+    assert "no docker daemon" in st["reason"]
+
+
+def test_sandbox_state_auto_with_daemon_and_image_is_docker(monkeypatch) -> None:
+    from arcen.sandbox import runtime as runtime_mod
+    from arcen.sandbox.runtime import sandbox_state
+
+    client = _fake_docker_client(image_present=True)
+    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: client)
+    st = sandbox_state("auto")
+    assert st["effective"] == "docker"
+    assert st["degraded"] is False
+    assert st["reason"] == "docker daemon and sandbox image present"
+
+
+def test_sandbox_state_docker_without_daemon_is_unavailable(monkeypatch) -> None:
+    """docker pinned but unreachable → effective 'unavailable' — the
+    /api/run refusal state, never a silent process fallback."""
+    from arcen.sandbox import runtime as runtime_mod
+    from arcen.sandbox.runtime import sandbox_state
+
+    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: None)
+    st = sandbox_state("docker")
+    assert st["effective"] == "unavailable"
+    assert st["degraded"] is True
+    assert "no docker daemon" in st["reason"] and "refused" in st["reason"]
+
+
+def test_sandbox_state_process_forced_is_process(monkeypatch) -> None:
+    from arcen.sandbox import runtime as runtime_mod
+    from arcen.sandbox.runtime import sandbox_state
+
+    client = _fake_docker_client(image_present=True)  # docker there, ignored
+    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: client)
+    st = sandbox_state("process")
+    assert st["effective"] == "process"
+    assert st["degraded"] is True
+    assert "forced" in st["reason"]
+
+
+def test_sandbox_state_docker_with_daemon_missing_image_pulls(monkeypatch) -> None:
+    """docker pinned, daemon up, image absent → still docker; the reason
+    says the image will be pulled on first use."""
+    from arcen.sandbox import runtime as runtime_mod
+    from arcen.sandbox.runtime import sandbox_state
+
+    client = _fake_docker_client(image_present=False, pullable=True)
+    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: client)
+    st = sandbox_state("docker")
+    assert st["effective"] == "docker"
+    assert "pulled on first use" in st["reason"]

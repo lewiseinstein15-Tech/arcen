@@ -33,6 +33,11 @@ interface SandboxStatus {
   docker_available: boolean;
   image_present: boolean;
   image: string;
+  // T-043: the boot-detected backend decision, surfaced for the user
+  backend?: string;
+  effective?: string;
+  reason?: string;
+  degraded?: boolean;
 }
 
 /** The General section's auto-scroll preference (T-036), read by ChatView. */
@@ -335,6 +340,55 @@ export function SettingsView() {
             ))}
           </select>
         </label>
+        {/* T-043: the boot-detected sandbox state — the same four lines
+            the server logs at boot, so what is actually happening is
+            visible, not a silent fallback. */}
+        {sandboxStatus && (
+          <div className="sandbox-state" data-testid="sandbox-state">
+            <div>docker daemon: {sandboxStatus.docker_available ? 'present' : 'absent'}</div>
+            <div>
+              image {sandboxStatus.image}: {sandboxStatus.image_present ? 'present' : 'absent'}
+            </div>
+            <div>
+              backend selected: {sandboxStatus.effective ?? String(sandbox.backend ?? 'auto')}
+              {sandboxStatus.reason ? ` — ${sandboxStatus.reason}` : ''}
+            </div>
+          </div>
+        )}
+        {(() => {
+          if (!sandboxStatus) return null;
+          const daemon = sandboxStatus.docker_available;
+          const image = sandboxStatus.image_present;
+          const backend = String(sandbox.backend ?? 'auto');
+          let kind: 'green' | 'amber' | 'red';
+          let text: string;
+          if (backend === 'docker' && !daemon) {
+            kind = 'red';
+            text = 'docker daemon not detected — running tasks will fail';
+          } else if (backend === 'process') {
+            kind = 'amber';
+            text = 'running in process mode — docker bypassed by config';
+          } else if (!daemon) {
+            kind = 'amber';
+            text = 'running in process mode — docker not available';
+          } else if (image) {
+            kind = 'green';
+            text = 'docker ready';
+          } else {
+            kind = 'amber';
+            text = 'docker ready — sandbox image will be pulled on first use';
+          }
+          return (
+            <div
+              className={`settings-chip settings-chip-${kind}`}
+              data-testid="sandbox-chip"
+              data-chip={kind}
+              role="status"
+            >
+              {text}
+            </div>
+          );
+        })()}
         {(() => {
           if (String(sandbox.backend ?? 'auto') !== 'docker' || !sandboxStatus) return null;
           const warn = !sandboxStatus.docker_available

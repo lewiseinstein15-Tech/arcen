@@ -38,6 +38,9 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
   const clearPendingTurn = useStreamStore((s) => s.clearPendingTurn);
   const [draft, setDraft] = useState(() => loadDraft()); // composer draft survives reload
   const [error, setError] = useState<string | null>(null);
+  // T-043: a refused run (docker pinned, no daemon) shows the server's
+  // fix-it message inline — it is not a reconnect, it is a refusal.
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const attachCtl = useRef<AbortController | null>(null);
   const attached = useRef(false);
@@ -170,6 +173,7 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
 
   const send = (text: string) => {
     if (!text.trim()) return;
+    setSubmitError(null); // a fresh send clears a previous refusal
     // T-032: the message and the DRAFT skeleton show the instant Send is
     // pressed — before the POST resolves, before the first stream event
     setPendingTurn(text);
@@ -193,9 +197,12 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
         }
         if (!attached.current) await attach(topSeq);
       })
-      .catch(() => {
-        // submit failures surface through the stream error banner
+      .catch((err) => {
+        // submit failures surface here — a T-043 refusal carries the
+        // server's detail ("Sandbox backend is set to docker, but no
+        // docker daemon is reachable…"), anything else the status code
         clearPendingTurn();
+        setSubmitError(err instanceof Error ? err.message : String(err));
       });
   };
 
@@ -294,6 +301,11 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
           <button type="button" className="retry-btn" data-testid="stream-retry" onClick={retry}>
             retry
           </button>
+        </div>
+      )}
+      {submitError && (
+        <div className="stream-error" role="alert" data-testid="submit-error">
+          <span>{submitError}</span>
         </div>
       )}
       <Composer value={draft} onChange={setDraft} onSend={send} status={status} />

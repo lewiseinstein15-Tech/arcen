@@ -759,6 +759,50 @@
   margin: 2px 0 10px;
 }
 
+/* T-043: the boot-detected sandbox state, verbatim from the server */
+.sandbox-state {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 2px 0 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* T-043: the sandbox health chip — green ready / amber degraded / red refusing */
+.settings-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 999px;
+  padding: 6px 12px;
+  margin: 2px 0 10px;
+  border: 1px solid;
+}
+
+.settings-chip-green {
+  color: var(--success);
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+.settings-chip-amber {
+  color: var(--warn);
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+}
+
+.settings-chip-red {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
 .settings-save-row {
   justify-content: flex-end;
 }

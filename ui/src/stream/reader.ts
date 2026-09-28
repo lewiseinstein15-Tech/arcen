@@ -8,9 +8,12 @@ import type { ArcenEvent } from '../types/events';
 
 export class StreamError extends Error {
   status: number;
-  constructor(status: number) {
-    super(`stream failed with ${status}`);
+  /** Server-provided explanation (e.g. the T-043 docker refusal detail). */
+  detail?: string;
+  constructor(status: number, detail?: string) {
+    super(detail || `stream failed with ${status}`);
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -81,6 +84,18 @@ export async function submitRun(goal: string, session?: string): Promise<{ run_i
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ goal, session }),
   });
-  if (!res.ok) throw new StreamError(res.status);
+  if (!res.ok) {
+    // the server's detail travels with the error — the T-043 docker
+    // refusal ("Sandbox backend is set to docker, but no docker daemon
+    // is reachable…") must reach the user, not collapse into a status code
+    let detail: string | undefined;
+    try {
+      const body = (await res.json()) as { detail?: string } | null;
+      if (body && typeof body.detail === 'string') detail = body.detail;
+    } catch {
+      /* non-JSON error body — fall back to the status code */
+    }
+    throw new StreamError(res.status, detail);
+  }
   return (await res.json()) as { run_id: string; session: string };
 }

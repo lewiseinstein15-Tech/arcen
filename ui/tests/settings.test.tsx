@@ -300,3 +300,96 @@ describe('T-039: theme stub removed', () => {
     expect(screen.getByTestId('autoscroll-select')).toBeInTheDocument();
   });
 });
+
+// T-043 — the docker-less machine is explicit and honest: Settings shows
+// the boot-detected sandbox state (three lines) and a health chip
+// (green ready / amber degraded / red refusing).
+
+function fullSandboxStatus(over: Record<string, unknown> = {}) {
+  return {
+    docker_available: false,
+    image_present: false,
+    image: 'ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0',
+    backend: 'auto',
+    effective: 'process',
+    reason: 'no docker daemon — degraded to the quarantined process backend',
+    degraded: true,
+    ...over,
+  };
+}
+
+function t043Fetch(statusBody: Record<string, unknown>) {
+  return vi.fn().mockImplementation((url: string) => {
+    if (String(url).includes('/api/sandbox/status')) {
+      return Promise.resolve(new Response(JSON.stringify(statusBody), { status: 200 }));
+    }
+    if (String(url).includes('/api/config')) {
+      return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+    }
+    return Promise.resolve(new Response('[]', { status: 200 }));
+  });
+}
+
+describe('T-043: sandbox state surfaced', () => {
+  it('auto + no daemon → amber chip "process mode" + the three state lines', async () => {
+    vi.stubGlobal('fetch', t043Fetch(fullSandboxStatus()));
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    const chip = await screen.findByTestId('sandbox-chip');
+    expect(chip).toHaveTextContent('running in process mode — docker not available');
+    expect(chip).toHaveAttribute('data-chip', 'amber');
+    const state = screen.getByTestId('sandbox-state');
+    expect(state).toHaveTextContent('docker daemon: absent');
+    expect(state).toHaveTextContent(
+      'image ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0: absent',
+    );
+    expect(state).toHaveTextContent('backend selected: process');
+    expect(state).toHaveTextContent('no docker daemon');
+  });
+
+  it('docker pinned + no daemon → red chip "running tasks will fail"', async () => {
+    vi.stubGlobal(
+      'fetch',
+      t043Fetch(fullSandboxStatus({ backend: 'docker', effective: 'unavailable', reason: 'backend=docker (forced) but no docker daemon — runs will be refused' })),
+    );
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+    fireEvent.change(await screen.findByTestId('sandbox-backend'), { target: { value: 'docker' } });
+    const chip = await screen.findByTestId('sandbox-chip');
+    expect(chip).toHaveTextContent('docker daemon not detected — running tasks will fail');
+    expect(chip).toHaveAttribute('data-chip', 'red');
+  });
+
+  it('daemon + image present → green "docker ready"', async () => {
+    vi.stubGlobal(
+      'fetch',
+      t043Fetch(fullSandboxStatus({
+        docker_available: true,
+        image_present: true,
+        effective: 'docker',
+        reason: 'docker daemon and sandbox image present',
+        degraded: false,
+      })),
+    );
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    const chip = await screen.findByTestId('sandbox-chip');
+    expect(chip).toHaveTextContent('docker ready');
+    expect(chip).toHaveAttribute('data-chip', 'green');
+  });
+
+  it('process forced → amber chip, docker bypassed by config', async () => {
+    vi.stubGlobal(
+      'fetch',
+      t043Fetch(fullSandboxStatus({ backend: 'process', reason: 'backend=process (forced) — quarantined confinement, not container isolation' })),
+    );
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+    fireEvent.change(await screen.findByTestId('sandbox-backend'), { target: { value: 'process' } });
+    const chip = await screen.findByTestId('sandbox-chip');
+    expect(chip).toHaveTextContent('running in process mode — docker bypassed by config');
+    expect(chip).toHaveAttribute('data-chip', 'amber');
+  });
+});

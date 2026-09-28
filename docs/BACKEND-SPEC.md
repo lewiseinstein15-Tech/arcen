@@ -212,6 +212,50 @@ Rules:
 1. **Secrets use `$VAR`.** Any value matching `^\$[A-Z_]+$` is resolved from the process environment by the credential vault (Part 8) at boot. Literal secrets in the config file are a spec violation.
 2. **Every value has an API equivalent.** Anything readable in the YAML is exposed via `GET /api/config` and mutable via `PUT /api/config` — the file is never the only interface. Secret values are never returned by the API, only their variable names.
 
+### Sandbox backends (T-043)
+
+> Note: the v0.1.2 ticket pointed at "Part 8 (sandbox)"; Part 8 is the
+> Credential Vault, and the sandbox lives here in the Part 4 config —
+> this subsection is the sandbox part of the spec.
+
+The sandbox has THREE backend states, configured via `sandbox.backend`
+(default `auto`; Settings → Sandbox or `PUT /api/config`):
+
+| backend | docker daemon present | docker daemon absent |
+|---|---|---|
+| `auto` (default) | docker backend (image pulled on first use if absent); **green** "docker ready" chip in Settings | quarantined **process** backend, degraded; **amber** chip "running in process mode — docker not available" |
+| `docker` (forced) | docker backend, real isolation; green chip | runs are **REFUSED** at `/api/run` (HTTP 409) with: *"Sandbox backend is set to docker, but no docker daemon is reachable. Either start docker or change the backend in Settings → Sandbox."* — **red** chip "docker daemon not detected — running tasks will fail". Never a silent fallback to process. |
+| `process` (forced) | quarantined process backend anyway; amber chip "docker bypassed by config" | quarantined process backend; amber chip |
+
+**To force docker-only** (no silent degrade, for machines where real
+isolation is mandatory): set `sandbox.backend: docker`. The runtime
+raises `SandboxBackendError` and the server refuses runs before planning
+while the daemon is unreachable — misconfiguration is an error, not a
+degrade.
+
+**Why process mode is degraded but functional:** without a daemon there
+is no container boundary, so commands run in a per-session quarantine
+root with a scrubbed environment; file-tool paths are resolved against
+the root and escapes are refused. This is confinement, not isolation —
+the runtime reports `degraded=True`, the boot log and Settings say so,
+and nothing ever overclaims docker-grade isolation.
+
+**Visibility (the docker-less machine is explicit, not silent):** boot
+logs the detected state verbatim —
+
+```
+[sandbox] docker daemon: <present|absent>
+[sandbox] image <name>: <present|absent>
+[sandbox] backend selected: <docker|process>
+[sandbox] reason: <why this backend was chosen>
+```
+
+and `GET /api/sandbox/status` returns the same picture
+(`docker_available`, `image_present`, `image`, `backend`, `effective`,
+`reason`, `degraded`) for the Settings → SANDBOX panel, which renders
+the three lines plus the health chip. A docker-pinned refusal never
+creates a session, never plans, and never reaches FORGE.
+
 ---
 
 ## Part 5 — Memory
