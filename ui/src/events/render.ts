@@ -59,6 +59,17 @@ export function truncate(text: string, n: number): string {
   return text.length > n ? text.slice(0, n - 1) + '…' : text;
 }
 
+// unix seconds → HH:MM (local, 24h) — the message timestamp under
+// user pills and bot messages (reference brief)
+export function fmtTime(ts: number | undefined): string {
+  if (typeof ts !== 'number' || !Number.isFinite(ts)) return '';
+  const d = new Date(ts * 1000);
+  if (Number.isNaN(d.getTime())) return '';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
 export function summarizeArgs(args: Record<string, unknown>): string {
   const parts = Object.entries(args).map(([k, v]) => {
     const s = typeof v === 'string' ? v : JSON.stringify(v);

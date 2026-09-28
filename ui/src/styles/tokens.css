@@ -1,36 +1,60 @@
-/* ARCEN — design tokens. Frozen for v0.1 (FRONTEND-SPEC Part 3.1).
-   21 tokens, exact values, no derivatives. Token names are the API —
-   components never hard-code hex values. Dark-only in v0.1. */
+/* ARCEN — design tokens. Frozen for v0.2 (reference visual brief).
+   v0.2 revision: palette re-anchored to the approved reference look —
+   coral #FF6B4A, warm off-white text, white-alpha hairlines. Token names
+   are the API — components never hard-code hex values. Dark-only. */
 
 :root {
   /* surfaces */
-  --bg:             #0A0B0D;
-  --surface:        #111316;
-  --elevated:       #181B20;
-  --sunken:         #060709;
+  --bg:             #0A0B0D;                        /* page — near-black, slight blue */
+  --sidebar:        #0D0E10;                        /* sidebar — hairline lighter */
+  --surface:        #101114;                        /* quiet raised fill (menus) */
+  --elevated:       #14161A;                        /* overlay panels */
+  --sunken:         #060709;                        /* terminal output, the one allowed fill */
 
-  /* borders */
-  --border-subtle:  #1E2126;
-  --border:         #2A2E35;
-  --border-strong:  #3A3F48;
+  /* hairlines & washes (white-alpha system) */
+  --hairline:       rgba(255, 255, 255, 0.06);      /* divider */
+  --hairline-2:     rgba(255, 255, 255, 0.10);      /* composer border */
+  --hover-wash:     rgba(255, 255, 255, 0.03);      /* nav hover */
+  --chip-bg:        rgba(255, 255, 255, 0.05);      /* key chips */
+  --chip-border:    rgba(255, 255, 255, 0.08);      /* key chips + round buttons */
+
+  /* borders — legacy names, repointed to the hairline system */
+  --border-subtle:  rgba(255, 255, 255, 0.06);
+  --border:         rgba(255, 255, 255, 0.10);
+  --border-strong:  rgba(255, 255, 255, 0.16);
 
   /* text */
-  --text:           #E6E8EB;
-  --text-2:         #9BA1A9;
-  --text-3:         #6A7079;
+  --text:           #E8E6E3;                        /* warm off-white */
+  --text-2:         #8A8A8A;                        /* secondary */
+  --text-3:         #5A5A5A;                        /* muted, timestamps */
+  --placeholder:    #6A6A6A;
 
-  /* accents & status */
-  --accent:         #FF6B5C;  /* coral */
-  --accent-hi:      #FF8878;
-  --accent-lo:      #D9534A;
-  --success:        #4ADE80;  /* mint */
-  --warn:           #FBBF24;  /* amber */
-  --danger:         #F87171;  /* soft red */
-  --info:           #60A5FA;  /* sky */
-  --memory:         #A78BFA;  /* violet */
-  --browse:         #2DD4BF;  /* teal */
+  /* accent — warm coral */
+  --accent:         #FF6B4A;
+  --accent-hi:      #FF7A55;                        /* avatar ring, active glow */
+  --accent-lo:      #E05538;                        /* pressed / dim coral */
+  --accent-08:      rgba(255, 107, 74, 0.08);       /* chip wash */
+  --accent-10:      rgba(255, 107, 74, 0.10);       /* active nav wash */
+  --accent-20:      rgba(255, 107, 74, 0.20);       /* chip border */
+  --accent-35:      rgba(255, 107, 74, 0.35);       /* user message border */
+  --accent-40:      rgba(255, 107, 74, 0.40);       /* composer focus border */
+  --on-accent:      #FFFFFF;                        /* icon on solid coral */
 
-  /* type */
+  /* status & event coding */
+  --success:        #4ADE80;                        /* mint */
+  --warn:           #FBBF24;                        /* amber */
+  --danger:         #F87171;                        /* soft red */
+  --info:           #60A5FA;                        /* sky */
+  --memory:         #A78BFA;                        /* violet */
+  --browse:         #2DD4BF;                        /* teal */
+
+  /* sidebar decoration — burnt-orange horizon, fades upward */
+  --deco-warm:      #3A2018;
+  --deco-warm-0:    rgba(58, 32, 24, 0);
+
+  /* overlays */
+  --backdrop:       rgba(0, 0, 0, 0.6);             /* drawer / sidebar scrim */
+
+  /* type — the entire UI is monospace (v0.2) */
   --font-mono:      'JetBrains Mono', 'Geist Mono', 'SF Mono', Menlo, monospace;
-  --font-sans:      'Inter', system-ui, sans-serif;
 }

@@ -1,32 +1,38 @@
-// ARCEN — Header: drawer button · wordmark · status dot · theme toggle (inert).
-// Mobile header is fixed 48px; drawer button is a 44×44 touch target (Part 11).
+// ARCEN — top bar of the main area (v0.2 reference layout, ~64px, floats —
+// no bottom border): hamburger on the left (toggles the sidebar), session
+// chip + theme toggle on the right. The chip opens the sessions drawer
+// (same store as Ctrl/Cmd+K).
 
 import { useDrawerStore } from '../state/drawerStore';
-import { useStreamStore } from '../state/streamStore';
+import { useSidebarStore } from '../state/sidebarStore';
+import { ChevronDownIcon, HamburgerIcon, MoonIcon } from './Icons';
 
 export function Header() {
-  const status = useStreamStore((s) => s.status);
-  const setOpen = useDrawerStore((s) => s.setOpen);
+  const toggleSidebar = useSidebarStore((s) => s.toggle);
+  const openSessions = useDrawerStore((s) => s.setOpen);
   return (
-    <header className="app-header" data-testid="header">
+    <header className="topbar" data-testid="header">
       <button
         className="drawer-btn"
-        aria-label="open sessions"
+        aria-label="toggle sidebar"
         data-testid="drawer-btn"
-        onClick={() => setOpen(true)}
+        onClick={toggleSidebar}
       >
-        ☰
+        <HamburgerIcon size={20} />
       </button>
-      <div className="wordmark" aria-label="ARCEN">
-        <span className="wordmark-mark" aria-hidden="true">
-          ◆
-        </span>
-        A&nbsp;R&nbsp;C&nbsp;E&nbsp;N
-      </div>
-      <div className="header-right">
-        <span className={`status-dot ${status}`} role="img" aria-label={`stream ${status}`} />
+      <div className="topbar-right">
+        <button
+          className="session-chip"
+          aria-label="open sessions"
+          data-testid="session-chip"
+          onClick={() => openSessions(true)}
+        >
+          <span className="chip-dot" aria-hidden="true" />
+          <span className="chip-label">Agentic Engineer</span>
+          <ChevronDownIcon size={16} className="chip-chev" />
+        </button>
         <button className="theme-toggle" aria-label="toggle theme" disabled title="dark only in v0.1">
-          ◐
+          <MoonIcon size={20} />
         </button>
       </div>
     </header>

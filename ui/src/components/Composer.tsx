@@ -1,14 +1,17 @@
-// ARCEN — Composer (FRONTEND-SPEC Part 10). Frozen key bindings:
+// ARCEN — Composer (FRONTEND-SPEC Part 10 · v0.2 reference look).
+// Shell: large transparent pill (hairline border → coral on focus) holding
+// five elements: [+] · textarea · [/] · paperclip · solid-coral send.
+// Frozen key bindings:
 //   Enter sends · Shift+Enter newline · ↑ edits last sent (empty composer)
 //   / opens slash menu (empty) · ↑↓/Enter/Esc in menu · Esc blurs
 //   Ctrl/Cmd+K opens the session drawer
-// Send states: idle ↗ (disabled empty) · armed ↗ accent · streaming ■ stop.
-// Auto-grow caps at 8 rows.
+// Send states: idle ↑ · armed ↑ (solid coral) · streaming ■ stop.
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { useDrawerStore } from '../state/drawerStore';
 import type { StreamStatus } from '../state/streamStore';
+import { PaperclipIcon } from './Icons';
 
 export const SLASH_COMMANDS: { cmd: string; help: string }[] = [
   { cmd: '/plan', help: 'show plan only' },
@@ -50,6 +53,13 @@ export function Composer({ value, onChange, onSend, onStop, status }: ComposerPr
 
   const insertCommand = (cmd: string) => {
     onChange(cmd + ' ');
+    ref.current?.focus();
+  };
+
+  // the [/] button: opens the slash menu from an empty composer; with text
+  // present it simply returns focus to the textarea
+  const openSlash = () => {
+    if (value.trim().length === 0) onChange('/');
     ref.current?.focus();
   };
 
@@ -127,30 +137,49 @@ export function Composer({ value, onChange, onSend, onStop, status }: ComposerPr
           ))}
         </ul>
       )}
-      <TextareaAutosize
-        ref={ref}
-        className="composer-input"
-        placeholder="describe the task…"
-        value={value}
-        minRows={1}
-        maxRows={8}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onKeyDown}
-        aria-label="composer"
-        data-testid="composer-input"
-      />
-      <button
-        className={`send-btn ${canSend ? 'armed' : ''}`}
-        aria-label={streaming ? 'stop' : 'send'}
-        data-testid="send-btn"
-        disabled={!streaming && !canSend}
-        onClick={() => {
-          if (streaming) onStop?.();
-          else send();
-        }}
-      >
-        {streaming ? '■' : '↗'}
-      </button>
+      <div className="composer-shell">
+        <button
+          type="button"
+          className="round-btn"
+          aria-label="add"
+          title="add context (v0.2)"
+          onClick={() => ref.current?.focus()}
+        >
+          +
+        </button>
+        <TextareaAutosize
+          ref={ref}
+          className="composer-input"
+          placeholder="Type your message..."
+          value={value}
+          minRows={1}
+          maxRows={8}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          aria-label="composer"
+          data-testid="composer-input"
+        />
+        <div className="composer-right">
+          <button type="button" className="round-btn" aria-label="commands" title="commands" onClick={openSlash}>
+            /
+          </button>
+          <button type="button" className="attach-btn" aria-label="attach files" title="attach (v0.2)">
+            <PaperclipIcon size={20} />
+          </button>
+          <button
+            className={`send-btn ${canSend ? 'armed' : ''}`}
+            aria-label={streaming ? 'stop' : 'send'}
+            data-testid="send-btn"
+            disabled={!streaming && !canSend}
+            onClick={() => {
+              if (streaming) onStop?.();
+              else send();
+            }}
+          >
+            {streaming ? '■' : '↑'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

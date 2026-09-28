@@ -27,28 +27,37 @@ Node 20+. Package manager: npm. No CSS framework — tokens.css plus plain CSS m
 
 ## Part 1 — Component Tree
 
+v0.2 shell: a 256px Sidebar + the main column (top bar · ChatView). The
+sidebar collapses behind the hamburger <900px (fixed overlay + backdrop).
+
 ```
 <App>
-├── <Drawer>                          mobile session list (Vaul, 375px)
-├── <Header>                          wordmark · status dot · theme toggle*
-│                                     (*present, inert in v0.1 — dark only)
-└── <ChatView>
-    ├── <Stream>                      role="log" aria-live="polite" · virtualized
-    │   └── events[] ──▶ one block per event, keyed by seq:
-    │       ├── <RunStartBlock>       ◆ goal line
-    │       ├── <ThinkBlock>          ✱ DRAFT narration, collapsible
-    │       ├── <PlanBlock>           ▸ steps checklist (plan / plan.update)
-    │       ├── <SpawnBlock>          ⎇ sub-agent line + children (spawn / spawn.done)
-    │       ├── <CommandBlock>        ❯ tool call (command / command.done)
-    │       ├── <FileDiffBlock>       Δ unified diff, collapsed
-    │       ├── <VerifyBlock>         ⊙ TEMPER pass/fail (verify.start / step.pass / step.fail)
-    │       ├── <AnswerBlock>         ✦ Inter prose, markdown + math + code + mermaid
-    │       ├── <MemoryBlock>         ⬡ recall/write notice
-    │       ├── <UsageBlock>          ¤ tokens · cost
-    │       ├── <RunErrorBlock>       ✗ fatal error banner
-    │       └── <Footer>              session footer: usage rollup + status
-    ├── <ScrollPill>                  floats above composer when scrolled up
-    └── <Composer>                    auto-grow textarea · slash menu · send/stop
+├── <Sidebar>                         logo (triangle mark · two-line wordmark ·
+│                                     breadcrumb) · nav (Chat/Projects/Tools/
+│                                     Settings) · status (Online) · quote block ·
+│                                     burnt-orange horizon gradient
+├── <Header>                          top bar of the main area: hamburger (toggles
+│                                     the sidebar) · session chip (opens sessions
+│                                     drawer) · theme toggle*  (*inert, dark only)
+├── <ChatView>
+│   ├── <Stream>                      role="log" aria-live="polite" · virtualized
+│   │   └── events[] ──▶ one block per event, keyed by seq:
+│   │       ├── <RunStartBlock>       ◆ goal → user message pill (coral hairline)
+│   │       ├── <ThinkBlock>          ✱ DRAFT narration, collapsible
+│   │       ├── <PlanBlock>           ▸ steps checklist (plan / plan.update)
+│   │       ├── <SpawnBlock>          ⎇ sub-agent line + children (spawn / spawn.done)
+│   │       ├── <CommandBlock>        ❯ tool call (command / command.done)
+│   │       ├── <FileDiffBlock>       Δ unified diff, collapsed
+│   │       ├── <VerifyBlock>         ⊙ TEMPER pass/fail (verify.start / step.pass / step.fail)
+│   │       ├── <AnswerBlock>         ✦ bot message: avatar + name row + mono prose
+│   │       ├── <MemoryBlock>         ⬡ recall/write notice
+│   │       ├── <UsageBlock>          ¤ tokens · cost
+│   │       ├── <RunErrorBlock>       ✗ fatal error banner
+│   │       └── <Footer>              session footer: usage rollup + status
+│   ├── <ScrollPill>                  floats above composer when scrolled up
+│   ├── <Composer>                    [+] · textarea · [/] · paperclip · send/stop
+│   └── <KbHints>                     ⌘K · / · ⌘Enter chips + version line
+└── <Drawer>                          sessions list (chip / Ctrl+K; bottom sheet on mobile)
 ```
 
 *plan.update mutates `<PlanBlock>` in place (matched by plan id). command.done mutates its `<CommandBlock>` in place. spawn.done mutates its `<SpawnBlock>` footer. Everything else appends.*
@@ -89,31 +98,67 @@ User overrides (Part 4) win over defaults for the session; defaults win on repla
 
 ```css
 :root {
+  /* surfaces */
   --bg:             #0A0B0D;
-  --surface:        #111316;
-  --elevated:       #181B20;
+  --sidebar:        #0D0E10;
+  --surface:        #101114;
+  --elevated:       #14161A;
   --sunken:         #060709;
-  --border-subtle:  #1E2126;
-  --border:         #2A2E35;
-  --border-strong:  #3A3F48;
-  --text:           #E6E8EB;
-  --text-2:         #9BA1A9;
-  --text-3:         #6A7079;
-  --accent:         #FF6B5C;   /* coral */
-  --accent-hi:      #FF8878;
-  --accent-lo:      #D9534A;
-  --success:        #4ADE80;   /* mint */
-  --warn:           #FBBF24;   /* amber */
-  --danger:         #F87171;   /* soft red */
-  --info:           #60A5FA;   /* sky */
-  --memory:         #A78BFA;   /* violet */
-  --browse:         #2DD4BF;   /* teal */
+
+  /* hairlines & washes (white-alpha system) */
+  --hairline:       rgba(255, 255, 255, 0.06);
+  --hairline-2:     rgba(255, 255, 255, 0.10);
+  --hover-wash:     rgba(255, 255, 255, 0.03);
+  --chip-bg:        rgba(255, 255, 255, 0.05);
+  --chip-border:    rgba(255, 255, 255, 0.08);
+
+  /* borders — legacy names, repointed to the hairline system */
+  --border-subtle:  rgba(255, 255, 255, 0.06);
+  --border:         rgba(255, 255, 255, 0.10);
+  --border-strong:  rgba(255, 255, 255, 0.16);
+
+  /* text */
+  --text:           #E8E6E3;
+  --text-2:         #8A8A8A;
+  --text-3:         #5A5A5A;
+  --placeholder:    #6A6A6A;
+
+  /* accent — warm coral */
+  --accent:         #FF6B4A;
+  --accent-hi:      #FF7A55;
+  --accent-lo:      #E05538;
+  --accent-08:      rgba(255, 107, 74, 0.08);
+  --accent-10:      rgba(255, 107, 74, 0.10);
+  --accent-20:      rgba(255, 107, 74, 0.20);
+  --accent-35:      rgba(255, 107, 74, 0.35);
+  --accent-40:      rgba(255, 107, 74, 0.40);
+  --on-accent:      #FFFFFF;
+
+  /* status & event coding */
+  --success:        #4ADE80;
+  --warn:           #FBBF24;
+  --danger:         #F87171;
+  --info:           #60A5FA;
+  --memory:         #A78BFA;
+  --browse:         #2DD4BF;
+
+  /* sidebar decoration — burnt-orange horizon */
+  --deco-warm:      #3A2018;
+  --deco-warm-0:    rgba(58, 32, 24, 0);
+
+  /* overlays */
+  --backdrop:       rgba(0, 0, 0, 0.6);
+
   --font-mono:      'JetBrains Mono', 'Geist Mono', 'SF Mono', Menlo, monospace;
-  --font-sans:      'Inter', system-ui, sans-serif;
 }
 ```
 
-21 tokens. v0.1 is dark-only; the token names are the API — components never hard-code hex values.
+36 tokens. **v0.2 visual revision**: the palette is re-anchored to the
+approved reference look — coral `#FF6B4A` (was `#FF6B5C`), warm off-white
+text `#E8E6E3`, and a white-alpha hairline/border system replacing the
+gray-blue border hexes. Legacy border token names (`--border*`) remain and
+now resolve to the hairline system, so Part 3.3 glyph colors are unchanged.
+The token names are the API — components never hard-code hex values.
 
 ### 3.2 Type
 
@@ -121,11 +166,14 @@ User overrides (Part 4) win over defaults for the session; defaults win on repla
 |---|---|---|---|---|---|
 | `meta` | mono | 11px | 500 | 1.4 | footer meter, timestamps |
 | `label` | mono | 12px | 500 | 1.4 | block headers, glyphs, badges |
-| `body` | mono | 13px | 400 | 1.5 | everything in the stream |
-| `prose` | sans (Inter) | 15px | 400 | 1.65 | prose paragraphs in `AnswerBlock` only |
+| `body` | mono | 13px | 400 | 1.5 | event panels in the stream |
+| `message` | mono | 14px | 400 | 1.65 | chat messages (user pill, bot prose) |
+| `composer` | mono | 15px | 400 | 1.5 | composer input |
 | `code` | mono | 12.5px | 400 | 1.55 | code blocks, diffs, command lines |
 
-`letter-spacing: 0` on mono; `-0.01em` on prose. Weights 400/500/600 only. Everything in the stream is JetBrains Mono; Inter appears nowhere except `AnswerBlock` prose paragraphs.
+`letter-spacing: 0` on mono; `-0.01em` on message prose. Weights 400/500/600
+only. **v0.2: the entire UI is JetBrains Mono** — nav, chat, buttons, hints;
+Inter was removed (v0.1 used it for answer prose).
 
 ### 3.3 Glyph map — 16 glyphs with colors
 
@@ -615,7 +663,7 @@ Budget: a 1,000-event session scrolls at 60fps on a 2020 laptop; appending an ev
 
 | ID | Test | Proves |
 |---|---|---|
-| F-01 | tokens.css loads; 21 custom properties resolve to exact spec hexes | Part 3.1 frozen palette |
+| F-01 | tokens.css loads; 35 custom properties resolve to the exact v0.2 reference palette | Part 3.1 frozen palette |
 | F-02 | App boots to ChatView; header, empty stream, composer present | Part 1 tree |
 | F-03 | Composer send: type + click `↗` → `POST /api/run` fired once | Part 10 states |
 | F-04 | Mock NDJSON stream of all 17 event types → all 17 components render with correct glyph/color | Part 2 map |

@@ -104,6 +104,11 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
         {folded.map((block) => (
           <BlockFor key={block.seq} block={block} depth={0} />
         ))}
+        {status === 'streaming' && (
+          <span className="stream-cursor" aria-hidden="true" data-testid="stream-cursor">
+            |
+          </span>
+        )}
       </div>
       {error && (
         <div className="stream-error" role="alert">
@@ -111,6 +116,28 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
         </div>
       )}
       <Composer value={draft} onChange={setDraft} onSend={send} status={status} />
+      <div className="kb-hints" data-testid="kb-hints">
+        <div className="hints-group">
+          <span className="kbd">⌘</span>
+          <span className="kbd">K</span>
+          <span className="hint-label">Quick actions</span>
+          <span className="hint-sep" aria-hidden="true">
+            |
+          </span>
+          <span className="kbd">/</span>
+          <span className="hint-label">Commands</span>
+          <span className="hint-sep" aria-hidden="true">
+            |
+          </span>
+          <span className="kbd">⌘</span>
+          <span className="kbd">Enter</span>
+          <span className="hint-label">Send</span>
+        </div>
+        <div className="version-line">
+          <span className="version-dot" aria-hidden="true" />
+          Agentic Engineer v1.0
+        </div>
+      </div>
     </main>
   );
 }

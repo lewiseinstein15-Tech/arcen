@@ -2,7 +2,8 @@
    PANELS, NOT CARDS: hierarchy comes from indentation + left hairline +
    glyph color. Event containers have NO rounded corners, NO drop shadows,
    NO background fills — the only filled surfaces are command output,
-   diffs, and the user's own message pill. */
+   diffs, and the user's own message pill (v0.2: transparent, coral
+   hairline border). */
 
 .block {
   position: relative;
@@ -157,23 +158,6 @@
   font-size: 12.5px;
 }
 
-/* -- answer: the only Inter prose on the page (Part 3.2) -------------------- */
-.answer {
-  border-left-color: var(--accent-lo);
-}
-
-.answer-prose {
-  font-family: var(--font-sans);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1.65;
-  letter-spacing: -0.01em;
-  color: var(--text);
-  display: inline-block;
-  max-width: 72ch;
-  vertical-align: top;
-}
-
 /* -- verify ------------------------------------------------------------------ */
 .verify-line {
   margin: 3px 0 3px 1.2em;
@@ -191,42 +175,164 @@
   color: var(--success);
 }
 
-/* -- user message pill: the goal, as the user sent it ------------------------
-   The reference look gives the USER's own words a bubble; agent events
-   stay flat panels. Surface fill + subtle border, still no shadow. */
-.user-pill {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-  max-width: 85%;
-  margin: 14px 0 6px auto;
-  padding: 9px 14px;
-  background: var(--elevated);
-  border: 1px solid var(--border);
-  border-radius: 999px; /* pill, not card */
-}
-
-.user-pill .goal {
-  color: var(--text);
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.user-tag {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: var(--accent);
-  flex-shrink: 0;
-}
-
+/* -- user message pill (run.start) --------------------------------------------
+   v0.2 reference look: right-aligned pill, max 60%, transparent background,
+   coral 35% hairline border, fully rounded. Timestamp + double-check sit
+   beneath, right-aligned. Agent events stay flat panels. */
 .run-start {
-  text-align: right; /* user words sit on the right, like a chat bubble */
+  text-align: right;
   border-left-color: transparent;
+  margin: 40px 0 0; /* bot response → next user message: ~40px */
+}
+
+.run-start:first-child {
+  margin-top: 0;
 }
 
 .run-start:hover {
   border-left-color: transparent;
+}
+
+/* the block right after the user's words: ~28px gap */
+.run-start + .block {
+  margin-top: 28px;
+}
+
+.user-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 60%;
+  padding: 14px 24px;
+  background: transparent;
+  border: 1px solid var(--accent-35);
+  border-radius: 24px; /* fully rounded pill */
+}
+
+.user-pill .goal {
+  color: var(--text);
+  font-size: 14px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.user-pill .glyph {
+  align-self: center;
+}
+
+/* message timestamps (user + bot) */
+.msg-ts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.msg-ts.with-check {
+  justify-content: flex-end;
+}
+
+.ts-check {
+  color: var(--text-3);
+}
+
+/* -- bot message (answer) ------------------------------------------------------
+   v0.2 reference look: 40px avatar with a 2px coral ring + triangle mark,
+   name row (✦ Agentic Engineer + green dot), monospace prose, timestamp. */
+.bot-message {
+  display: flex;
+  gap: 14px;
+  margin: 28px 0 8px;
+  font-family: var(--font-mono);
+}
+
+.bot-avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--bg);
+}
+
+.bot-content {
+  min-width: 0;
+}
+
+.bot-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.bot-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.bot-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  margin-left: 2px;
+}
+
+.bot-message .msg-ts {
+  margin-top: 12px;
+}
+
+/* prose: monospace now (v0.2 — the whole UI is mono), 14px / 1.65 */
+.answer-prose {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  max-width: 68ch;
+}
+
+.answer-prose p {
+  margin: 0 0 12px;
+}
+
+.answer-prose p:last-child {
+  margin-bottom: 0;
+}
+
+/* bold/emphasis on key words renders warm coral */
+.answer-prose strong,
+.answer-prose b {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* bulleted lists: ">" glyphs in coral, not dots */
+.answer-prose ul {
+  list-style: none;
+  margin: 0 0 12px;
+  padding-left: 1.2em;
+}
+
+.answer-prose ul li {
+  position: relative;
+  padding: 2px 0;
+}
+
+.answer-prose ul li::before {
+  content: '>';
+  position: absolute;
+  left: -1.2em;
+  color: var(--accent);
 }
 
 /* -- error banner ------------------------------------------------------------ */

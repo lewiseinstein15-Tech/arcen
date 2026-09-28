@@ -1,10 +1,13 @@
-/* ARCEN — mobile drawer + responsive layout (FRONTEND-SPEC Part 11).
-   < 768px mobile · 768–1279 tablet · ≥1280 desktop (centered, max 880px). */
+/* ARCEN — mobile + responsive layout (v0.2 reference brief).
+   <900px: the sidebar collapses behind the hamburger — it becomes a fixed
+   overlay with a backdrop. The sessions drawer (chip / Ctrl+K) stays a
+   left panel with 44px touch targets (Part 11). */
 
 .drawer-overlay {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 60%);
+  background: var(--backdrop);
+  z-index: 60;
 }
 
 .drawer-content {
@@ -13,11 +16,12 @@
   left: 0;
   width: min(85vw, 360px);
   background: var(--surface);
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--hairline-2);
   padding: 12px 0 12px;
   display: flex;
   flex-direction: column;
   outline: none;
+  z-index: 61;
 }
 
 .drawer-handle {
@@ -60,7 +64,7 @@
 
 .session-row.is-active {
   border-left-color: var(--accent);
-  background: var(--elevated);
+  background: var(--accent-10);
 }
 
 .session-empty {
@@ -71,43 +75,76 @@
   min-height: 44px;
   min-width: 44px;
   margin: 8px 16px 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--hairline-2);
   border-radius: 6px;
   color: var(--text-2);
 }
 
-/* breakpoints (Part 11) */
-.chat-view {
-  max-width: none;
-  margin: 0;
+/* -- sidebar overlay mode (<900px) ------------------------------------------ */
+.sidebar-overlay {
+  display: none;
 }
 
-@media (min-width: 1280px) {
-  .chat-view {
-    max-width: 880px;
-    margin: 0 auto;
-    width: 100%;
+@media (max-width: 899px) {
+  .app.sidebar-open .sidebar {
+    position: fixed;
+    inset-block: 0;
+    left: 0;
+    width: min(85vw, 300px);
+    z-index: 50;
+    border-right: 1px solid var(--hairline-2);
   }
-}
 
-@media (max-width: 767px) {
-  .app-header {
+  .app.sidebar-open .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: var(--backdrop);
+    z-index: 49;
+  }
+
+  .topbar {
     position: sticky;
     top: 0;
     z-index: 10;
   }
 
   .stream {
-    padding: 12px 8px 8px;
+    padding: 8px 12px 8px;
+  }
+
+  .composer,
+  .kb-hints {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .user-pill {
+    max-width: 85%;
+  }
+
+  /* the chip label is the first thing to go on narrow screens */
+  .chip-label {
+    display: none;
+  }
+
+  .version-line {
+    display: none;
   }
 }
 
-/* scroll pill (Part 6) */
+@media (min-width: 900px) {
+  .sidebar-overlay {
+    display: none;
+  }
+}
+
+/* -- scroll pill (Part 6) ----------------------------------------------------- */
 .scroll-pill {
   position: fixed;
-  left: 50%;
+  left: calc(50% + 128px); /* center of the main area with sidebar open */
   transform: translateX(-50%);
-  bottom: 84px;
+  bottom: 150px;
   display: inline-flex;
   align-items: center;
   gap: 8px;

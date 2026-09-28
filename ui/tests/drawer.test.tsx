@@ -1,5 +1,6 @@
-// F-11 — 375px viewport: header shows the drawer button; the drawer opens;
-// the session list is visible; targets ≥44px (FRONTEND-SPEC Part 11).
+// F-11 — 375px viewport: header shows the drawer button; the session chip
+// opens the sessions drawer; the hamburger toggles the sidebar store; the
+// session list is visible; targets ≥44px (FRONTEND-SPEC Part 11 · v0.2).
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,13 +8,15 @@ import { DrawerNav } from '../src/components/Drawer';
 import { Header } from '../src/components/Header';
 import { useDrawerStore } from '../src/state/drawerStore';
 import { useSessionStore } from '../src/state/sessionStore';
+import { useSidebarStore } from '../src/state/sidebarStore';
 
 beforeEach(() => {
   useDrawerStore.getState().setOpen(false);
+  useSidebarStore.getState().setOpen(true);
 });
 
 describe('F-11: mobile drawer', () => {
-  it('header shows an enabled 44px drawer button; theme toggle stays wired-dark', () => {
+  it('header shows an enabled 44px hamburger and a wired-dark theme toggle', () => {
     render(<Header />);
     const btn = screen.getByTestId('drawer-btn');
     expect(btn).toBeEnabled();
@@ -23,7 +26,7 @@ describe('F-11: mobile drawer', () => {
     expect(screen.getByLabelText('toggle theme')).toBeDisabled(); // dark-only v0.1
   });
 
-  it('drawer button opens the drawer; session list renders with rows', async () => {
+  it('session chip opens the sessions drawer; session list renders with rows', async () => {
     const listSpy = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify([
@@ -41,7 +44,7 @@ describe('F-11: mobile drawer', () => {
         <DrawerNav />
       </div>,
     );
-    fireEvent.click(screen.getByTestId('drawer-btn'));
+    fireEvent.click(screen.getByTestId('session-chip'));
     expect(useDrawerStore.getState().open).toBe(true);
 
     await waitFor(() => {
@@ -50,6 +53,15 @@ describe('F-11: mobile drawer', () => {
       expect(screen.getByText('refactor auth')).toBeInTheDocument();
     });
     expect(listSpy).toHaveBeenCalledWith('/api/sessions');
+  });
+
+  it('the hamburger toggles the sidebar store (overlay <900px, collapse ≥900px)', () => {
+    render(<Header />);
+    expect(useSidebarStore.getState().open).toBe(true);
+    fireEvent.click(screen.getByTestId('drawer-btn'));
+    expect(useSidebarStore.getState().open).toBe(false);
+    fireEvent.click(screen.getByTestId('drawer-btn'));
+    expect(useSidebarStore.getState().open).toBe(true);
   });
 
   it('active session row is highlighted; tap replays and closes the drawer', async () => {
