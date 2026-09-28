@@ -3,6 +3,14 @@
 Proves: connect to a test MCP server → tools listed and callable;
 the three-state machine (declarative → connecting → connected) with the
 lazy-connect rule and fail-safe handshake; disabled servers never I/O.
+
+Hermetic-server fix (the "9 failing tests" round): the test server is
+plain-stdlib JSON-RPC over stdio (tests/mcp_test_server.py) — no npx,
+no uvx, no node, no FastMCP inside the child. The only remaining
+dependency is the MCP Python SDK on the client side, which is a core
+dependency of ARCEN; if a host somehow lacks it, the spawn-based tests
+SKIP with a clear reason instead of failing with a confusing
+"handshake failed".
 """
 
 import asyncio
@@ -25,6 +33,13 @@ from arcen.tools.registry import Registry
 SERVER_SCRIPT = str(Path(__file__).parent / "mcp_test_server.py")
 
 
+def _needs_sdk():
+    """Clear SKIP when the MCP SDK is absent (client side needs it)."""
+    return pytest.importorskip(
+        "mcp", reason="MCP Python SDK not installed — pip install 'arcen[mcp]'"
+    )
+
+
 def _stdio_server(name: str = "test", state: str = "declarative") -> McpServer:
     return McpServer(
         name=name,
@@ -37,6 +52,8 @@ def _stdio_server(name: str = "test", state: str = "declarative") -> McpServer:
 
 # -- the ticket command: connect to a test MCP server -------------------------
 def test_connect_list_and_call() -> None:
+    _needs_sdk()
+
     async def run():
         registry = Registry()
         manager = McpManager([_stdio_server("test")], registry)
@@ -98,6 +115,8 @@ def test_handshake_failure_returns_to_declarative() -> None:
 
 
 def test_lazy_connect_on_first_call() -> None:
+    _needs_sdk()
+
     async def run():
         client = McpClient(_stdio_server("lazy"))
         client.declare()
@@ -111,6 +130,7 @@ def test_lazy_connect_on_first_call() -> None:
 
 
 def test_bridge_registers_qualified_tools() -> None:
+    _needs_sdk()
     registry = Registry()
     manager = McpManager([_stdio_server("test")], registry)
     try:
@@ -126,6 +146,7 @@ def test_bridge_registers_qualified_tools() -> None:
 
 
 def test_bridge_tool_execute_envelope() -> None:
+    _needs_sdk()
     registry = Registry()
     manager = McpManager([_stdio_server("test")], registry)
     try:
