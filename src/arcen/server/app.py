@@ -22,6 +22,7 @@ cleanly (T-037) — no goal-as-bash fallback exists anywhere.
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 import uuid
@@ -49,6 +50,8 @@ from arcen.tools.registry import load_builtin
 
 app = FastAPI(title="ARCEN", version="0.1.0")
 
+log = logging.getLogger("arcen.server")
+
 
 class ServerState:
     """Everything the server owns. One per process."""
@@ -67,6 +70,29 @@ class ServerState:
         self.run_flags: dict[str, threading.Event] = {}
         self.active_runs: dict[str, int] = {}  # session -> in-flight turns
         self._lock = threading.Lock()
+        self._warn_sandbox_backend()
+
+    def _warn_sandbox_backend(self) -> None:
+        """Boot warning for a pinned sandbox backend that cannot serve (T-038)."""
+        if self.config.sandbox.backend != "docker":
+            return
+        from arcen.sandbox.runtime import docker_status
+
+        status = docker_status(self.config.sandbox.image)
+        if not status["docker_available"]:
+            log.warning(
+                "config sandbox.backend='docker' but no docker daemon is "
+                "available — sandboxed tasks will fail with a clear error "
+                "until docker is running (set sandbox.backend=auto|process "
+                "to allow the quarantined process fallback)"
+            )
+        elif not status["image_present"]:
+            log.warning(
+                "config sandbox.backend='docker' but sandbox image %s is not "
+                "present locally — it will be pulled on first use, or the run "
+                "degrades to the process backend",
+                status["image"],
+            )
 
     def emitter_for(self, session_id: str) -> StreamEmitter:
         with self._lock:
@@ -467,6 +493,14 @@ def test_config(payload: dict = Body(...)) -> dict:
 @app.get("/api/sessions")
 def list_sessions() -> list[dict]:
     return [STATE.sessions_meta[s] for s in sorted(STATE.sessions_meta)]
+
+
+@app.get("/api/sandbox/status")
+def sandbox_status() -> dict:
+    """Docker/image availability for the Settings backend warning (T-038)."""
+    from arcen.sandbox.runtime import docker_status
+
+    return docker_status(STATE.config.sandbox.image)
 
 
 @app.get("/api/sessions/{session_id}/events")

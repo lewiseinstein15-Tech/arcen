@@ -18,6 +18,7 @@ import os
 import re
 import warnings
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -56,6 +57,7 @@ DEFAULT_CONFIG: dict = {
         "mem_limit": "2g",
         "cpus": 2.0,
         "network": "none",
+        "backend": "auto",
     },
     "stream": {"port": 3002, "content_type": "application/x-ndjson"},
     "session": {"dir": "~/.arcen/sessions"},
@@ -121,6 +123,10 @@ class SandboxConfig(BaseModel):
     mem_limit: str = "2g"
     cpus: float = 2.0
     network: str = "none"
+    # T-038: auto = docker when usable, else the quarantined process backend;
+    # docker = require docker (clear error, never a silent fallback);
+    # process = always the quarantined process backend
+    backend: Literal["auto", "docker", "process"] = "auto"
 
 
 class StreamConfig(BaseModel):

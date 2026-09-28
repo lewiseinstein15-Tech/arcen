@@ -748,6 +748,17 @@
   word-break: break-all;
 }
 
+.settings-warn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 2px 0 10px;
+}
+
 .settings-save-row {
   justify-content: flex-end;
 }

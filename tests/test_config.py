@@ -82,3 +82,20 @@ def test_deep_merge_nested() -> None:
 def test_full_model_round_trip() -> None:
     model = ArcenConfig.model_validate(DEFAULT_CONFIG)
     assert model.model_dump()["sandbox"]["network"] == "none"
+
+
+# -- T-038: sandbox.backend field ---------------------------------------------
+
+def test_sandbox_backend_defaults_to_auto() -> None:
+    config = ArcenConfig()
+    assert config.sandbox.backend == "auto"
+    assert DEFAULT_CONFIG["sandbox"]["backend"] == "auto"
+
+
+def test_sandbox_backend_validated() -> None:
+    from pydantic import ValidationError
+
+    ok = ArcenConfig.model_validate({"sandbox": {"backend": "process"}})
+    assert ok.sandbox.backend == "process"
+    with pytest.raises(ValidationError):
+        ArcenConfig.model_validate({"sandbox": {"backend": "swarm"}})

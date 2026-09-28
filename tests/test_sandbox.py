@@ -240,3 +240,72 @@ def test_runtime_container_failure_degrades_to_process() -> None:
     assert out["ok"] is True
     assert rt.backend == "process" and rt.degraded is True
     rt.destroy()
+
+
+# -- T-038: configurable sandbox backend (auto / docker / process) -----------
+
+def test_backend_process_forces_process_even_with_a_daemon() -> None:
+    """backend='process' is deterministic — docker present changes nothing."""
+    client = _fake_docker_client(image_present=True)
+    rt = SandboxRuntime(docker_client=client, backend="process")
+    assert rt.backend == "process"
+    assert rt.degraded is True
+
+
+def test_backend_docker_without_daemon_raises_no_silent_fallback() -> None:
+    """backend='docker' + no daemon → a clear error, never a process degrade."""
+    from arcen.sandbox.runtime import SandboxBackendError
+
+    with pytest.raises(SandboxBackendError, match="no docker daemon"):
+        SandboxRuntime(docker_client=False, backend="docker")
+
+
+def test_backend_docker_with_image_runs_docker() -> None:
+    client = _fake_docker_client(image_present=True)
+    rt = SandboxRuntime(docker_client=client, backend="docker")
+    assert rt.backend == "docker"
+    assert rt.degraded is False
+    out = rt.run("echo forced-docker")
+    assert out["ok"] is True
+
+
+def test_backend_docker_missing_image_warns_and_keeps_docker() -> None:
+    """Image absent + forced docker → boot warning, docker kept — the
+    runtime NEVER silently falls back to process on a pinned backend."""
+    client = _fake_docker_client(image_present=False, pullable=False)
+    rt = SandboxRuntime(docker_client=client, backend="docker")
+    assert rt.backend == "docker"
+    assert rt.degraded is False
+
+
+def test_backend_invalid_value_rejected() -> None:
+    with pytest.raises(ValueError, match="unknown sandbox backend"):
+        SandboxRuntime(docker_client=False, backend="swarm")
+
+
+def test_backend_from_config_dict() -> None:
+    rt = SandboxRuntime(config={"sandbox": {"backend": "process"}}, docker_client=False)
+    assert rt.backend == "process"
+
+
+def test_backend_parameter_wins_over_config() -> None:
+    rt = SandboxRuntime(
+        config={"sandbox": {"backend": "docker"}}, docker_client=False, backend="process"
+    )
+    assert rt.backend == "process"
+
+
+def test_backend_auto_unchanged_with_no_daemon() -> None:
+    rt = SandboxRuntime(docker_client=False, backend="auto")
+    assert rt.backend == "process" and rt.degraded is True
+
+
+def test_docker_status_probe(monkeypatch) -> None:
+    """docker_status never raises and reports the three Settings fields."""
+    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: None)
+    status = runtime_mod.docker_status("some/image:1.0")
+    assert status == {
+        "docker_available": False,
+        "image_present": False,
+        "image": "some/image:1.0",
+    }

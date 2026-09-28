@@ -15,8 +15,15 @@ Two backends:
   about the limit: this is confinement, not isolation — the runtime
   reports ``degraded=True`` so the UI and logs never overclaim.
 
+Backend selection is configurable (T-038): ``sandbox.backend`` (or the
+``backend=`` parameter) is ``auto`` | ``docker`` | ``process``. ``auto``
+keeps the historical docker-when-usable behavior; ``process`` always
+confining; ``docker`` REQUIRES docker — with no daemon it raises
+``SandboxBackendError`` instead of silently falling back.
+
 Boot rule (Part 10): sandbox unavailability never aborts boot — the
-capability boots degraded.
+capability boots degraded (auto/process). A forced docker backend is
+the one exception: misconfiguration is an error, not a degrade.
 """
 
 from __future__ import annotations
@@ -51,6 +58,14 @@ _KNOWN_GOOD_IMAGE = re.compile(
 _PULL_TRIED: set[str] = set()
 
 
+class SandboxBackendError(RuntimeError):
+    """backend='docker' was forced but docker cannot serve it (T-038).
+
+    Raised instead of a silent fallback — the operator asked for real
+    isolation; degrading to process without a word would overclaim it.
+    """
+
+
 def _env_image_override() -> str | None:
     """ARCEN_SANDBOX_IMAGE — an explicit, trusted image reference."""
     ref = os.environ.get("ARCEN_SANDBOX_IMAGE", "").strip()
@@ -74,14 +89,42 @@ def _docker_client():
         return None
 
 
+def docker_status(image: str | None = None) -> dict:
+    """Docker/image availability probe — /api/sandbox/status + boot warnings.
+
+    Never raises. Returns {docker_available, image_present, image} so the
+    Settings view can warn when 'docker' is selected but unusable (T-038).
+    """
+    ref = image or _env_image_override() or DEFAULT_IMAGE
+    client = _docker_client()
+    present = False
+    if client is not None:
+        try:
+            client.images.get(ref)
+            present = True
+        except Exception:  # noqa: BLE001 — ImageNotFound / SDK absent
+            present = False
+    return {
+        "docker_available": client is not None,
+        "image_present": present,
+        "image": ref,
+    }
+
+
 class SandboxRuntime:
     """One sandbox per session. Commands run inside; the host stays out.
 
-    Backend selection (the T-012 environment fix):
-      1. no docker daemon            → process backend, degraded
-      2. daemon + image present      → docker backend
-      3. daemon + image absent       → one trusted auto-pull attempt for
-        known-good refs; success → docker, failure → process, degraded
+    Backend selection (the T-012 environment fix, configurable since T-038):
+      ``backend`` = "auto" | "docker" | "process" (parameter wins over
+      config['sandbox']['backend']; default auto).
+      - auto:    no daemon → process, degraded; daemon + image → docker;
+                 daemon + missing image → one trusted auto-pull attempt,
+                 success → docker, failure → process, degraded
+      - docker:  REQUIRE docker — no daemon raises SandboxBackendError;
+                 a missing image logs a boot warning and the docker path
+                 is kept (the first run degrades fail-soft if it truly
+                 cannot serve) — never a silent auto fallback
+      - process: always the quarantined process backend, deterministically
     The docker path is never selected unless the image is actually
     usable, and a runtime container-create failure degrades the
     instance instead of crashing the session.
@@ -95,6 +138,7 @@ class SandboxRuntime:
         config: dict | None = None,
         root: str | None = None,
         docker_client: object | None = None,
+        backend: str | None = None,
     ) -> None:
         config = config or {}
         sandbox_cfg = config.get("sandbox", {})
@@ -105,6 +149,14 @@ class SandboxRuntime:
         self.cpus: float = float(sandbox_cfg.get("cpus", DEFAULT_CPUS))
         self.network: str = sandbox_cfg.get("network", "none")
         self.id: str = f"s-{uuid.uuid4().hex[:8]}"
+        requested = str(
+            backend if backend is not None else sandbox_cfg.get("backend", "auto")
+        ).lower()
+        if requested not in ("auto", "docker", "process"):
+            raise ValueError(
+                f"unknown sandbox backend {requested!r} — expected auto|docker|process"
+            )
+        self.requested_backend: str = requested
         self.backend: str = "process"
         self.degraded: bool = True
         if docker_client is False:
@@ -117,7 +169,30 @@ class SandboxRuntime:
         self._container: object | None = None
         self._root: str | None = None
 
-        if self._client is not None and self._image_present():
+        if requested == "process":
+            self._degrade_to_process(root=root, reason="backend=process (forced)")
+        elif requested == "docker":
+            if self._client is None:
+                raise SandboxBackendError(
+                    "sandbox backend='docker' but no docker daemon is available — "
+                    "start docker, or set sandbox.backend to 'auto' or 'process'"
+                )
+            if self._image_present():
+                self.backend = "docker"
+                self.degraded = False
+                log.info("sandbox %s backend=docker (forced) image=%s", self.id, self.image)
+            else:
+                # boot continues (Part 10) — the run() path degrades fail-soft
+                # if the image truly cannot serve; the warning is the signal
+                log.warning(
+                    "sandbox %s backend='docker' but image %s is not present "
+                    "locally and was not pulled — first run may degrade to process",
+                    self.id,
+                    self.image,
+                )
+                self.backend = "docker"
+                self.degraded = False
+        elif self._client is not None and self._image_present():
             self.backend = "docker"
             self.degraded = False
             log.info(

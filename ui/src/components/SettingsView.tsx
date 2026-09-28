@@ -27,6 +27,14 @@ const MODEL_SUGGESTIONS: Record<Provider, string[]> = {
 const VERBOSITY_KEY = 'arcen.verbosity';
 const AUTOSCROLL_KEY = 'arcen.autoscroll';
 
+const SANDBOX_BACKENDS = ['auto', 'docker', 'process'] as const;
+
+interface SandboxStatus {
+  docker_available: boolean;
+  image_present: boolean;
+  image: string;
+}
+
 /** The General section's auto-scroll preference (T-036), read by ChatView. */
 export function autoScrollPreference(): boolean {
   return localStorage.getItem(AUTOSCROLL_KEY) !== 'off'; // on by default
@@ -43,6 +51,7 @@ export function SettingsView() {
   const [test, setTest] = useState<TestState>({ status: 'idle' });
   const [toast, setToast] = useState<{ message: string; kind: 'ok' | 'err' } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [sandboxStatus, setSandboxStatus] = useState<SandboxStatus | null>(null);
 
   // local (UI-only) general preferences
   const [verbosity, setVerbosity] = useState<'full' | 'compact' | 'minimal'>('full');
@@ -58,6 +67,17 @@ export function SettingsView() {
         if (alive) setCfg(body);
       } catch (err) {
         if (alive) setLoadError(String(err));
+      }
+      // docker/image availability for the backend warning (T-038) —
+      // advisory: a failure to fetch it never blocks Settings
+      try {
+        const st = await fetch('/api/sandbox/status');
+        const body = (await st.json()) as Partial<SandboxStatus> | null;
+        if (st.ok && alive && body && typeof body === 'object' && 'docker_available' in body) {
+          setSandboxStatus(body as SandboxStatus);
+        }
+      } catch {
+        /* status is advisory — absence just means no warning */
       }
     })();
     const v = localStorage.getItem(VERBOSITY_KEY);
@@ -299,8 +319,36 @@ export function SettingsView() {
         <legend>SANDBOX</legend>
         <label className="field">
           <span className="field-label">Backend</span>
-          <input type="text" value="auto — docker when available" disabled readOnly />
+          <select
+            data-testid="sandbox-backend"
+            value={String(sandbox.backend ?? 'auto')}
+            onChange={(e) => patchSandbox({ backend: e.target.value })}
+          >
+            {SANDBOX_BACKENDS.map((b) => (
+              <option key={b} value={b}>
+                {b === 'auto'
+                  ? 'auto — docker when available'
+                  : b === 'docker'
+                    ? 'docker — require isolation'
+                    : 'process — quarantined, no docker'}
+              </option>
+            ))}
+          </select>
         </label>
+        {(() => {
+          if (String(sandbox.backend ?? 'auto') !== 'docker' || !sandboxStatus) return null;
+          const warn = !sandboxStatus.docker_available
+            ? 'no docker daemon detected — docker-pinned tasks will fail with a clear error until docker is running'
+            : !sandboxStatus.image_present
+              ? `sandbox image ${sandboxStatus.image} is not present locally — it will be pulled on first use, or the run degrades to process`
+              : null;
+          if (!warn) return null;
+          return (
+            <div className="settings-warn" data-testid="sandbox-warn" role="alert">
+              {warn}
+            </div>
+          );
+        })()}
         <label className="field">
           <span className="field-label">Image</span>
           <input type="text" data-testid="sandbox-image" value={String(sandbox.image ?? '')}

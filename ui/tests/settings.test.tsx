@@ -166,3 +166,111 @@ describe('T-036: settings view', () => {
     });
   });
 });
+
+// T-038 — the sandbox backend dropdown is editable and warns honestly.
+function sandboxStatus(over: Record<string, unknown> = {}) {
+  return {
+    docker_available: false,
+    image_present: false,
+    image: 'ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0',
+    ...over,
+  };
+}
+
+describe('T-038: sandbox backend', () => {
+  it('backend select offers auto/docker/process and PUTs the chosen value', async () => {
+    const putBodies: string[] = [];
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes('/api/config') && init?.method === 'PUT') {
+        putBodies.push(String(init.body));
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      if (String(url).includes('/api/sandbox/status')) {
+        return Promise.resolve(new Response(JSON.stringify(sandboxStatus()), { status: 200 }));
+      }
+      if (String(url).includes('/api/config')) {
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+    const select = (await screen.findByTestId('sandbox-backend')) as HTMLSelectElement;
+    expect([...select.options].map((o) => o.value)).toEqual(['auto', 'docker', 'process']);
+    expect(select.value).toBe('auto'); // the config default
+
+    fireEvent.change(select, { target: { value: 'process' } });
+    fireEvent.click(screen.getByTestId('settings-save'));
+    await waitFor(() => expect(putBodies.length).toBe(1));
+    expect(JSON.parse(putBodies[0]).sandbox.backend).toBe('process');
+    // auto/process never warn
+    expect(screen.queryByTestId('sandbox-warn')).not.toBeInTheDocument();
+  });
+
+  it('warns when docker is pinned but no docker daemon exists', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/sandbox/status')) {
+        return Promise.resolve(new Response(JSON.stringify(sandboxStatus({ docker_available: false })), { status: 200 }));
+      }
+      if (String(url).includes('/api/config')) {
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+    fireEvent.change(await screen.findByTestId('sandbox-backend'), { target: { value: 'docker' } });
+    expect(await screen.findByTestId('sandbox-warn')).toHaveTextContent('no docker daemon');
+  });
+
+  it('warns when docker is pinned but the sandbox image is missing', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/sandbox/status')) {
+        return Promise.resolve(
+          new Response(JSON.stringify(sandboxStatus({ docker_available: true, image_present: false })), { status: 200 }),
+        );
+      }
+      if (String(url).includes('/api/config')) {
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+    fireEvent.change(await screen.findByTestId('sandbox-backend'), { target: { value: 'docker' } });
+    const warn = await screen.findByTestId('sandbox-warn');
+    expect(warn).toHaveTextContent('not present locally');
+  });
+
+  it('docker pinned and fully usable → no warning', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/sandbox/status')) {
+        return Promise.resolve(
+          new Response(JSON.stringify(sandboxStatus({ docker_available: true, image_present: true })), { status: 200 }),
+        );
+      }
+      if (String(url).includes('/api/config')) {
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+    fireEvent.change(await screen.findByTestId('sandbox-backend'), { target: { value: 'docker' } });
+    await waitFor(() => {
+      expect(screen.queryByTestId('sandbox-warn')).not.toBeInTheDocument();
+    });
+  });
+});

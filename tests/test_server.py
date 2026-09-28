@@ -279,3 +279,33 @@ def test_interrupt_run(client) -> None:
     events = _stream_until(client, session, want="run.done", limit=300)
     assert events[-1]["type"] == "run.done"
     assert events[-1]["status"] == "interrupted"
+
+
+# -- T-038: sandbox backend configurability ----------------------------------
+
+def test_sandbox_status_endpoint(client) -> None:
+    """Settings fetches docker/image availability from here; never raises."""
+    status = client.get("/api/sandbox/status").json()
+    assert set(status) == {"docker_available", "image_present", "image"}
+    assert isinstance(status["docker_available"], bool)
+    assert isinstance(status["image_present"], bool)
+
+
+def test_boot_warns_when_docker_pinned_but_unavailable(caplog) -> None:
+    """sandbox.backend='docker' with no daemon → the boot logs a warning."""
+    import logging
+
+    cfg = ArcenConfig()
+    cfg.sandbox.backend = "docker"
+    with caplog.at_level(logging.WARNING, logger="arcen.server"):
+        ServerState(config=cfg)
+    assert any("sandbox.backend='docker'" in r.message for r in caplog.records)
+
+
+def test_boot_quiet_when_backend_is_auto(caplog) -> None:
+    import logging
+
+    cfg = ArcenConfig()  # default auto
+    with caplog.at_level(logging.WARNING, logger="arcen.server"):
+        ServerState(config=cfg)
+    assert not any("sandbox.backend" in r.message for r in caplog.records)
