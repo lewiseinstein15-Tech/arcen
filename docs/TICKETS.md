@@ -269,3 +269,55 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Command:** verify all 6 docs exist
 - **Verification:** no missing files
 
+---
+
+## v0.1 release blockers (laptop-tested, real API key)
+
+### [T-031] Intent classifier (CRITICAL)
+- **Status:** [ ] todo
+- **Depends on:** T-008
+- **Deliverable:** `classify_intent(text)` in src/arcen/agents/draft.py — LLM-driven routing into DIRECT / RESEARCH / CODE (UNKNOWN falls through to CODE); DIRECT skips the plan and answers with the ARCEN identity; server wires a real LLM client built from config
+- **Test:** `pytest tests/test_draft.py` — classifier matrix (hello/hi/2+2/what is 2+2?/what is your name/who built you?/explain closures → DIRECT; weather/search → RESEARCH; calculator/list files/python script → CODE)
+- **Verification:** live — "2+2" answers "4" directly; "what is your name" answers as ARCEN; "explain closures" answers in prose; "build a calculator" still plans; "search for ai news" plans web search
+- **Evidence:** "2+2" was planned as a bash task and failed (`bash: 2+2: command not found`); same for "what is you name"
+
+### [T-032] Live streaming visibility
+- **Status:** [ ] todo
+- **Depends on:** T-022, T-027
+- **Deliverable:** optimistic user pill + "◆ DRAFT" skeleton block on send; events stream into it in seq order; "generating" indicator (pulse dot + "DRAFT is thinking…" / "FORGE is working…") near the composer; out-of-order events wait for the gap
+- **Test:** `npx vitest run` — optimistic pill + skeleton + indicator tests
+- **Verification:** live — pressing Send shows the message and skeleton immediately, thinking/plan/answer stream into place, indicator disappears on turn completion
+- **Evidence:** user quote — "i cant see when is thinking when i sent the question i have to find where it is"
+
+### [T-033] Turn order (new turns at bottom)
+- **Status:** [ ] todo
+- **Depends on:** T-027
+- **Deliverable:** strictly chronological stream — session replay loads ascending seq, new events append to the end, defensive seq-sort on hydrate, no unshift/reverse anywhere
+- **Test:** `npx vitest run` — 3-turn chronological order test
+- **Verification:** live — send 3 messages; turns 1, 2, 3 stack top→bottom, newest at the bottom
+- **Evidence:** user quote — "it should not go on the top"
+
+### [T-034] Auto-scroll (make it actually work)
+- **Status:** [ ] todo
+- **Depends on:** T-024
+- **Deliverable:** useAutoScroll + ScrollPill actually mounted in ChatView — smooth follow while pinned (≤100px from bottom), no yank while browsing, floating "↓ jump to latest" pill when scrolled up, click → smooth scroll + re-pin
+- **Test:** `npx vitest run` — hook + pill behavior tests
+- **Verification:** live — long task streams with the newest block always visible; scroll up mid-stream shows the pill; click snaps to bottom; manual return to bottom resumes pinning
+- **Evidence:** user quote — "the auto scroll is not ther" (hook + pill existed but were never mounted)
+
+### [T-035] "+ New chat" button
+- **Status:** [ ] todo
+- **Depends on:** T-021
+- **Deliverable:** "+ New chat" button below the logo block in the sidebar (plus icon in coral, 40px, hairline coral border) + compact "+" in the top bar; click → save current session to history, fresh session id, clear stream, focus composer; no-op when the current session has 0 messages
+- **Test:** `npx vitest run` — new-chat behavior tests
+- **Verification:** live — click creates a clean slate; previous session remains in the sessions drawer; composer focused
+- **Evidence:** reference image requires the button; user asked for it
+
+### [T-036] Settings view with model providers
+- **Status:** [ ] todo
+- **Depends on:** T-014, T-004
+- **Deliverable:** SettingsView (PROVIDER / AGENTS / SANDBOX / GENERAL sections) reachable from the sidebar; backend GET/PUT /api/config persisting to ~/.arcen/config.yaml + POST /api/config/test provider probe; PUT reloads the provider bridge in-memory
+- **Test:** `pytest tests/test_server.py` (config round-trip, masked keys, test endpoint mocked) + `npx vitest run`
+- **Verification:** live — open Settings, configure the custom provider, Test Connection shows green, Save, "hello" answers through the new provider
+- **Evidence:** user quote — "in settings it should have place for model providers you can set from there"
+
