@@ -283,7 +283,8 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** "2+2" was planned as a bash task and failed (`bash: 2+2: command not found`); same for "what is you name"
 
 ### [T-032] Live streaming visibility
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
+- **Note:** optimistic user pill + DRAFT skeleton appear <50ms after Send; store inserts seq-ordered (gap-safe, no out-of-order render); generating indicator names DRAFT/FORGE/TEMPER and disappears on completion. Live 7/7 (mock provider, chromium).
 - **Depends on:** T-022, T-027
 - **Deliverable:** optimistic user pill + "◆ DRAFT" skeleton block on send; events stream into it in seq order; "generating" indicator (pulse dot + "DRAFT is thinking…" / "FORGE is working…") near the composer; out-of-order events wait for the gap
 - **Test:** `npx vitest run` — optimistic pill + skeleton + indicator tests
@@ -291,7 +292,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** user quote — "i cant see when is thinking when i sent the question i have to find where it is"
 
 ### [T-033] Turn order (new turns at bottom)
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-027
 - **Deliverable:** strictly chronological stream — session replay loads ascending seq, new events append to the end, defensive seq-sort on hydrate, no unshift/reverse anywhere
 - **Test:** `npx vitest run` — 3-turn chronological order test
