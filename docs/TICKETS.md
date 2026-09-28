@@ -357,7 +357,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** v0.1 final report P7 — "theme is dark-only per v0.2 spec"
 
 ### [T-040] /api/sessions sorts wrong
-- **Status:** [ ]
+- **Status:** [~] in progress
 - **Note:** the endpoint returns id-sorted sessions; the drawer re-sorts newest-first client-side. Every API consumer has to know the sort is wrong.
 - **Deliverable:** GET /api/sessions returns sessions sorted by created_at DESC (newest first); the client-side sort in the session store is removed — single source of truth
 - **Test:** `pytest tests/test_server.py` — endpoint order test; `npx vitest run`

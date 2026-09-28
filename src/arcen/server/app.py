@@ -492,7 +492,11 @@ def test_config(payload: dict = Body(...)) -> dict:
 
 @app.get("/api/sessions")
 def list_sessions() -> list[dict]:
-    return [STATE.sessions_meta[s] for s in sorted(STATE.sessions_meta)]
+    """Sessions newest-first (created_at DESC) — the API is the single
+    source of truth for ordering (T-040); clients render as-is."""
+    sessions = list(STATE.sessions_meta.values())
+    sessions.sort(key=lambda s: s.get("created_at") or 0.0, reverse=True)
+    return sessions
 
 
 @app.get("/api/sandbox/status")

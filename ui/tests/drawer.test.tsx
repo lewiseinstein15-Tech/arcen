@@ -131,4 +131,23 @@ describe('F-11: mobile drawer', () => {
     //   .drawer-btn { width: 44px; height: 44px }
     void css;
   });
+
+  it('renders the API order as-is — the server owns ordering (T-040)', async () => {
+    // the API already returns newest-first; the drawer must NOT re-sort
+    // (and must not "fix" an unordered feed either — it renders as-is)
+    useSessionStore.setState({
+      sessions: [
+        { id: 's-old', title: 'old', status: 'done', events: 1, last_seq: 1, created_at: 100 },
+        { id: 's-new', title: 'new', status: 'idle', events: 2, last_seq: 2, created_at: 900 },
+        { id: 's-mid', title: 'mid', status: 'idle', events: 3, last_seq: 3, created_at: 500 },
+      ],
+      activeId: null,
+    });
+    vi.stubGlobal('fetch', vi.fn());
+    render(<DrawerNav />);
+    useDrawerStore.getState().setOpen(true);
+    const rows = screen.getAllByTestId(/^session-s-/);
+    const ids = rows.map((r) => r.getAttribute('data-testid'));
+    expect(ids).toEqual(['session-s-old', 'session-s-new', 'session-s-mid']); // as fed
+  });
 });

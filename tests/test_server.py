@@ -309,3 +309,18 @@ def test_boot_quiet_when_backend_is_auto(caplog) -> None:
     with caplog.at_level(logging.WARNING, logger="arcen.server"):
         ServerState(config=cfg)
     assert not any("sandbox.backend" in r.message for r in caplog.records)
+
+
+# -- T-040: /api/sessions is the single source of truth for ordering ----------
+
+def test_sessions_sorted_newest_first(client) -> None:
+    """created_at DESC — newest first, regardless of session id order."""
+    for i, created in ((1, 500.0), (2, 900.0), (3, 100.0)):
+        sid = f"s-order-{i}"
+        server_app.STATE.emitter_for(sid)
+        server_app.STATE.sessions_meta[sid]["created_at"] = created
+    sessions = client.get("/api/sessions").json()
+    ids = [s["id"] for s in sessions]
+    assert ids == ["s-order-2", "s-order-1", "s-order-3"]  # 900 → 500 → 100
+    created = [s["created_at"] for s in sessions]
+    assert created == sorted(created, reverse=True)
