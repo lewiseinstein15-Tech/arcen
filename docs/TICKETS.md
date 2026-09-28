@@ -365,7 +365,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** v0.1 final report P7 — "/api/sessions still returns id-sorted; the drawer sorts newest-first client-side"
 
 ### [T-041] .venv gitignore — document, don't change
-- **Status:** [ ]
+- **Status:** [x] done
 - **Note:** .venv is gitignored, correctly; CI/GHCR are unaffected. Do NOT add it to the repo — document it.
 - **Deliverable:** a note in README.md under "Contributing": the .venv directory is gitignored; create it with `python -m venv .venv && source .venv/bin/activate`
 - **Test:** none (doc-only)

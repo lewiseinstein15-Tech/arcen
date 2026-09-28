@@ -326,9 +326,12 @@ Available hooks: `on_boot`, `before_tool`, `after_tool`, `on_spawn`, `on_error`,
 
 ## Contributing
 
+The `.venv` directory is gitignored. Create it with `python -m venv .venv && source .venv/bin/activate`, then install the dev extras (`pip install -e ".[dev]"`) — CI and the GHCR image build are unaffected by local virtualenv provisioning.
+
 ```bash
 git clone https://github.com/lewiseinstein15-Tech/arcen
 cd arcen
+python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q                      # full backend suite, must pass 3x back-to-back
 ./scripts/dev.sh               # backend on :3002 + UI on :5173
