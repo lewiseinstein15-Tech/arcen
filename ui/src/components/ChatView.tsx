@@ -1,60 +1,144 @@
 // ARCEN — ChatView: Stream (role="log") + Composer. The UI renders events;
 // it does not hide them (FRONTEND-SPEC Part 0). Events fold in place per
 // Part 1 before rendering. Reload → replay + draft restore (Part 8).
+//
+// Live-stream lifecycle (stream-fix):
+// - /api/sessions/<id>/events is the authority for "what we have seen";
+//   localStorage lastSeq may belong to a previous server process and is
+//   never trusted for resume.
+// - exactly ONE stream attach at a time; the server closes each stream
+//   after a terminal event, the next send() re-attaches (one GET per turn).
+// - reconnect ladder 500ms/1s/2s/5s, 5 consecutive failures → pill with a
+//   manual retry; from the 3rd failure a 1s /events poll guarantees the
+//   reply is visible even if the stream route dies.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStreamStore } from '../state/streamStore';
 import { foldEvents } from '../stream/fold';
 import { consumeStream, submitRun } from '../stream/reader';
-import { loadDraft, loadLastSeq, saveDraft, saveLastSeq } from '../state/persist';
+import { loadDraft, saveDraft, saveLastSeq } from '../state/persist';
 import { BlockFor } from '../events';
+import type { ArcenEvent } from '../types/events';
 import { Composer } from './Composer';
+
+const BACKOFF_MS = [500, 1000, 2000, 5000]; // delay before retry N (attempt 1 is immediate)
+const MAX_FAILURES = 5; // stop retrying after 5 consecutive failures
+const POLL_AFTER_FAILURES = 3; // failover: poll /events every 1s from here on
+const POLL_MS = 1000;
 
 export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
   const events = useStreamStore((s) => s.events);
   const status = useStreamStore((s) => s.status);
-  const lastSeq = useStreamStore((s) => s.lastSeq);
   const [draft, setDraft] = useState(() => loadDraft()); // composer draft survives reload
   const [error, setError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
+  const attachCtl = useRef<AbortController | null>(null);
+  const attached = useRef(false);
+  const pollTimer = useRef<number | null>(null);
+
+  const stopPoll = useCallback(() => {
+    if (pollTimer.current !== null) {
+      window.clearInterval(pollTimer.current);
+      pollTimer.current = null;
+    }
+  }, []);
+
+  const startPoll = useCallback(() => {
+    if (pollTimer.current !== null) return; // already polling
+    pollTimer.current = window.setInterval(async () => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/events`);
+        if (!res.ok) return;
+        const replayed = (await res.json()) as ArcenEvent[];
+        if (!replayed.length) return;
+        const store = useStreamStore.getState();
+        for (const e of replayed) {
+          if (typeof e.seq === 'number' && e.seq > store.lastSeq) store.apply(e);
+        }
+        const last = replayed[replayed.length - 1];
+        if (last.type === 'run.done' || last.type === 'run.error') stopPoll(); // turn complete
+      } catch {
+        // keep polling — the next tick may catch up
+      }
+    }, POLL_MS);
+  }, [sessionId, stopPoll]);
+
+  // one live stream at a time; exponential backoff; poll failover
+  const attach = useCallback(
+    async (fromSeq: number) => {
+      attachCtl.current?.abort();
+      const controller = new AbortController();
+      attachCtl.current = controller;
+      attached.current = true;
+      const onEvent = (e: ArcenEvent) => {
+        useStreamStore.getState().apply(e);
+        if (typeof e.seq === 'number') saveLastSeq(sessionId, e.seq);
+      };
+      try {
+        let failures = 0;
+        for (;;) {
+          try {
+            await consumeStream(sessionId, onEvent, controller.signal, fromSeq);
+            setError(null); // clean close (stream.done) — turn delivered
+            return;
+          } catch (err) {
+            if (controller.signal.aborted) return;
+            failures += 1;
+            if (failures >= POLL_AFTER_FAILURES) startPoll(); // guarantee liveness
+            if (failures >= MAX_FAILURES) {
+              setError(String(err)); // pill with the manual retry button
+              return;
+            }
+            setError(`stream failed — retrying (${failures}/${MAX_FAILURES})`);
+            await new Promise((r) => setTimeout(r, BACKOFF_MS[Math.min(failures - 1, BACKOFF_MS.length - 1)]));
+            fromSeq = useStreamStore.getState().lastSeq; // resume from what we have
+          }
+        }
+      } finally {
+        if (attachCtl.current === controller) {
+          attachCtl.current = null;
+          attached.current = false;
+        }
+      }
+    },
+    [sessionId, startPoll],
+  );
 
   // replay from the API first, then follow the live stream (Part 8)
   useEffect(() => {
-    const controller = new AbortController();
     let alive = true;
 
     async function boot() {
-      const seen = loadLastSeq(sessionId);
+      // server truth first: /events is the authority for the last seen seq
+      // (a localStorage seq can be "in the future" after a server restart)
+      let seen = 0;
+      let exists = false;
       try {
         const res = await fetch(`/api/sessions/${sessionId}/events`);
         if (res.ok) {
-          const replayed = (await res.json()) as import('../types/events').ArcenEvent[];
+          exists = true;
+          const replayed = (await res.json()) as ArcenEvent[];
           if (alive && replayed.length > 0) {
             useStreamStore.getState().hydrate(replayed);
+            seen = replayed[replayed.length - 1].seq;
           }
         }
       } catch {
         // replay is best-effort; the live stream still works
       }
-      consumeStream(
-        sessionId,
-        (e) => {
-          if (!alive) return;
-          useStreamStore.getState().apply(e);
-          saveLastSeq(sessionId, e.seq);
-        },
-        controller.signal,
-        seen,
-      ).catch((err) => {
-        if (alive && !controller.signal.aborted) setError(String(err));
-      });
+      if (!alive) return;
+      // a session that exists nowhere has nothing to stream — the first
+      // send() attaches after POST /api/run creates it (no 404 spinning)
+      if (exists) await attach(seen);
     }
     void boot();
     return () => {
       alive = false;
-      controller.abort();
+      attachCtl.current?.abort();
+      stopPoll();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, retryTick]);
 
   // persist the draft as it changes (Part 8)
   useEffect(() => {
@@ -62,27 +146,38 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
   }, [draft]);
 
   const folded = useMemo(() => foldEvents(events), [events]);
-  void lastSeq; // exposed for tests / reconnect bookkeeping
 
   const send = (text: string) => {
     if (!text.trim()) return;
     void submitRun(text, sessionId)
       .then(async () => {
-        // the stream attach polls until the session goes live; catch up on
-        // anything emitted in between (duplicate seqs are dropped by the store)
+        // catch up on anything emitted between POST and now (server truth),
+        // then attach ONE stream from the last seen seq — never from 0
+        // (ticket #7: this kills the double-render / refresh-required bug)
+        let topSeq = useStreamStore.getState().lastSeq;
         try {
           const res = await fetch(`/api/sessions/${sessionId}/events`);
           if (res.ok) {
-            const replayed = (await res.json()) as import('../types/events').ArcenEvent[];
-            useStreamStore.getState().hydrate(replayed);
+            const replayed = (await res.json()) as ArcenEvent[];
+            if (replayed.length > 0) {
+              useStreamStore.getState().hydrate(replayed);
+              topSeq = replayed[replayed.length - 1].seq;
+            }
           }
         } catch {
           // best-effort catch-up; the live stream covers the rest
         }
+        if (!attached.current) await attach(topSeq);
       })
       .catch(() => {
         // submit failures surface through the stream error banner
       });
+  };
+
+  const retry = () => {
+    setError(null);
+    stopPoll();
+    setRetryTick((t) => t + 1); // re-runs boot: /events truth + fresh attach
   };
 
   return (
@@ -111,8 +206,11 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
         )}
       </div>
       {error && (
-        <div className="stream-error" role="alert">
-          reconnecting… {error}
+        <div className="stream-error" role="alert" data-testid="stream-error">
+          <span>reconnecting… {error}</span>
+          <button type="button" className="retry-btn" data-testid="stream-retry" onClick={retry}>
+            retry
+          </button>
         </div>
       )}
       <Composer value={draft} onChange={setDraft} onSend={send} status={status} />

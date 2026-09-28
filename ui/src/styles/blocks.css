@@ -370,9 +370,29 @@
 
 /* -- empty + error ------------------------------------------------------------- */
 .stream-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 6px 12px;
   background: var(--elevated);
   color: var(--warn);
   font-family: var(--font-mono);
   font-size: 12px;
+}
+
+.stream-error .retry-btn {
+  padding: 3px 12px;
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.stream-error .retry-btn:hover {
+  background: var(--warn);
+  color: var(--bg);
 }
