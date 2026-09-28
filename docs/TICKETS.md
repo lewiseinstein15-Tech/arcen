@@ -398,8 +398,8 @@ Non-issues from the v0.1.1 report, recorded here so they are never re-litigated 
 - **Evidence:** v0.1.1 report — "No real docker daemon on this host — the docker-forced happy path is proven via fake-client unit tests + live error-path; a true docker run needs your machine."
 
 ### [T-044] Document the mock-provider contract (doc-only)
-- **Status:** [~] in progress
-- **Note:** the mock provider had the same no-args bug (bare-label plans) — fixed in T-037; document so it never regresses.
+- **Status:** [x] done — verified
+- **Note:** DONE — both edits landed verbatim: scripts/mock_provider.py header now opens with the CONTRACT block ("This mock must model a REAL planner: plans must carry tool args (cmd, path, code), not just step labels. A regression here means tests pass but live runs fail."); BACKEND-SPEC Part 11 gains the "Mock provider contract (T-044)" note ("The mock provider must always emit tool args. Bare-label plans hide arg-derivation bugs from the test suite."). No code change — the mock's plan_for() already emitted args (T-037).
 - **Deliverable:** header comment in scripts/mock_provider.py ("This mock must model a REAL planner: plans must carry tool args (cmd, path, code), not just step labels. A regression here means tests pass but live runs fail."); a note in docs/BACKEND-SPEC.md Part 11 under the mock-provider material ("The mock provider must always emit tool args. Bare-label plans hide arg-derivation bugs from the test suite.")
 - **Test:** none (doc-only)
 - **Verification:** both texts present; no code change
