@@ -16,6 +16,7 @@ import pytest
 import uvicorn
 
 import arcen.server.app as server_app
+from arcen.config import ArcenConfig
 from arcen.server.app import ServerState, app
 
 PORT = 3179
@@ -24,7 +25,9 @@ BASE = f"http://127.0.0.1:{PORT}"
 
 class _Server:
     def __init__(self) -> None:
-        server_app.STATE = ServerState()
+        # explicit defaults — the suite must not depend on a real
+        # ~/.arcen/config.yaml (a dev machine may configure any provider)
+        server_app.STATE = ServerState(config=ArcenConfig())
         config = uvicorn.Config(app, host="127.0.0.1", port=PORT, log_level="error")
         self.server = uvicorn.Server(config)
 
