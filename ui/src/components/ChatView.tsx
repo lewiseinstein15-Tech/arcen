@@ -127,6 +127,8 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
           if (alive && replayed.length > 0) {
             useStreamStore.getState().hydrate(replayed);
             seen = replayed[replayed.length - 1].seq;
+          } else if (alive) {
+            useStreamStore.getState().reset(); // fresh/empty chat (T-035 session switch)
           }
         }
       } catch {

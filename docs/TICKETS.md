@@ -310,7 +310,8 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** user quote — "the auto scroll is not ther" (hook + pill existed but were never mounted)
 
 ### [T-035] "+ New chat" button
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
+- **Note:** sidebar button (coral hairline, 40px) + compact top-bar "+"; crypto.randomUUID() swap via sessionStore, stream reset, deferred composer focus, empty-chat no-churn guard, drawer sorted by recency. Live 9/9.
 - **Depends on:** T-021
 - **Deliverable:** "+ New chat" button below the logo block in the sidebar (plus icon in coral, 40px, hairline coral border) + compact "+" in the top bar; click → save current session to history, fresh session id, clear stream, focus composer; no-op when the current session has 0 messages
 - **Test:** `npx vitest run` — new-chat behavior tests
@@ -318,7 +319,7 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** reference image requires the button; user asked for it
 
 ### [T-036] Settings view with model providers
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-014, T-004
 - **Deliverable:** SettingsView (PROVIDER / AGENTS / SANDBOX / GENERAL sections) reachable from the sidebar; backend GET/PUT /api/config persisting to ~/.arcen/config.yaml + POST /api/config/test provider probe; PUT reloads the provider bridge in-memory
 - **Test:** `pytest tests/test_server.py` (config round-trip, masked keys, test endpoint mocked) + `npx vitest run`

@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { useDrawerStore } from '../state/drawerStore';
+import { FOCUS_COMPOSER_EVENT } from '../state/chatActions';
 import type { StreamStatus } from '../state/streamStore';
 import { PaperclipIcon } from './Icons';
 
@@ -109,6 +110,13 @@ export function Composer({ value, onChange, onSend, onStop, status }: ComposerPr
       setDrawerOpen(true); // Ctrl/Cmd+K opens the session drawer, anywhere
     }
   };
+
+  // T-035: "+ New chat" focuses the composer after switching sessions
+  useEffect(() => {
+    const focus = () => ref.current?.focus();
+    window.addEventListener(FOCUS_COMPOSER_EVENT, focus);
+    return () => window.removeEventListener(FOCUS_COMPOSER_EVENT, focus);
+  }, []);
 
   useEffect(() => {
     window.addEventListener('keydown', onGlobalKey);

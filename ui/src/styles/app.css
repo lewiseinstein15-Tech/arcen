@@ -554,3 +554,55 @@
   border-radius: 50%;
   background: var(--accent);
 }
+
+/* -- T-035: "+ New chat" button (sidebar) + compact top-bar plus ------------ */
+.new-chat-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 32px);
+  height: 40px;
+  margin: 2px 16px 14px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 107, 74, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 107, 74, 0.05);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.new-chat-btn:hover {
+  background: rgba(255, 107, 74, 0.1);
+}
+
+.new-chat-plus {
+  color: var(--accent);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.topbar-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.topbar-plus:hover {
+  background: rgba(255, 107, 74, 0.1);
+  color: var(--accent);
+}

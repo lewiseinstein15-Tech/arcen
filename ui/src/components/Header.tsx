@@ -1,25 +1,37 @@
 // ARCEN — top bar of the main area (v0.2 reference layout, ~64px, floats —
-// no bottom border): hamburger on the left (toggles the sidebar), session
-// chip + theme toggle on the right. The chip opens the sessions drawer
-// (same store as Ctrl/Cmd+K).
+// no bottom border): hamburger on the left with the compact "+ New chat"
+// (T-035), session chip + theme toggle on the right. The chip opens the
+// sessions drawer (same store as Ctrl/Cmd+K).
 
 import { useDrawerStore } from '../state/drawerStore';
 import { useSidebarStore } from '../state/sidebarStore';
-import { ChevronDownIcon, HamburgerIcon, MoonIcon } from './Icons';
+import { newChat } from '../state/chatActions';
+import { ChevronDownIcon, HamburgerIcon, MoonIcon, PlusIcon } from './Icons';
 
 export function Header() {
   const toggleSidebar = useSidebarStore((s) => s.toggle);
   const openSessions = useDrawerStore((s) => s.setOpen);
   return (
     <header className="topbar" data-testid="header">
-      <button
-        className="drawer-btn"
-        aria-label="toggle sidebar"
-        data-testid="drawer-btn"
-        onClick={toggleSidebar}
-      >
-        <HamburgerIcon size={20} />
-      </button>
+      <div className="topbar-left">
+        <button
+          className="drawer-btn"
+          aria-label="toggle sidebar"
+          data-testid="drawer-btn"
+          onClick={toggleSidebar}
+        >
+          <HamburgerIcon size={20} />
+        </button>
+        <button
+          className="topbar-plus"
+          aria-label="new chat"
+          title="New chat"
+          data-testid="topbar-plus"
+          onClick={newChat}
+        >
+          <PlusIcon size={18} />
+        </button>
+      </div>
       <div className="topbar-right">
         <button
           className="session-chip"

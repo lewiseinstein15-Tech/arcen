@@ -93,3 +93,12 @@ export function HamburgerIcon({ size = 20, className }: IconProps) {
     </svg>
   );
 }
+
+export function PlusIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} strokeWidth={2}>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}

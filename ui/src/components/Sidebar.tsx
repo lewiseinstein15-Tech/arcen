@@ -1,13 +1,15 @@
 // ARCEN — Sidebar (v0.2 reference layout, ~256px, top to bottom):
-//   logo block (triangle mark + two-line wordmark + breadcrumb) · nav list
-//   (Chat active — coral wash + 2px left border) · burnt-orange horizon
-//   gradient in the bottom third · status block (green dot + Online) ·
-//   quote block (coral bar + italic lines + attribution).
+//   logo block (triangle mark + two-line wordmark + breadcrumb) · + New chat
+//   button (coral hairline, T-035) · nav list (Chat active — coral wash +
+//   2px left border) · burnt-orange horizon gradient in the bottom third ·
+//   status block (green dot + Online) · quote block (coral bar + italic
+//   lines + attribution).
 // <900px the sidebar becomes a fixed overlay behind the hamburger.
 
 import { LogoMark } from './LogoMark';
-import { ChatIcon, FolderIcon, GearIcon, WrenchIcon } from './Icons';
+import { ChatIcon, FolderIcon, GearIcon, PlusIcon, WrenchIcon } from './Icons';
 import { useSidebarStore } from '../state/sidebarStore';
+import { newChat } from '../state/chatActions';
 
 const NAV_ITEMS = [
   { label: 'Chat', Icon: ChatIcon, active: true },
@@ -41,6 +43,21 @@ export function Sidebar() {
           <div className="breadcrumb">
             Plan <span className="sep">&gt;</span> Build <span className="sep">&gt;</span> Execute
           </div>
+
+          <button
+            type="button"
+            className="new-chat-btn"
+            data-testid="new-chat-btn"
+            onClick={() => {
+              newChat();
+              // close the overlay only on <900px — on desktop the sidebar
+              // is a persistent column and must not collapse on use
+              if (window.innerWidth < 900) setOpen(false);
+            }}
+          >
+            <PlusIcon size={18} className="new-chat-plus" />
+            <span>New chat</span>
+          </button>
 
           <nav className="side-nav" aria-label="primary">
             {NAV_ITEMS.map(({ label, Icon, active }) => (

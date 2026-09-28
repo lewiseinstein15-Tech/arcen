@@ -18,10 +18,12 @@ const VAUL_USABLE =
 function SessionRows({ onPick }: { onPick: (id: string) => void }) {
   const sessions = useSessionStore((s) => s.sessions);
   const activeId = useSessionStore((s) => s.activeId);
+  // most recent session first — the drawer is "history" (T-035 saves chats here)
+  const ordered = [...sessions].sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
   return (
     <ul className="session-list" data-testid="session-list">
-      {sessions.length === 0 && <li className="session-empty meta">no sessions yet</li>}
-      {sessions.map((s) => (
+      {ordered.length === 0 && <li className="session-empty meta">no sessions yet</li>}
+      {ordered.map((s) => (
         <li key={s.id}>
           <button
             className={`session-row ${s.id === activeId ? 'is-active' : ''}`}
