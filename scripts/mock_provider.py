@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """ARCEN dev utility — a local OpenAI-compatible mock provider.
 
+CONTRACT (T-044): this mock must model a REAL planner: plans must carry
+tool args (cmd, path, code), not just step labels. A regression here
+means tests pass but live runs fail.
+
 Serves POST /v1/chat/completions so the full provider bridge (T-031/T-036)
 can be exercised end-to-end WITHOUT any real API key: point the config's
 custom provider at this server and every DRAFT call lands here.

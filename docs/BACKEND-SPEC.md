@@ -460,6 +460,13 @@ Failure rule: steps 1–5 are fatal (exit non-zero with the reason). Steps 6–9
 
 **Flakiness rule:** every test must pass **3× back-to-back** (`pytest -q && pytest -q && pytest -q`). Two passes and one failure is a failure — no flaky test ships, no `retry=3` in CI, no `sleep()` masking races.
 
+**Mock provider contract (T-044):** the mock provider must always emit
+tool args. Bare-label plans hide arg-derivation bugs from the test
+suite. `scripts/mock_provider.py` must stay in sync with the real
+planner contract — plans carry `cmd` / `path` / `code`, never just step
+labels; a regression there means tests pass but live runs fail (the
+exact no-args bug T-037 fixed).
+
 ---
 
 ## Part 12 — Repository Structure
