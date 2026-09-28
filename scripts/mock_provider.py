@@ -116,6 +116,52 @@ def plan_for(text: str, research: bool) -> str:
     )
 
 
+# -- T-042 live-demo scenarios ------------------------------------------------
+# The mock must model a REAL planner (see CONTRACT in the header): real
+# planners sometimes produce steps that fail, then plan around them. Goals
+# mentioning "flaky" fail their first attempt and succeed after the replan;
+# goals mentioning "doomed" always fail with a distinct exit code — the
+# bounded-replan terminal case ("replanned twice, still failing: …").
+ATTEMPTS: dict[str, int] = {}
+
+
+def demo_scenario(goal: str, is_replan: bool) -> str | None:
+    if "flaky" in goal.lower():
+        if not is_replan:
+            return json.dumps(
+                [
+                    {
+                        "title": "run the flaky step",
+                        "tool": "bash",
+                        "args": {"cmd": "exit 3"},
+                    }
+                ]
+            )
+        return json.dumps(
+            [
+                {
+                    "title": f"do the work: {goal}",
+                    "tool": "bash",
+                    "args": {"cmd": f"echo mock-work: {goal}"},
+                },
+                {"title": "verify the result", "tool": "bash", "args": {"cmd": "true"}},
+            ]
+        )
+    if "doomed" in goal.lower():
+        ATTEMPTS[goal] = ATTEMPTS.get(goal, 0) + 1
+        n = ATTEMPTS[goal]
+        return json.dumps(
+            [
+                {
+                    "title": f"doomed attempt {n}",
+                    "tool": "bash",
+                    "args": {"cmd": f"exit {40 + n}"},
+                }
+            ]
+        )
+    return None
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):  # quiet by default
         pass
@@ -159,7 +205,10 @@ class Handler(BaseHTTPRequestHandler):
         elif "Return ONLY a JSON array" in user:
             goal = user[len("Goal: ") :].split("\n")[0] if user.startswith("Goal: ") else user
             research = "search.text|http.get" in user
-            self._reply(plan_for(goal, research), model)
+            # the replan prompt carries the failed step ("The step {…} failed")
+            is_replan = "The step " in user
+            scenario = demo_scenario(goal, is_replan)
+            self._reply(scenario if scenario is not None else plan_for(goal, research), model)
         elif system.startswith("You are ARCEN"):
             self._reply(direct_answer(user), model)
         else:
