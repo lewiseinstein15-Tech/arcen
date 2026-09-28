@@ -341,8 +341,8 @@ Commit messages reference the ticket: `T-006: bash tool executes in sandbox`.
 - **Evidence:** v0.1 final report P7 — "CODE-turn offline arg derivation runs the goal text as a literal shell command (fails → replan → honest 'Turn failed' answer)"
 
 ### [T-038] Sandbox backend is not configurable
-- **Status:** [ ]
-- **Note:** Settings shows the backend but it is read-only "auto". Users on docker-less machines cannot force "process"; users needing isolation cannot force "docker".
+- **Status:** [x] done — verified
+- **Note:** DONE — SandboxConfig.backend (Literal, default auto); runtime accepts backend= (auto unchanged; process forced; docker REQUIRES the daemon — SandboxBackendError, never a silent fallback — and boot-warns when the image is missing); ServerState boot warning; GET /api/sandbox/status; Settings dropdown editable with inline daemon/image warnings. Live verify 9/9 (scripts/verify_t038.py). Real-docker run covered by the fake-client unit test (this host has no daemon).
 - **Deliverable:** src/arcen/sandbox/runtime.py accepts `backend`: "auto" | "docker" | "process" — auto keeps current behavior, docker requires docker (clear error, no silent fallback), process always uses the quarantined process backend; config gains `sandbox.backend` (default "auto"); the Settings dropdown becomes editable (auto/docker/process) with a warning when docker is selected but the image is missing; boot logs a warning when backend="docker" and the image is absent
 - **Test:** `pytest tests/test_sandbox.py tests/test_config.py` + `npx vitest run` — backend pinning tests
 - **Verification:** backend=process → task runs in process mode (log confirms); backend=docker → runs in docker; backend=docker without docker → clean error, no silent fallback; backend=auto → unchanged
