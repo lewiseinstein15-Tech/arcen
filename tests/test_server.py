@@ -116,11 +116,71 @@ def test_stream_resume_from_last_event_id(client) -> None:
     assert [e["seq"] for e in resumed] == list(range(3, last_seq + 1))
 
 
-def test_stream_future_last_event_id_400(client) -> None:
+def test_stream_future_last_event_id_replays_fresh(client) -> None:
+    """Client seq ahead of the server (restart wiped memory) must never 400.
+
+    The exact laptop bug: localStorage carried a Last-Event-ID from a
+    previous server process; the route now replays from the top with 200.
+    """
     session = _new_session(client, "echo x")
-    _stream_until(client, session)
+    events = _stream_until(client, session)
     resp = client.get(f"/api/stream?session={session}", headers={"Last-Event-ID": "99999"})
-    assert resp.status_code == 400
+    assert resp.status_code == 200
+    lines = [json.loads(line) for line in resp.text.splitlines() if line.strip()]
+    assert lines[0]["seq"] == 1  # full replay from the top
+    assert lines[-1]["type"] == "stream.done"  # clean close, no hang
+    assert [e["seq"] for e in lines[:-1]] == [e["seq"] for e in events]
+
+
+def test_stream_garbage_last_event_id_replays_fresh(client) -> None:
+    session = _new_session(client, "echo y")
+    _stream_until(client, session)
+    resp = client.get(f"/api/stream?session={session}", headers={"Last-Event-ID": "not-a-number"})
+    assert resp.status_code == 200
+    lines = [json.loads(line) for line in resp.text.splitlines() if line.strip()]
+    assert lines[0]["seq"] == 1
+    assert lines[-1]["type"] == "stream.done"
+
+
+def test_stream_closes_after_turn_with_done_sentinel(client) -> None:
+    """One stream per turn: terminal event → stream.done frame → close 200."""
+    session = _new_session(client, "echo close-check")
+    resp = client.get(f"/api/stream?session={session}")
+    assert resp.status_code == 200
+    lines = [json.loads(line) for line in resp.text.splitlines() if line.strip()]
+    assert lines[-1]["type"] == "stream.done"
+    assert lines[-2]["type"] == "run.done"
+    assert resp.headers["content-type"].startswith("application/x-ndjson")
+
+
+def test_stream_disk_seed_after_restart(client, server) -> None:
+    """Restart survival: memory wiped, disk log intact.
+
+    A fresh ServerState over the same session dir must (a) stream the
+    disk history with 200 + sentinel, (b) continue seqs AFTER the disk
+    tail for new turns — never stamp colliding seqs from 1 again.
+    """
+    session = _new_session(client, "echo restart-proof")
+    events = _stream_until(client, session)
+    last_seq = events[-1]["seq"]
+
+    old_state = server_app.STATE
+    server_app.STATE = ServerState(config=old_state.config)
+    try:
+        assert session not in server_app.STATE.emitters  # memory wiped
+        resp = client.get(f"/api/stream?session={session}")
+        assert resp.status_code == 200  # was a hang-prone 404 loop before
+        lines = [json.loads(line) for line in resp.text.splitlines() if line.strip()]
+        assert lines[-1]["type"] == "stream.done"
+        assert [e["seq"] for e in lines[:-1]] == list(range(1, last_seq + 1))
+
+        # a NEW turn continues the seq space — the client dedup keeps them
+        client.post("/api/run", json={"goal": "echo after-restart", "session": session})
+        resumed = _stream_until(client, session, last_event_id=last_seq)
+        assert resumed[0]["seq"] == last_seq + 1
+        assert resumed[-1]["type"] == "run.done"
+    finally:
+        server_app.STATE = old_state
 
 
 def test_config_get_redacted(client) -> None:

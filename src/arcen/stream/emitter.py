@@ -84,6 +84,20 @@ class StreamEmitter:
         with self._lock:
             return [e for e in self._buffer if e["seq"] > after_seq]
 
+    def seed(self, events: list[dict]) -> None:
+        """Adopt a disk-persisted event log (server-restart recovery).
+
+        Restores seq continuity: after a process restart the log on disk
+        already owns seqs 1..N — a fresh emitter must continue at N+1,
+        not stamp colliding seqs from 1 again. Only valid on an empty
+        emitter; live subscribers are not notified (replay serves them).
+        """
+        with self._lock:
+            if self._buffer or self._seq:
+                return  # never clobber a live emitter
+            self._buffer = list(events)
+            self._seq = events[-1]["seq"] if events else 0
+
     def replay_lines(self, after_seq: int) -> list[str]:
         return [self.to_line(e) + "\n" for e in self.replay(after_seq)]
 

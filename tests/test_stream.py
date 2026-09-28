@@ -114,6 +114,29 @@ def test_subscribers_notified_live() -> None:
     assert [e["type"] for e in seen] == ["run.start", "run.done"]
 
 
+def test_seed_adopts_disk_log_and_continues_seq() -> None:
+    """Server-restart recovery: seed from disk, seqs continue at N+1."""
+    emitter = StreamEmitter("s-test")
+    for e in _all_17():
+        emitter.emit(e)
+    disk_log = emitter.replay(0)  # what SessionStore.read() hands back
+
+    fresh = StreamEmitter("s-test")  # new process, empty memory
+    fresh.seed(disk_log)
+    assert fresh.last_seq == 17  # continuity — NOT reset to 0
+    assert [e["seq"] for e in fresh.replay(0)] == list(range(1, 18))
+    wire = fresh.emit(Answer(seq=0, text="post-restart"))
+    assert wire["seq"] == 18  # new turns never collide with disk history
+
+    fresh.seed(disk_log)  # seeding a live emitter is a no-op
+    assert fresh.last_seq == 18
+
+    empty = StreamEmitter("s-empty")
+    empty.seed([])
+    assert empty.last_seq == 0
+    assert empty.emit(Answer(seq=0, text="first"))["seq"] == 1
+
+
 def test_unknown_event_rejected_by_schema() -> None:
     # the emitter only accepts the frozen 17 — enforced by the dataclass table
     class Fake:

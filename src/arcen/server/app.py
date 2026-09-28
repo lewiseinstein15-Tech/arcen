@@ -5,7 +5,10 @@ Endpoints (Part 10): /api/run, /api/stream, /api/health, /api/config,
 
 - stream: NDJSON, Content-Type application/x-ndjson, one JSON object per
   line; every event carries seq + ts; ``Last-Event-ID`` replays from that
-  seq (409 + oldest seq when compacted away, 404 for unknown sessions).
+  seq — optional, garbage/future values replay fresh (never a 400);
+  409 + oldest seq when compacted away, 404 for sessions that exist
+  nowhere (memory AND disk). After a terminal event the stream emits a
+  ``{type:"stream.done"}`` transport frame and closes — replay+close.
 - config: GET returns the redacted view (names, never secret values);
   PUT updates the live config.
 - runs: POST /api/run starts a turn in a worker thread and returns the
@@ -58,6 +61,7 @@ class ServerState:
         self.emitters: dict[str, StreamEmitter] = {}
         self.sessions_meta: dict[str, dict] = {}
         self.run_flags: dict[str, threading.Event] = {}
+        self.active_runs: dict[str, int] = {}  # session -> in-flight turns
         self._lock = threading.Lock()
 
     def emitter_for(self, session_id: str) -> StreamEmitter:
@@ -73,6 +77,38 @@ class ServerState:
                     "created_at": time.time(),
                 }
             return self.emitters[session_id]
+
+    def ensure_session(self, session_id: str) -> bool:
+        """Attach a session that only exists on disk (server-restart recovery).
+
+        Seeds the fresh emitter from the persisted event log so seqs
+        continue after the disk tail instead of colliding from 1 — a
+        client's Last-Event-ID from before the restart stays valid and
+        /api/stream can replay + resume exactly like /sessions/events.
+        Returns True when the session is streamable.
+        """
+        if session_id in self.emitters:
+            return True
+        if not self.store.exists(session_id):
+            return False
+        emitter = self.emitter_for(session_id)
+        emitter.seed(self.store.read(session_id))
+        meta = self.sessions_meta[session_id]
+        meta["events"] = emitter.last_seq
+        meta["last_seq"] = emitter.last_seq
+        return True
+
+    def turn_started(self, session_id: str) -> None:
+        with self._lock:
+            self.active_runs[session_id] = self.active_runs.get(session_id, 0) + 1
+
+    def turn_finished(self, session_id: str) -> None:
+        with self._lock:
+            remaining = self.active_runs.get(session_id, 1) - 1
+            if remaining <= 0:
+                self.active_runs.pop(session_id, None)
+            else:
+                self.active_runs[session_id] = remaining
 
     def note_event(self, session_id: str, wire: dict) -> None:
         meta = self.sessions_meta.get(session_id)
@@ -139,6 +175,14 @@ def _derive_args(step: dict, goal: str) -> dict:
     if tool == "file.list":
         return {"path": "."}
     return {}
+
+
+def _turn_guard(goal: str, session_id: str, run_id: str, state: ServerState) -> None:
+    """Decrement the in-flight counter no matter how the turn ends."""
+    try:
+        run_turn(goal, session_id, run_id, state)
+    finally:
+        state.turn_finished(session_id)
 
 
 def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> None:
@@ -235,7 +279,10 @@ def post_run(payload: dict = Body(...)) -> dict:
     STATE.run_flags[run_id] = threading.Event()
     STATE.emitter_for(session_id)
     STATE.sessions_meta[session_id]["title"] = goal[:80]
-    threading.Thread(target=run_turn, args=(goal, session_id, run_id, STATE), daemon=True).start()
+    STATE.turn_started(session_id)
+    threading.Thread(
+        target=_turn_guard, args=(goal, session_id, run_id, STATE), daemon=True
+    ).start()
     return {"run_id": run_id, "session": session_id}
 
 
@@ -248,9 +295,24 @@ def delete_run(run_id: str) -> dict:
     return {"ok": True, "run_id": run_id, "interrupted": True}
 
 
+TERMINAL_EVENTS = frozenset({"run.done", "run.error"})
+# Transport frame, NOT one of the 17 frozen events — tells the client the
+# stream closed cleanly after a terminal event (replay+close contract).
+STREAM_DONE_LINE = '{"type":"stream.done"}\n'
+
+
 @app.get("/api/stream")
 def get_stream(session: str, last_event_id: str | None = Header(default=None)) -> StreamingResponse:
-    if session not in STATE.emitters:
+    """Live NDJSON event stream — replay-first, close-after-turn.
+
+    Resume contract (the stream never rejects a valid session):
+    - unknown session (not in memory AND not on disk)  → 404
+    - garbage or future Last-Event-ID (client seq from
+      before a server restart)                          → fresh replay from 0, still 200
+    - Last-Event-ID behind the compaction horizon       → 409 + oldest seq
+    - nothing pending and no active turn                → replay + stream.done + close 200
+    """
+    if not STATE.ensure_session(session):
         raise HTTPException(status_code=404, detail="unknown session")
     emitter = STATE.emitters[session]
 
@@ -259,14 +321,15 @@ def get_stream(session: str, last_event_id: str | None = Header(default=None)) -
         try:
             last_id = int(last_event_id)
         except ValueError:
-            raise HTTPException(status_code=400, detail="Last-Event-ID must be an integer")
-        if last_id > emitter.last_seq:
-            raise HTTPException(status_code=400, detail="Last-Event-ID is in the future")
+            last_id = 0  # garbage resume hint — replay fresh, never a 400
         if 0 < last_id + 1 < emitter.oldest_seq:
             return JSONResponse(
                 status_code=409,
                 content={"error": "compacted", "oldest": emitter.oldest_seq},
             )
+        last_id = max(last_id, 0)  # negative garbage → fresh
+        if last_id > emitter.last_seq:
+            last_id = 0  # client ahead (server restart) → full replay from 0
 
     async def gen():
         import asyncio
@@ -282,15 +345,33 @@ def get_stream(session: str, last_event_id: str | None = Header(default=None)) -
             for wire in replayed:
                 yield emitter.to_line(wire) + "\n"
             high_water = replayed[-1]["seq"] if replayed else last_id
+            terminal = bool(replayed) and replayed[-1]["type"] in TERMINAL_EVENTS
+            if terminal and not STATE.active_runs.get(session):
+                yield STREAM_DONE_LINE  # turn already over → replay + close, never a hang
+                return
             while True:
                 try:
                     wire = await asyncio.wait_for(live.get(), timeout=15)
                 except asyncio.TimeoutError:
-                    continue  # hold the connection open
+                    if terminal and not STATE.active_runs.get(session):
+                        yield STREAM_DONE_LINE
+                        return
+                    continue  # hold the connection open — a turn may still start
                 if wire["seq"] <= high_water:
                     continue  # already replayed
                 high_water = wire["seq"]
                 yield emitter.to_line(wire) + "\n"
+                if wire["type"] in TERMINAL_EVENTS:
+                    # one stream per turn: the run thread clears the active
+                    # counter right after the terminal event lands; wait it
+                    # out briefly, then close cleanly (200, no hang).
+                    terminal = True
+                    for _ in range(40):
+                        if not STATE.active_runs.get(session):
+                            break
+                        await asyncio.sleep(0.05)
+                    yield STREAM_DONE_LINE
+                    return
         finally:
             unsubscribe()
 
