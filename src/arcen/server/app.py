@@ -22,6 +22,7 @@ cleanly (T-037) — no goal-as-bash fallback exists anywhere.
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -41,6 +42,7 @@ from arcen.stream.emitter import StreamEmitter
 from arcen.stream.events import (
     Answer,
     Memory,
+    PlanUpdate,
     RunDone,
     RunError,
     RunStart,
@@ -207,7 +209,9 @@ def _turn_guard(goal: str, session_id: str, run_id: str, state: ServerState) -> 
 
 def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> None:
     """One narrated turn. DRAFT plans from the provider; without one a
-    real task refuses cleanly (T-037). Every step lands on the stream."""
+    real task refuses cleanly (T-037). A failed step triggers a DRAFT
+    replan and the loop CONTINUES with the corrected steps, bounded to
+    2 replans per turn (T-042). Every step lands on the stream."""
     turn_start = time.time()
     emitter = state.emitter_for(session_id)
     interrupted = state.run_flags[run_id]
@@ -232,7 +236,14 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
             return
         steps = plan_events[-1].steps
 
-        # FORGE executes, one step at a time
+        # FORGE executes, one step at a time. A failed step triggers a DRAFT
+        # replan and the loop CONTINUES with the corrected steps (T-042) —
+        # the old code emitted plan.update then broke, so the Aider-style
+        # replan was decorative and every nontrivial task died on the first
+        # hiccup. Bounds: max 2 replans per turn; a replan that returns
+        # nothing useful (empty, or the same failing step again) is terminal;
+        # a step that already failed with the same error is terminal. The
+        # goal text is NEVER run as a command (T-037).
         def interrupted_done() -> bool:
             if interrupted.is_set():
                 emit(RunDone(seq=0, status="interrupted", steps=executed,
@@ -240,16 +251,29 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
                 return True
             return False
 
+        def step_sig(step: dict) -> tuple[str, str]:
+            """Identity of a step for the repeat-failure guard: tool + args."""
+            return (
+                step.get("tool") or "bash",
+                json.dumps(step.get("args") or {}, sort_keys=True, default=str),
+            )
+
         forge = ForgeExecutor(state.registry, emit=emit)
         executed = 0
         last_cmd: tuple[str, dict] | None = None
         last_ok = True
-        for step in steps:
+        pending: list[dict] = list(steps)
+        replans = 0
+        MAX_REPLANS = 2
+        failed_sigs: set[tuple[str, str]] = set()
+        failure: str | None = None
+
+        while pending:
+            step = pending.pop(0)
             if interrupted_done():
                 return
             # args come from the plan (the LLM fills them); a step without
-            # the args its tool needs simply fails and DRAFT re-plans —
-            # the goal text is NEVER run as a command (T-037)
+            # the args its tool needs simply fails and DRAFT re-plans
             args = step.get("args") or {}
             events = forge.execute_step({**step, "args": args})
             executed += 1
@@ -257,14 +281,43 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
             last_cmd = (step.get("tool") or "bash", args)
             if interrupted_done():
                 return
-            if not events[1].ok:
-                # failure → DRAFT re-plans (plan.update on the stream)
-                draft.replan(goal, f"step {step.get('id')} failed", failed_step=step)
+            if events[1].ok:
+                continue
+
+            done = events[1]
+            res = done.result if isinstance(done.result, dict) else {}
+            err = str(res.get("error") or res.get("detail") or "unknown error")[:300]
+            reason = f"step {step.get('id')} ({step.get('tool') or 'bash'}) failed: {err}"
+            sig = step_sig(step)
+
+            if sig in failed_sigs:
+                # this exact step already failed once this turn — replanning
+                # again cannot help; a third identical run proves nothing
+                failure = f"the same step failed twice — treating as terminal: {err}"
                 break
+            if replans >= MAX_REPLANS:
+                failure = f"replanned twice, still failing: {err}"
+                break
+
+            failed_sigs.add(sig)
+            replans += 1
+            # DRAFT re-plans; the plan.update is already on the stream (live)
+            plan_events = draft.replan(goal, reason, failed_step=step)
+            update = plan_events[-1] if plan_events else None
+            new_steps = getattr(update, "steps", None)
+            if not isinstance(update, PlanUpdate) or not new_steps:
+                failure = f"replan produced no usable plan: {err}"
+                break
+            if step_sig(new_steps[0]) == sig:
+                # replanning returned the step that just failed — running it
+                # again would loop forever; treat as terminal now
+                failure = f"replan returned the same failing step — not looping: {err}"
+                break
+            pending = list(new_steps)  # corrected steps replace the remainder
 
         # TEMPER verifies adversarially — smoke-check re-runs the last command
         verified = False
-        if last_cmd is not None and last_ok:
+        if failure is None and last_cmd is not None and last_ok:
             tool, cmd_args = last_cmd
             check = cmd_args.get("cmd", "true") if tool == "bash" else "true"
             temper = TemperVerifier(state.registry, emit=emit, adversarial=True, reruns=1)
@@ -276,7 +329,11 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
         emit(Usage(seq=0, tokens={"input": 0, "output": 0}, cost_usd=0.0, ts=0.0))
 
         duration = round(time.time() - turn_start, 4)
-        if verified:
+        if failure is not None:
+            # T-042: the honest terminal summary — what was tried, why it died
+            emit(Answer(seq=0, text=f"Turn failed: {failure}", ts=0.0))
+            emit(RunDone(seq=0, status="failed", steps=executed, duration_s=duration, ts=0.0))
+        elif verified:
             emit(Answer(seq=0, text=f"Done. {executed} step(s) executed against: {goal}. Verification passed.", ts=0.0))
             emit(RunDone(seq=0, status="ok", steps=executed, duration_s=duration, ts=0.0))
         else:

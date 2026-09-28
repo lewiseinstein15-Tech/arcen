@@ -533,3 +533,184 @@ def test_open_turn_task_with_llm_plans_from_provider() -> None:
     assert [type(e) for e in events] == [Think, Plan]
     assert [s["tool"] for s in events[1].steps] == ["file.read", "bash", "file.edit"]
     assert llm.n == 2  # classify + decompose
+
+
+# -- T-042: the replan loop continues (app.run_turn end-to-end) --------------
+
+import threading  # noqa: E402
+import time as _time  # noqa: E402
+import json as _json  # noqa: E402
+from uuid import uuid4  # noqa: E402
+
+import arcen.server.app as server_app  # noqa: E402
+from arcen.config import ArcenConfig  # noqa: E402
+from arcen.server.app import ServerState, run_turn  # noqa: E402
+
+
+class _ScriptedPlannerLLM:
+    """CODE-classifies; hands out scripted plans per decompose call.
+
+    Call order: 1 classify, 2 initial plan, 3 replan #1, 4 replan #2…
+    The last script repeats (an always-failing provider keeps planning
+    the same way).
+    """
+
+    def __init__(self, plans: list):
+        self.plans = plans
+        self.calls = 0
+
+    def is_available(self) -> bool:
+        return True
+
+    def complete(self, role, messages, **kwargs):
+        content = messages[-1]["content"]
+        if "Return ONLY the word" in content:
+            self.calls += 1  # classify consumes a call too
+            return LLMResponse(text=CODE, model="m", tokens={"input": 1, "output": 1})
+        self.calls += 1
+        idx = min(self.calls - 2, len(self.plans) - 1)  # -2: classify consumed 1
+        return LLMResponse(
+            text=_json.dumps(self.plans[idx]), model="m", tokens={"input": 4, "output": 4}
+        )
+
+
+def _run_turn(goal: str, llm) -> list[dict]:
+    """Drive one full turn synchronously; return the wire events in order."""
+    server_app.STATE = ServerState(config=ArcenConfig())
+    server_app.STATE.llm = llm
+    session = f"s-replan-{_time.time_ns() % 1_000_000}"
+    run_id = f"r-{uuid4().hex[:6]}"
+    server_app.STATE.run_flags[run_id] = threading.Event()
+    run_turn(goal, session, run_id, server_app.STATE)
+    return server_app.STATE.emitters[session].replay(0)
+
+
+def _of_type(wire: list[dict], etype: str) -> list[dict]:
+    return [e for e in wire if e.get("type") == etype]
+
+
+def test_replan_continues_loop_fail_then_success():
+    """THE T-042 contract: attempt 1 fails → plan.update → the corrected
+    steps actually run → the turn completes ok (never 'Turn failed')."""
+    llm = _ScriptedPlannerLLM(
+        plans=[
+            # initial plan: a step that fails, then a checkpoint
+            [
+                {"title": "flaky step", "tool": "bash", "args": {"cmd": "exit 3"}},
+                {"title": "checkpoint", "tool": "bash", "args": {"cmd": "true"}},
+            ],
+            # the replan: corrected steps that succeed
+            [
+                {"title": "corrected step", "tool": "bash", "args": {"cmd": "echo fixed"}},
+                {"title": "checkpoint", "tool": "bash", "args": {"cmd": "true"}},
+            ],
+        ]
+    )
+    wire = _run_turn("run the flaky task", llm)
+    dones = _of_type(wire, "run.done")
+    assert dones, "the turn must reach run.done"
+    assert dones[-1]["status"] == "ok", f"expected ok, got {dones[-1]}"
+    updates = _of_type(wire, "plan.update")
+    assert len(updates) == 1, "exactly one replan for one failure"
+    assert updates[0]["reason"], "the plan.update carries the failure reason"
+    # the corrected steps executed AFTER the plan.update (live, in order)
+    update_seq = updates[0]["seq"]
+    corrected = [
+        e for e in _of_type(wire, "command")
+        if e["args"].get("cmd") == "echo fixed" and e["seq"] > update_seq
+    ]
+    assert corrected, "the replanned step must actually execute"
+    assert _of_type(wire, "command.done")[-1]["ok"] is True
+    answers = _of_type(wire, "answer")
+    assert answers and answers[-1]["text"].startswith("Done.")
+
+
+def test_replan_twice_then_success_two_plan_updates():
+    """Fail → replan → fail → replan → success: the loop lands ok using
+    both bounded replan attempts, with 2 plan.update events on the stream."""
+    llm = _ScriptedPlannerLLM(
+        plans=[
+            [{"title": "bad v1", "tool": "bash", "args": {"cmd": "exit 31"}}],
+            [{"title": "bad v2", "tool": "bash", "args": {"cmd": "exit 32"}}],
+            [{"title": "fixed", "tool": "bash", "args": {"cmd": "true"}}],
+        ]
+    )
+    wire = _run_turn("run the twice-flaky task", llm)
+    dones = _of_type(wire, "run.done")
+    assert dones[-1]["status"] == "ok"
+    assert len(_of_type(wire, "plan.update")) == 2
+
+
+def test_replan_terminal_after_two_attempts():
+    """A step that always fails → exactly 2 replans → run.done failed with
+    the 'replanned twice, still failing' summary. Never a hang, never a
+    third replan."""
+    llm = _ScriptedPlannerLLM(
+        plans=[
+            [{"title": "doomed v1", "tool": "bash", "args": {"cmd": "exit 41"}}],
+            [{"title": "doomed v2", "tool": "bash", "args": {"cmd": "exit 42"}}],
+            [{"title": "doomed v3", "tool": "bash", "args": {"cmd": "exit 43"}}],
+            [{"title": "doomed v4", "tool": "bash", "args": {"cmd": "exit 44"}}],
+        ]
+    )
+    wire = _run_turn("run the doomed task", llm)
+    dones = _of_type(wire, "run.done")
+    assert dones, "terminal case still reaches run.done"
+    assert dones[-1]["status"] == "failed"
+    assert len(_of_type(wire, "plan.update")) == 2, "exactly 2 replans, then terminal"
+    answers = _of_type(wire, "answer")
+    assert answers and "replanned twice, still failing" in answers[-1]["text"]
+    assert "exit 43" in answers[-1]["text"], "the summary names the last error"
+
+
+def test_replan_same_failing_step_is_terminal():
+    """A replan that hands back the exact step that just failed is refused
+    — the loop breaks instead of executing the same failure forever."""
+    failing = {"title": "same old", "tool": "bash", "args": {"cmd": "exit 7"}}
+    llm = _ScriptedPlannerLLM(
+        plans=[
+            [failing],
+            [dict(failing)],  # the replan returns the identical step
+        ]
+    )
+    wire = _run_turn("run the stubborn task", llm)
+    dones = _of_type(wire, "run.done")
+    assert dones[-1]["status"] == "failed"
+    answers = _of_type(wire, "answer")
+    assert "same failing step" in answers[-1]["text"]
+    # the failing command ran exactly ONCE — the identical replan step
+    # was refused, not re-executed (no infinite loop, no double failure)
+    same_cmds = [e for e in _of_type(wire, "command") if e["args"].get("cmd") == "exit 7"]
+    assert len(same_cmds) == 1
+
+
+def test_replan_with_no_usable_plan_is_terminal():
+    """The provider dies mid-turn → replan refuses honestly (no fake
+    steps) → the turn ends failed with a clear summary, not a crash."""
+    class _DiedAfterPlan:
+        def __init__(self):
+            self.calls = 0
+
+        def is_available(self) -> bool:
+            return True
+
+        def complete(self, role, messages, **kwargs):
+            content = messages[-1]["content"]
+            if "Return ONLY the word" in content:
+                return LLMResponse(text=CODE, model="m", tokens={"input": 1, "output": 1})
+            self.calls += 1
+            if self.calls == 1:  # the initial plan
+                return LLMResponse(
+                    text=_json.dumps([{"title": "boom", "tool": "bash", "args": {"cmd": "exit 9"}}]),
+                    model="m",
+                    tokens={"input": 4, "output": 4},
+                )
+            raise RuntimeError("provider died mid-turn")
+
+    wire = _run_turn("run the doomed provider task", _DiedAfterPlan())
+    dones = _of_type(wire, "run.done")
+    assert dones[-1]["status"] == "failed"
+    assert _of_type(wire, "plan.update") == [], "no usable replan — no plan.update"
+    answers = _of_type(wire, "answer")
+    assert any("replan produced no usable plan" in a["text"] for a in answers)
+    assert any("couldn't plan" in a["text"] for a in answers)  # the honest refusal
