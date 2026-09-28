@@ -3,6 +3,7 @@
 import { memo, useState } from 'react';
 import type { MemoryEvent } from '../types/events';
 import { GLYPHS } from './render';
+import { Chevron } from './Chevron';
 
 export const MemoryBlock = memo(function MemoryBlock({ event }: { event: MemoryEvent }) {
   const { glyph, color } = GLYPHS['memory'];
@@ -16,6 +17,7 @@ export const MemoryBlock = memo(function MemoryBlock({ event }: { event: MemoryE
         <span className="meta">
           {event.op} · {event.entity}
         </span>
+        <Chevron open={open} />
       </button>
       {open && <p className="body">{event.fact}</p>}
     </article>

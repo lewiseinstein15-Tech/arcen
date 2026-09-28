@@ -18,6 +18,9 @@ export function Header() {
         ☰
       </button>
       <div className="wordmark" aria-label="ARCEN">
+        <span className="wordmark-mark" aria-hidden="true">
+          ◆
+        </span>
         A&nbsp;R&nbsp;C&nbsp;E&nbsp;N
       </div>
       <div className="header-right">

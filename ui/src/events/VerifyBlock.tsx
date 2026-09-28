@@ -4,6 +4,7 @@
 import { memo, useState } from 'react';
 import type { StepFailEvent, StepPassEvent, VerifyStartEvent } from '../types/events';
 import { GLYPHS } from './render';
+import { Chevron } from './Chevron';
 
 type Verdict = StepPassEvent | StepFailEvent;
 
@@ -53,6 +54,7 @@ export const VerifyBlock = memo(function VerifyBlock({
           </span>
           <span className="who">step {event.step} failed</span>
           <span className="meta">{event.retry > 0 ? `retry ${event.retry}` : 'retry pending'}</span>
+          <Chevron open={open} />
         </button>
         {open && <p className="body">{event.reason}</p>}
       </article>
@@ -75,6 +77,7 @@ export const VerifyBlock = memo(function VerifyBlock({
         </span>
         <span className="who">{event.type === 'verify.start' ? event.agent : 'TEMPER'}</span>
         <span className="meta">{target}</span>
+        <Chevron open={open} />
       </button>
       {open &&
         verdicts.map((v) =>

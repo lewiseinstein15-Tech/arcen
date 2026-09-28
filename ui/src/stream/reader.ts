@@ -20,7 +20,18 @@ export async function consumeStream(
 ): Promise<void> {
   const headers: Record<string, string> = {};
   if (lastEventId !== undefined) headers['Last-Event-ID'] = String(lastEventId);
-  const res = await fetch(`/api/stream?session=${sessionId}`, { signal, headers });
+
+  // 404 = the session has no live emitter yet — the boot state before the
+  // first /api/run. That is not an error: wait quietly and attach as soon
+  // as the session goes live (the UI must not spam a reconnect banner).
+  let res: Response;
+  for (;;) {
+    res = await fetch(`/api/stream?session=${sessionId}`, { signal, headers });
+    if (res.status !== 404) break;
+    if (signal?.aborted) return;
+    await new Promise((r) => setTimeout(r, 1500));
+    if (signal?.aborted) return;
+  }
   if (!res.ok || !res.body) throw new StreamError(res.status);
 
   const reader = res.body.getReader();

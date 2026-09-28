@@ -3,6 +3,7 @@
 import { memo, useState } from 'react';
 import type { SpawnDoneEvent, SpawnEvent } from '../types/events';
 import { GLYPHS, indent, truncate } from './render';
+import { Chevron } from './Chevron';
 
 export const SpawnBlock = memo(function SpawnBlock({
   event,
@@ -18,7 +19,7 @@ export const SpawnBlock = memo(function SpawnBlock({
   return (
     <article
       className="block spawn"
-      style={{ paddingLeft: `${indent(depth)}ch` }}
+      style={{ paddingLeft: `calc(${indent(depth)}ch + 10px)` }}
       data-seq={event.seq}
       aria-label={`spawned ${event.name}: ${truncate(event.task ?? '', 60)}`}
     >
@@ -33,6 +34,7 @@ export const SpawnBlock = memo(function SpawnBlock({
             ✓ {done.calls} calls · {done.duration_s}s
           </span>
         )}
+        <Chevron open={open} />
       </button>
       {open && <div className="spawn-children" data-depth={depth + 1} />}
     </article>

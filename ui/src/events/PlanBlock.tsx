@@ -3,6 +3,7 @@
 import { memo, useState } from 'react';
 import type { PlanEvent, PlanUpdateEvent } from '../types/events';
 import { GLYPHS } from './render';
+import { Chevron } from './Chevron';
 
 export const PlanBlock = memo(function PlanBlock({
   event,
@@ -31,6 +32,7 @@ export const PlanBlock = memo(function PlanBlock({
         <span className="meta">
           {isUpdate ? `re-plan · ${reason}` : `plan · ${steps.length} steps`}
         </span>
+        <Chevron open={open} />
       </button>
       {open && (
         <ol className="plan-steps">

@@ -3,6 +3,7 @@
 import { memo, useState } from 'react';
 import type { FileDiffEvent } from '../types/events';
 import { GLYPHS, truncate } from './render';
+import { Chevron } from './Chevron';
 
 export const FileDiffBlock = memo(function FileDiffBlock({ event }: { event: FileDiffEvent }) {
   const { glyph, color } = GLYPHS['file.diff'];
@@ -14,12 +15,9 @@ export const FileDiffBlock = memo(function FileDiffBlock({ event }: { event: Fil
           {glyph}
         </span>
         <span className="path">{truncate(event.path, 72)}</span>
+        <Chevron open={open} />
       </button>
-      {open && (
-        <pre className="diff" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-          {event.patch}
-        </pre>
-      )}
+      {open && <pre className="diff">{event.patch}</pre>}
     </article>
   );
 });

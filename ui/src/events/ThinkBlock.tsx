@@ -3,6 +3,7 @@
 import { memo, useState } from 'react';
 import type { ThinkEvent } from '../types/events';
 import { GLYPHS, truncate } from './render';
+import { Chevron } from './Chevron';
 
 export const ThinkBlock = memo(function ThinkBlock({ event }: { event: ThinkEvent }) {
   const { glyph, color } = GLYPHS['think'];
@@ -15,6 +16,7 @@ export const ThinkBlock = memo(function ThinkBlock({ event }: { event: ThinkEven
         </span>
         <span className="who">{event.agent}</span>
         {!open && <span className="preview">{truncate(event.text, 72)}</span>}
+        <Chevron open={open} />
       </button>
       {open && <p className="body">{event.text}</p>}
     </article>

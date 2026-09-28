@@ -66,7 +66,23 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
 
   const send = (text: string) => {
     if (!text.trim()) return;
-    void submitRun(text, sessionId);
+    void submitRun(text, sessionId)
+      .then(async () => {
+        // the stream attach polls until the session goes live; catch up on
+        // anything emitted in between (duplicate seqs are dropped by the store)
+        try {
+          const res = await fetch(`/api/sessions/${sessionId}/events`);
+          if (res.ok) {
+            const replayed = (await res.json()) as import('../types/events').ArcenEvent[];
+            useStreamStore.getState().hydrate(replayed);
+          }
+        } catch {
+          // best-effort catch-up; the live stream covers the rest
+        }
+      })
+      .catch(() => {
+        // submit failures surface through the stream error banner
+      });
   };
 
   return (
@@ -74,9 +90,14 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
       <div className="stream" role="log" aria-live="polite" data-testid="stream" tabIndex={0}>
         {events.length === 0 && (
           <div className="stream-empty" data-testid="stream-empty">
-            <p className="empty-line">◆ ready</p>
+            <span className="empty-mark" aria-hidden="true">
+              ◆
+            </span>
+            <p className="empty-line">ready.</p>
             <p className="empty-sub">
-              send a goal — DRAFT plans, FORGE executes, TEMPER verifies. every step lands here.
+              send a goal — DRAFT plans, FORGE executes, TEMPER verifies.
+              <br />
+              every step lands here, live.
             </p>
           </div>
         )}
