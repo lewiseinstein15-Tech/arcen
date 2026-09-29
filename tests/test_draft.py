@@ -579,7 +579,10 @@ class _ScriptedPlannerLLM:
 
 def _run_turn(goal: str, llm) -> list[dict]:
     """Drive one full turn synchronously; return the wire events in order."""
+    from arcen.config import default_config_path
+
     server_app.STATE = ServerState(config=ArcenConfig())
+    server_app.STATE.config_path = default_config_path().parent / "config.yaml.test"  # T-054: never the real file
     server_app.STATE.llm = llm
     session = f"s-replan-{_time.time_ns() % 1_000_000}"
     run_id = f"r-{uuid4().hex[:6]}"

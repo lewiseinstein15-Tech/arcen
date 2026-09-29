@@ -507,3 +507,11 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Test:** pytest — bridge maps custom+org/model → `openai/org/model` and the completion call carries `api_base`; config-test probe prefixes the same way.
 - **Verification:** the phase-B live run — Test Connection green and real chat replies against a custom endpoint carrying the dahl model id.
 - **Evidence:** found live during the v0.1.4 phase-B verification: with the settings saved correctly, the Test-Connection probe still failed — the probe (and bridge) passed `deepseek-ai/…` bare and LiteLLM misrouted it. Caught by `wait_for_selector('[data-testid="test-ok"]')` timeout.
+
+### [T-054] The test suite must never write the user's real config.yaml (noticed while fixing, v0.1.4)
+- **Status:** [x] done — verified
+- **Depends on:** T-049
+- **Deliverable:** every test-owned ServerState points `config_path` into pytest tmp — a PUT inside any suite can never reach `~/.arcen/config.yaml`. `test_config_put_round_trip` now hashes the real file before/after its PUT and fails if the bytes changed.
+- **Test:** pytest — the round-trip guard test; full suite runs with the real file byte-identical.
+- **Verification:** full pytest with a pre-existing real config → file untouched (verified by hash during the v0.1.4 closeout).
+- **Evidence:** found live during the v0.1.4 phase-B verification — the harness's saved dahl settings vanished between runs: `test_server._Server` never overrode `STATE.config_path`, so `test_config_put_round_trip`'s PUT persisted the suite's config (empty provider scalars, max_depth 3 — the exact fingerprint found on disk) over the user's real file. The process rule made it a ticket instead of a report line.

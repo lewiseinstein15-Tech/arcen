@@ -17,7 +17,7 @@ import pytest
 import uvicorn
 
 import arcen.server.app as server_app
-from arcen.config import ArcenConfig
+from arcen.config import ArcenConfig, default_config_path
 from arcen.llm.client import LLMResponse
 from arcen.server.app import ServerState, app
 
@@ -54,10 +54,13 @@ class _StubProviderLLM:
 
 
 class _Server:
-    def __init__(self) -> None:
+    def __init__(self, config_path) -> None:
         # explicit defaults — the suite must not depend on a real
         # ~/.arcen/config.yaml (a dev machine may configure any provider)
         server_app.STATE = ServerState(config=ArcenConfig())
+        # T-054: a PUT in this suite must NEVER reach the user's real
+        # config.yaml — the state's config_path points into pytest tmp
+        server_app.STATE.config_path = config_path
         # T-037: with no provider a real task refuses cleanly, so the
         # server tests run against a stub provider (the provider path)
         server_app.STATE.llm = _StubProviderLLM()
@@ -83,8 +86,8 @@ class _Server:
 
 
 @pytest.fixture()
-def server():
-    with _Server() as s:
+def server(tmp_path):
+    with _Server(tmp_path / "config.yaml") as s:
         yield s
 
 
@@ -202,6 +205,7 @@ def test_stream_disk_seed_after_restart(client, server) -> None:
 
     old_state = server_app.STATE
     server_app.STATE = ServerState(config=old_state.config)
+    server_app.STATE.config_path = old_state.config_path  # T-054: never the real file
     server_app.STATE.llm = _StubProviderLLM()  # keep the provider path alive
     try:
         assert session not in server_app.STATE.emitters  # memory wiped
@@ -230,11 +234,16 @@ def test_config_get_redacted(client) -> None:
 
 
 def test_config_put_round_trip(client) -> None:
+    # T-054 guard: the suite's PUTs must never touch the user's real file
+    real = default_config_path()
+    before = real.read_bytes() if real.exists() else None
     cfg = client.get("/api/config").json()
     cfg["subagents"]["max_depth"] = 3
     resp = client.put("/api/config", json=cfg)
     assert resp.status_code == 200
     assert client.get("/api/config").json()["subagents"]["max_depth"] == 3
+    after = real.read_bytes() if real.exists() else None
+    assert after == before, "the test suite wrote to the REAL ~/.arcen/config.yaml"
 
 
 def test_sessions_listed_and_replayable(client) -> None:

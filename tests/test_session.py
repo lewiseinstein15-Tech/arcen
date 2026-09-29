@@ -101,6 +101,9 @@ def test_server_persists_every_event(tmp_path) -> None:
 
     port = 3181
     server_app.STATE = ServerState()
+    from arcen.config import default_config_path
+
+    server_app.STATE.config_path = default_config_path().parent / "config.yaml.test"  # T-054: never the real file
     server_app.STATE.store = SessionStore(tmp_path)  # type: ignore[attr-defined]
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error"))
     thread = threading.Thread(target=server.run, daemon=True)
