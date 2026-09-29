@@ -23,6 +23,7 @@ Usage: python scripts/mock_provider.py [port]   (default 9377)
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import time
@@ -166,6 +167,30 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):  # quiet by default
         pass
 
+    def _fail(self) -> bool:
+        """v0.1.6 T4: MOCK_FAIL_STATUS=401 → every completion answers with
+        an OpenAI-shaped auth error, so the fail-fast path can be driven
+        end-to-end without touching a real provider."""
+        status = os.environ.get("MOCK_FAIL_STATUS", "").strip()
+        if not status:
+            return False
+        body = json.dumps(
+            {
+                "error": {
+                    "message": "invalid api key",
+                    "type": "invalid_request_error",
+                    "param": None,
+                    "code": "invalid_api_key",
+                }
+            }
+        ).encode()
+        self.send_response(int(status))
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        return True
+
     def _reply(self, content: str, model: str) -> None:
         body = json.dumps(
             {
@@ -188,6 +213,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802 — http.server API
         if not self.path.endswith("/chat/completions"):
             self.send_error(404)
+            return
+        if self._fail():
             return
         length = int(self.headers.get("Content-Length", 0))
         payload = json.loads(self.rfile.read(length) or b"{}")

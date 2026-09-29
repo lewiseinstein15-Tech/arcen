@@ -147,6 +147,8 @@ provider:
   base_url: https://inference.dahl.global/v1   # OpenAI-compatible endpoint (custom/ollama)
   api_key: $DAHL_API_KEY     # literal (file is chmod 600) or $VAR vault reference
   model: deepseek-ai/DeepSeek-V4-Flash-0731    # the model for all agents
+  max_retries: 3             # v0.1.6: transient-failure retries (429/500/502/503 only)
+  retry_backoff_seconds: 1.0 # v0.1.6: exponential base → 1s, 2s, 4s
 
 agents:
   draft:
@@ -239,6 +241,32 @@ characters or fewer are masked entirely; it is never logged in full. A boot
 where the config already has every slot filled writes nothing and logs
 nothing — the file, not the environment, is the source of truth after the
 first seeded boot.
+
+### LLM retry policy (v0.1.6)
+
+The provider block owns ONE retry policy. LiteLLM's internal retry loop and
+the provider SDK's own retry loop are both DISABLED (`num_retries=0`,
+`max_retries=0` on every `litellm.completion` call) — stacked retriers with
+independent 10-second backoffs were what hung the UI for minutes while the
+stream sat silent (`Retrying request to /chat/completions in 10.0s` ×5+).
+ARCEN retries instead, in one place (`llm/client.py`):
+
+| failure class | policy |
+|---------------|--------|
+| HTTP 400 / 401 / 403 / 404 | **fail immediately** — the request itself is wrong; a second identical call cannot succeed |
+| HTTP 429 / 500 / 502 / 503 | retry up to `provider.max_retries` (default 3), exponential backoff `provider.retry_backoff_seconds` × 2^k → **1s, 2s, 4s** |
+| connection error (never reached the provider) | treated as transient — same retry budget as 5xx |
+| timeout | the call is CANCELLED and reported at `provider` timeout (default **60s** per call, spec'd) — a call that already burned its whole budget is never re-burned |
+
+The FIRST failure's status + response-body excerpt is recorded; when the
+last attempt dies, the turn ends with a `run.error` event carrying the wire
+format **`provider error: <status> <brief message>`** (e.g. `provider error:
+401 invalid api key`) — the stream closes cleanly and the UI's spinner ends
+with the cause on screen. `ProviderError` is never swallowed into offline
+fallbacks: DRAFT's classifier, DIRECT replies, and the planner all re-raise
+it. The Test-Connection probe (`POST /api/config/test`) is a single call —
+no retries — and answers with the fix-it-shaped message (e.g. `provider
+error: 401 unauthorized — check your API key`) within seconds.
 
 ### Sandbox backends (T-043)
 
@@ -447,7 +475,9 @@ GET /api/stream?session=s-77 HTTP/1.1
 Last-Event-ID: 42
 ```
 
-and the server resumes from `seq` 43, re-emitting buffered events first, then live. Missing sessions return `404`; unknown `Last-Event-ID` (compacted away) returns `409` with the oldest available `seq` so the client can re-decide.
+and the server resumes from `seq` 43, re-emitting buffered events first, then live. A compacted-away `Last-Event-ID` returns `409` with the oldest available `seq` so the client can re-decide; garbage or future ids replay fresh from the top (never a 400).
+
+**Held streams (v0.1.6).** The stream never rejects a valid session: a malformed id is a client bug → `400`; a valid id that exists nowhere (memory AND disk) — a client-minted uuid before its first `/api/run` — returns **200 and holds**, polling for the session's birth (attach within ~0.25s of the POST), then replays and delivers live until the terminal event, then `stream.done` + close. `{"type":"stream.ping"}` heartbeats every 15s of silence keep proxies from killing the idle hold (the ping is a transport frame, seq-less — invisible to the event store). **There is no 404 on `/api/stream` for valid sessions.**
 
 ---
 
