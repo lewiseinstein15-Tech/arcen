@@ -449,7 +449,7 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Evidence:** v0.1.2 report — "sessions accumulate there across runs"; T-045 removes the shared id, T-046 proves the isolation
 
 ### [T-047] Ticket pointer correction (housekeeping)
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** none
 - **Deliverable:** every spec pointer that means sandbox says Part 4 (config/sandbox), not Part 8 (credential vault). Part 8 (Credential Vault) gets the one-line note: "(Note: earlier tickets sometimes referred to Part 8 as 'sandbox' — the sandbox lives in Part 4. Part 8 is the credential vault.)" The T-043 deliverable line is corrected to name Part 4. No code change.
 - **Test:** `grep -rn "Part 8" docs/` — no remaining reference means sandbox; the Part 8 header note is present
