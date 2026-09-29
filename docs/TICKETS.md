@@ -431,7 +431,7 @@ This closes the pattern where real bugs sit unactioned in a report.
 | vitest chip branch-order bug | [x] handled by tests (v0.1.2 chip tests, caught + fixed the order) |
 
 ### [T-045] Deterministic session id "s-ui" (real bug)
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** none
 - **Deliverable:** no hardcoded default session id anywhere. On first load (no stored session id) the UI generates a fresh `crypto.randomUUID()` and persists it (`localStorage['arcen.activeId']` — the repo's canonical key for the ticket's "arcen.currentSession") and uses it everywhere — stream, run, session store. The old "s-ui" survives only as a migration target: a context still pinned to it loads those events once, then rotates to a fresh id for the next turn. Tests stop using s-ui fixtures (deterministic fixture ids or generated UUIDs).
 - **Test:** `npx vitest run` — fresh context generates a UUID (never "s-ui"); reload keeps the same id; "+ New chat" generates a new UUID; two fresh contexts get different UUIDs; a legacy "s-ui" context replays once then rotates
