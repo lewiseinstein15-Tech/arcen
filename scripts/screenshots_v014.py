@@ -155,9 +155,16 @@ def boot_stack(procs: list) -> bool:
 
     The backend reads the REAL ~/.arcen/config.yaml (no override) — phase B
     therefore boots with the endpoint/model the phase-A save persisted."""
-    for pattern in ("uvicorn arcen.server.app", "mock_provider.py", "vite"):
+    for pattern in ("arcen.server.app", "mock_provider.py", "vite"):
         subprocess.run(["pkill", "-f", pattern], capture_output=True)
     time.sleep(1)
+    # the stale-backend trap: health must FAIL right now (nothing on :3002).
+    # The pkill pattern above matches the harness's own `python -c` cmdline —
+    # a pattern that misses it leaves an old backend squatting on the port,
+    # serving pre-fix code while every fresh boot fails to bind silently.
+    if wait_http(f"{BASE}/api/health", timeout=2):
+        print("FATAL: something is still listening on :3002 — stale backend")
+        return False
     procs.append(subprocess.Popen(
         [".venv/bin/python", "scripts/mock_provider.py", str(MOCK_PORT)],
         cwd=ROOT, stdout=open("/tmp/v014-mock.log", "w"), stderr=subprocess.STDOUT,
@@ -320,10 +327,19 @@ def run_phase_b(page) -> None:
           page.locator('[data-testid="save-chip"]').count() == 0)
 
     page.click('[data-testid="test-connection-btn"]')
-    page.wait_for_selector('[data-testid="test-ok"]', timeout=20000)
-    ok_text = page.locator('[data-testid="test-ok"]').inner_text()
+    # wait for EITHER outcome — a timeout with no probe response means the
+    # click never fired; test-err text names the failure
+    outcome = ""
+    try:
+        page.wait_for_selector('[data-testid="test-ok"], [data-testid="test-err"]', timeout=20000)
+        if page.locator('[data-testid="test-ok"]').count() > 0:
+            outcome = "ok: " + page.locator('[data-testid="test-ok"]').inner_text()
+        else:
+            outcome = "err: " + page.locator('[data-testid="test-err"]').inner_text()
+    except Exception as e:
+        outcome = f"no probe outcome at all ({type(e).__name__})"
     check("B0 Test Connection green (model probe through the bridge shape)",
-          "connected" in ok_text, ok_text[:60])
+          outcome.startswith("ok:"), outcome[:160])
 
     # -- 04: hello -> a real reply through the bridge -----------------------
     page.click('[data-testid="nav-chat"]')
@@ -339,20 +355,25 @@ def run_phase_b(page) -> None:
     # -- 05: 2+2 -> "4", no bash plan ----------------------------------------
     seq1 = max((int(e["seq"]) for e in events1 if isinstance(e.get("seq"), int)), default=0)
     answer2, base2, events2 = run_turn(page, "2+2", "4")
-    check("05 2+2 -> 4", answer2.strip().endswith("4"), answer2[-70:].replace("\n", " / "))
+    answers = [e for e in events2 if e.get("type") == "answer"]
+    wire_text = str(answers[-1].get("text", "")) if answers else answer2
+    check("05 2+2 -> 4 (wire answer text)", wire_text.strip() == "4",
+          wire_text[:70].replace("\n", " / "))
     bash_steps = [e for e in events2 if e.get("type") in ("plan", "plan.update")]
     check("05 no bash plan (direct answer)", not bash_steps)
     guarded_capture(page, SHOTS / "05-math-direct.png", "05",
                     TurnBaseline(rendered_count=base2, max_seq=seq1), events2)
 
     # -- T-052: no 404s for /api/sessions/<uuid>/events ----------------------
-    log = BACKEND_LOG.read_text()
+    # uvicorn colorizes access-log status codes — strip ANSI before matching
+    ansi = re.compile(r"\x1b\[[0-9;]*m")
+    log = "\n".join(ansi.sub("", ln) for ln in BACKEND_LOG.read_text(errors="replace").splitlines())
     not_founds = [ln for ln in log.splitlines()
-                  if '"/api/sessions/' in ln and '" 404' in ln]
+                  if "/api/sessions/" in ln and "/events" in ln and " 404 " in ln]
     check("05 server log: no 404 for /api/sessions/<uuid>/events", not not_founds,
           not_founds[0][:110] if not_founds else "")
     replays = [ln for ln in log.splitlines()
-               if '"/api/sessions/' in ln and '/events' in ln and '" 200' in ln]
+               if "/api/sessions/" in ln and "/events" in ln and " 200 " in ln]
     check("05 server log: fresh-session event replays return 200", bool(replays),
           f"{len(replays)} x 200 on /api/sessions/*/events")
 
