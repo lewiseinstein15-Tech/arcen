@@ -494,24 +494,19 @@ def get_config() -> dict:
 
 @app.put("/api/config")
 def put_config(payload: dict = Body(...)) -> dict:
-    """Update the config (T-036 Settings → Save).
+    """Update the config (T-036 Settings → Save; T-049 scalar provider).
 
-    - '<redacted>' api-key values are substituted with the live config's
-      stored value — a redacted GET round-trip never wipes a key;
+    - a '<redacted>' provider.api_key is substituted with the live
+      config's stored value — a redacted GET round-trip never wipes a key;
     - the result is persisted to the user's config.yaml (chmod 600);
     - the provider bridge reloads in-memory so the next turn uses the
       new provider immediately (no restart).
     """
     incoming = dict(payload)
-    incoming.setdefault("provider", {})
-    if isinstance(incoming.get("provider"), dict):
-        incoming_provider = dict(incoming["provider"])
-        keys = dict(incoming_provider.get("api_keys") or {})
-        for name, value in keys.items():
-            if value == "<redacted>":
-                keys[name] = STATE.config.provider.api_keys.get(name, "")
-        incoming_provider["api_keys"] = keys
-        incoming["provider"] = incoming_provider
+    provider = dict(incoming.get("provider") or {})
+    if provider.get("api_key") == "<redacted>":
+        provider["api_key"] = STATE.config.provider.api_key
+    incoming["provider"] = provider
     updated = ArcenConfig.model_validate(incoming)
     STATE.config = updated
     save_config(STATE.config_path, updated)
@@ -524,12 +519,13 @@ PROVIDERS = frozenset({"custom", "groq", "deepseek", "openai", "anthropic", "oll
 
 @app.post("/api/config/test")
 def test_config(payload: dict = Body(...)) -> dict:
-    """Probe a provider connection (T-036 Test Connection).
+    """Probe a provider connection (T-036 Test Connection; T-049 scalar).
 
-    Accepts {provider, model?, base_url?, api_key?}. A missing key falls
-    back to the live config's stored credential (the UI sends the
-    redacted placeholder when the field is untouched). The reply never
-    echoes the key — errors are sanitized before returning.
+    Accepts {provider, model?, base_url?, api_key?}. A missing key/model
+    falls back to the live config's stored values when the probe targets
+    the configured provider; an unresolved ``$VAR`` key resolves from the
+    environment. No vendor defaults: an empty model is an error, never
+    claude-*. The reply never echoes the key — errors are sanitized.
     """
     import litellm
 
@@ -538,17 +534,30 @@ def test_config(payload: dict = Body(...)) -> dict:
     provider = str(payload.get("provider", "")).strip().lower()
     if provider not in PROVIDERS:
         raise HTTPException(status_code=422, detail=f"unknown provider {provider!r}")
+    configured = STATE.config.provider
+    same = configured.name.strip().lower() == provider
+
     model = str(payload.get("model", "")).strip()
-    base_url = str(payload.get("base_url", "")).strip() or None
+    if not model and same:
+        model = configured.model.strip()
+    if not model:
+        return {"ok": False, "error": "no model given — set Model Name in Settings"}
+
+    base_url = str(payload.get("base_url", "")).strip()
+    if not base_url and same:
+        base_url = configured.base_url.strip()
+
     api_key = str(payload.get("api_key", "")).strip()
-    if api_key in ("", "<redacted>"):
-        resolved, _missing = resolve_secrets({"api_keys": STATE.config.provider.api_keys})
-        api_key = str((resolved.get("api_keys") or {}).get(provider, "") or "")
-    if not api_key and provider not in KEYLESS_PROVIDERS:
+    if api_key in ("", "<redacted>") and same:
+        api_key = configured.api_key.strip()
+    if api_key.startswith("$"):
+        resolved, _missing = resolve_secrets({"k": api_key})
+        api_key = str(resolved.get("k") or "").strip()
+    if api_key in ("", "<redacted>") and provider not in KEYLESS_PROVIDERS:
         return {"ok": False, "error": "no API key configured for this provider"}
 
     prefix = LITELLM_PREFIX.get(provider, "")
-    full_model = model if "/" in model else prefix + (model or {"anthropic": "claude-haiku-4-5", "openai": "gpt-4o-mini"}.get(provider, "default"))
+    full_model = model if "/" in model else prefix + model
     kwargs: dict = {
         "model": full_model,
         "messages": [{"role": "user", "content": "reply with the word: pong"}],

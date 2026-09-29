@@ -221,11 +221,11 @@ def test_stream_disk_seed_after_restart(client, server) -> None:
 
 def test_config_get_redacted(client) -> None:
     cfg = client.get("/api/config").json()
-    assert cfg["provider"]["models"]["planner"] == "claude-sonnet-4-5"
-    for value in cfg["provider"].get("api_keys", {}).values():
-        assert value in ("$ANTHROPIC_API_KEY", "$OPENAI_API_KEY", "<redacted>"), (
-            "secret values must never leave the server"
-        )
+    assert "models" not in cfg["provider"]  # T-049: the dict shape is gone
+    key = cfg["provider"]["api_key"]
+    assert key in ("", "<redacted>") or key.startswith("$"), (
+        "secret values must never leave the server"
+    )
 
 
 def test_config_put_round_trip(client) -> None:

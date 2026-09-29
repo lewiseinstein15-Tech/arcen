@@ -163,7 +163,10 @@ def test_real_client_mocked_provider_end_to_end() -> None:
             usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1),
         )
 
-    client = Client(completion_fn=fake_completion)
+    client = Client(
+        models={"planner": "m-planner", "executor": "m-executor", "verifier": "m-verifier"},
+        completion_fn=fake_completion,
+    )
     planner = DraftPlanner(llm=client)
     events = planner.open_turn("wire it")
     assert events[1].steps[0]["title"] == "act"

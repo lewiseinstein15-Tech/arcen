@@ -9,7 +9,7 @@
 // wipe a key. Saving persists to ~/.arcen/config.yaml and reloads the
 // provider bridge in-memory.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Toast } from './Toast';
 
 const PROVIDERS = ['custom', 'groq', 'deepseek', 'openai', 'anthropic', 'ollama'] as const;
@@ -94,32 +94,19 @@ export function SettingsView() {
   }, []);
 
   // -- typed accessors over the raw config tree ---------------------------
+  // T-049: the provider block is four scalars (name/base_url/api_key/model)
+  // — no per-vendor dicts, no shipped vendor defaults.
   const provider = (cfg?.provider ?? {}) as Record<string, unknown>;
-  const models = (provider.models ?? {}) as Record<string, string>;
-  const apiKeys = (provider.api_keys ?? {}) as Record<string, string>;
-  const baseUrls = (provider.base_urls ?? {}) as Record<string, string>;
   const agents = (cfg?.agents ?? {}) as Record<string, Record<string, unknown>>;
   const sandbox = (cfg?.sandbox ?? {}) as Record<string, unknown>;
 
-  const currentProvider = (provider.default as Provider) ?? 'custom';
+  const currentProvider = (provider.name as Provider) || 'custom';
   const [keyDraft, setKeyDraft] = useState<string | undefined>(undefined);
-
-  const commonModel = useMemo(() => {
-    const vals = new Set(Object.values(models));
-    return vals.size === 1 ? [...vals][0] ?? '' : '';
-  }, [models]);
 
   const patchProvider = (patch: Record<string, unknown>) => {
     setCfg((c) => {
       const p = (c?.provider as Record<string, unknown> | undefined) ?? {};
       return { ...c, provider: { ...p, ...patch } };
-    });
-  };
-  const patchModels = (patch: Record<string, string>) => {
-    setCfg((c) => {
-      const p = (c?.provider as Record<string, unknown> | undefined) ?? {};
-      const m = (p.models as Record<string, string> | undefined) ?? {};
-      return { ...c, provider: { ...p, models: { ...m, ...patch } } };
     });
   };
   const patchAgent = (name: string, field: string, value: unknown) => {
@@ -135,10 +122,6 @@ export function SettingsView() {
     });
   };
 
-  const setModelEverywhere = (name: string) => {
-    patchModels({ planner: name, executor: name, verifier: name });
-  };
-
   const doTest = useCallback(async () => {
     setTest({ status: 'testing' });
     try {
@@ -147,9 +130,12 @@ export function SettingsView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: currentProvider,
-          model: models.planner || '',
-          base_url: baseUrls[currentProvider] || '',
-          api_key: keyDraft !== undefined ? keyDraft : apiKeys[currentProvider] || '',
+          model: String(provider.model ?? ''),
+          base_url: String(provider.base_url ?? ''),
+          api_key:
+            keyDraft !== undefined && keyDraft !== ''
+              ? keyDraft
+              : String(provider.api_key ?? ''),
         }),
       });
       const body = (await res.json()) as { ok: boolean; error?: string; sample?: string };
@@ -158,17 +144,18 @@ export function SettingsView() {
     } catch (err) {
       setTest({ status: 'err', message: String(err) });
     }
-  }, [currentProvider, models.planner, baseUrls, apiKeys, keyDraft]);
+  }, [currentProvider, provider.model, provider.base_url, provider.api_key, keyDraft]);
 
   const doSave = useCallback(async () => {
-    if (!cfg) return;
+    if (!cfg) return; // a null config renders the loading/error view — no inert button
     setSaving(true);
     try {
       const payload = structuredClone(cfg);
       const p = (payload.provider ?? {}) as Record<string, unknown>;
-      const keys = { ...(p.api_keys as Record<string, string> | undefined) };
-      if (keyDraft !== undefined && keyDraft !== '') keys[currentProvider] = keyDraft;
-      p.api_keys = keys;
+      // the select DISPLAYS 'custom' while the stored name is still empty —
+      // persist what the user sees, never a silent empty name (T-049)
+      if (!String(p.name ?? '').trim()) p.name = currentProvider;
+      if (keyDraft !== undefined && keyDraft !== '') p.api_key = keyDraft;
       payload.provider = p;
       const res = await fetch('/api/config', {
         method: 'PUT',
@@ -179,6 +166,8 @@ export function SettingsView() {
         const detail = await res.text();
         throw new Error(detail.slice(0, 160) || String(res.status));
       }
+      // adopt the server's redacted view so the key field stays consistent
+      setCfg((await res.json()) as Record<string, unknown>);
       localStorage.setItem(VERBOSITY_KEY, verbosity);
       localStorage.setItem(AUTOSCROLL_KEY, autoScroll ? 'on' : 'off');
       setToast({ message: 'Saved', kind: 'ok' });
@@ -218,7 +207,7 @@ export function SettingsView() {
           <select
             data-testid="provider-select"
             value={currentProvider}
-            onChange={(e) => patchProvider({ default: e.target.value })}
+            onChange={(e) => patchProvider({ name: e.target.value })}
           >
             {PROVIDERS.map((p) => (
               <option key={p} value={p}>{p}</option>
@@ -233,8 +222,8 @@ export function SettingsView() {
               type="text"
               data-testid="base-url-input"
               placeholder="http://localhost:11434"
-              value={baseUrls[currentProvider] ?? ''}
-              onChange={(e) => patchProvider({ base_urls: { ...baseUrls, [currentProvider]: e.target.value } })}
+              value={String(provider.base_url ?? '')}
+              onChange={(e) => patchProvider({ base_url: e.target.value })}
             />
           </label>
         )}
@@ -244,7 +233,7 @@ export function SettingsView() {
           <input
             type="password"
             data-testid="api-key-input"
-            placeholder={apiKeys[currentProvider] ? '•••• stored — leave blank to keep' : 'sk-…'}
+            placeholder={String(provider.api_key ?? '') ? '•••• stored — leave blank to keep' : 'sk-…'}
             value={keyDraft ?? ''}
             onChange={(e) => setKeyDraft(e.target.value)}
             autoComplete="off"
@@ -257,9 +246,9 @@ export function SettingsView() {
             type="text"
             data-testid="model-input"
             list="model-suggestions"
-            placeholder={commonModel || 'model for all agents'}
-            value={commonModel}
-            onChange={(e) => setModelEverywhere(e.target.value)}
+            placeholder="model for all agents"
+            value={String(provider.model ?? '')}
+            onChange={(e) => patchProvider({ model: e.target.value })}
           />
           <datalist id="model-suggestions">
             {MODEL_SUGGESTIONS[currentProvider].map((m) => (
@@ -287,17 +276,20 @@ export function SettingsView() {
         <label className="field">
           <span className="field-label">DRAFT model</span>
           <input type="text" list="model-suggestions" data-testid="draft-model"
-            value={models.planner ?? ''} onChange={(e) => patchModels({ planner: e.target.value })} />
+            value={String((agents.draft?.model as string | null) ?? '')}
+            onChange={(e) => patchAgent('draft', 'model', e.target.value || null)} />
         </label>
         <label className="field">
           <span className="field-label">FORGE model</span>
           <input type="text" list="model-suggestions" data-testid="forge-model"
-            value={models.executor ?? ''} onChange={(e) => patchModels({ executor: e.target.value })} />
+            value={String((agents.forge?.model as string | null) ?? '')}
+            onChange={(e) => patchAgent('forge', 'model', e.target.value || null)} />
         </label>
         <label className="field">
           <span className="field-label">TEMPER model</span>
           <input type="text" list="model-suggestions" data-testid="temper-model"
-            value={models.verifier ?? ''} onChange={(e) => patchModels({ verifier: e.target.value })} />
+            value={String((agents.temper?.model as string | null) ?? '')}
+            onChange={(e) => patchAgent('temper', 'model', e.target.value || null)} />
         </label>
         <label className="field">
           <span className="field-label">DRAFT max steps</span>

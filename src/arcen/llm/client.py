@@ -6,8 +6,10 @@ ARCEN identity block prepended to every call so each model speaks as the
 correct core agent (DRAFT / FORGE / TEMPER).
 
 Roles are fixed: planner→DRAFT, executor→FORGE, verifier→TEMPER.
-Model names come from config ``provider.models``; credentials are
-resolved from the environment by the credential vault — never literals.
+Model names are passed in by the bridge (llm/bridge.py): the agent's
+own ``agents.<name>.model`` or the inherited ``provider.model`` —
+no vendor defaults live here (T-049/T-050). Credentials are resolved
+from the environment by the credential vault — never literals.
 """
 
 from __future__ import annotations
@@ -71,15 +73,13 @@ class LLMResponse:
     duration_s: float = 0.0
 
 
-DEFAULT_MODELS: dict[str, str] = {
-    "planner": "claude-sonnet-4-5",
-    "executor": "claude-sonnet-4-5",
-    "verifier": "claude-haiku-4-5",
-}
-
-
 class Client:
-    """The one LLM bridge. Fixed per-role model mapping over LiteLLM."""
+    """The one LLM bridge. Fixed per-role model mapping over LiteLLM.
+
+    ``models`` maps role → concrete model name and comes from the bridge
+    (provider.model + agents inheritance). A role with no model is a
+    configuration error — model_for raises rather than inventing one.
+    """
 
     def __init__(
         self,
@@ -88,14 +88,19 @@ class Client:
         completion_fn: Callable[..., Any] | None = None,
     ) -> None:
         # fixed per-role mapping — callers cannot pass arbitrary models per call
-        self.models = {**DEFAULT_MODELS, **(models or {})}
+        self.models = dict(models or {})
         self.max_retries = max_retries
         self._completion = completion_fn or litellm.completion
 
     def model_for(self, role: str) -> str:
         if role not in ROLE_AGENTS:
             raise ValueError(f"unknown role {role!r}; expected one of {sorted(ROLE_AGENTS)}")
-        return self.models[role]
+        model = self.models.get(role, "").strip()
+        if not model:
+            raise ValueError(
+                f"no model configured for role {role!r} — set Model Name in Settings"
+            )
+        return model
 
     def is_available(self) -> bool:
         """True when a usable provider credential was resolved (T-037).

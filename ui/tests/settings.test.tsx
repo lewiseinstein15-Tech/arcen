@@ -13,23 +13,24 @@ import { useStreamStore } from '../src/state/streamStore';
 import { useUiStore } from '../src/state/uiStore';
 
 function configFixture() {
+  // T-049: the provider block is four scalars; agents carry nullable models
   return {
     provider: {
-      default: 'custom',
-      models: { planner: 'mock-1', executor: 'mock-1', verifier: 'mock-1' },
-      api_keys: { custom: '<redacted>' },
-      base_urls: { custom: 'http://127.0.0.1:9377/v1' },
+      name: 'custom',
+      base_url: 'http://127.0.0.1:9377/v1',
+      api_key: '<redacted>',
+      model: 'mock-1',
     },
     agents: {
-      draft: { max_steps: 40, replan_on_fail: true },
-      forge: { step_timeout_s: 120, max_retries: 2 },
-      temper: { adversarial: true, reruns: 1 },
+      draft: { max_steps: 40, replan_on_fail: true, model: null },
+      forge: { step_timeout_s: 120, max_retries: 2, model: null },
+      temper: { adversarial: true, reruns: 1, model: null },
     },
     sandbox: { image: 'ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0', mem_limit: '2g', cpus: 2, network: 'none' },
     stream: { port: 3002, content_type: 'application/x-ndjson' },
     session: { dir: '~/.arcen/sessions' },
     memory: { db: '~/.arcen/memory.db', decay_half_life_days: 14 },
-    subagents: { max_depth: 2, max_concurrent: 8, default_model: 'claude-haiku-4-5' },
+    subagents: { max_depth: 2, max_concurrent: 8, default_model: null },
     skills: { paths: [] },
     mcps: [],
     plugins: { enabled: [], paths: [] },
@@ -95,10 +96,74 @@ describe('T-036: settings view', () => {
       expect(putBodies.length).toBe(1);
     });
     const body = JSON.parse(putBodies[0]);
-    expect(body.provider.default).toBe('groq');
-    expect(body.provider.api_keys.custom).toBe('<redacted>'); // untouched → placeholder
+    expect(body.provider.name).toBe('groq');
+    expect(body.provider.api_key).toBe('<redacted>'); // untouched → placeholder
     expect(body.agents.draft.max_steps).toBe(40); // full config preserved
     expect(await screen.findByTestId('toast')).toHaveTextContent('Saved');
+  });
+
+  it('T-049: typing a Model Name PUTs provider.model; agents keep inherit', async () => {
+    const putBodies: string[] = [];
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes('/api/config') && init?.method === 'PUT') {
+        putBodies.push(String(init.body));
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      if (String(url).includes('/api/config')) {
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+
+    const modelInput = await screen.findByTestId('model-input');
+    expect(modelInput).toHaveValue('mock-1'); // the stored model is shown
+    fireEvent.change(modelInput, { target: { value: 'deepseek-ai/DeepSeek-V4-Flash-0731' } });
+    fireEvent.click(screen.getByTestId('settings-save'));
+
+    await waitFor(() => {
+      expect(putBodies.length).toBe(1);
+    });
+    const body = JSON.parse(putBodies[0]);
+    expect(body.provider.model).toBe('deepseek-ai/DeepSeek-V4-Flash-0731');
+    expect(body.provider.name).toBe('custom');
+    // agent models stay null → inherit provider.model
+    expect(body.agents.draft.model).toBeNull();
+    expect(body.agents.temper.model).toBeNull();
+  });
+
+  it('T-049: the AGENTS fields carry a typed override; empty stays null', async () => {
+    const putBodies: string[] = [];
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes('/api/config') && init?.method === 'PUT') {
+        putBodies.push(String(init.body));
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      if (String(url).includes('/api/config')) {
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+
+    fireEvent.change(await screen.findByTestId('temper-model'), { target: { value: 'verifier-x' } });
+    fireEvent.change(screen.getByTestId('draft-model'), { target: { value: '' } });
+    fireEvent.click(screen.getByTestId('settings-save'));
+
+    await waitFor(() => {
+      expect(putBodies.length).toBe(1);
+    });
+    const body = JSON.parse(putBodies[0]);
+    expect(body.agents.temper.model).toBe('verifier-x');
+    expect(body.agents.draft.model).toBeNull();
   });
 
   it('Test Connection shows ok inline (and the toast flow stays separate)', async () => {

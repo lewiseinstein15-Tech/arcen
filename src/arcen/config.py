@@ -26,28 +26,24 @@ from pydantic import BaseModel, Field
 VAR_PATTERN = re.compile(r"^\$[A-Z_]+$")
 
 DEFAULT_CONFIG: dict = {
+    # T-049: the provider block is the four scalar fields Settings saves.
+    # No Anthropic (or any vendor) defaults ship in the config — an empty
+    # model means offline, never claude-* against a custom endpoint.
     "provider": {
-        "default": "anthropic",
-        "models": {
-            "planner": "claude-sonnet-4-5",
-            "executor": "claude-sonnet-4-5",
-            "verifier": "claude-haiku-4-5",
-        },
-        "api_keys": {
-            "anthropic": "$ANTHROPIC_API_KEY",
-            "openai": "$OPENAI_API_KEY",
-        },
-        "base_urls": {},
+        "name": "",  # custom | groq | deepseek | openai | anthropic | ollama
+        "base_url": "",  # OpenAI-compatible endpoint (custom / ollama)
+        "api_key": "",  # literal or $VAR (credential vault indirection)
+        "model": "",  # the model for all agents — agents.<name>.model overrides
     },
     "agents": {
-        "draft": {"max_steps": 40, "replan_on_fail": True},
-        "forge": {"step_timeout_s": 120, "max_retries": 2},
-        "temper": {"adversarial": True, "reruns": 1},
+        "draft": {"max_steps": 40, "replan_on_fail": True, "model": None},
+        "forge": {"step_timeout_s": 120, "max_retries": 2, "model": None},
+        "temper": {"adversarial": True, "reruns": 1, "model": None},
     },
     "subagents": {
         "max_depth": 2,
         "max_concurrent": 8,
-        "default_model": "claude-haiku-4-5",
+        "default_model": None,  # T-050: null → inherit provider.model
     },
     "skills": {"paths": ["~/.arcen/skills", "./skills"]},
     "mcps": [],
@@ -66,25 +62,32 @@ DEFAULT_CONFIG: dict = {
 
 
 class ProviderConfig(BaseModel):
-    default: str = "anthropic"
-    models: dict[str, str] = Field(default_factory=lambda: dict(DEFAULT_CONFIG["provider"]["models"]))
-    api_keys: dict[str, str] = Field(default_factory=dict)
-    base_urls: dict[str, str] = Field(default_factory=dict)
+    """The provider Settings saves (T-049): four scalars, no per-vendor
+    dicts, no shipped vendor defaults. ``api_key`` may be a ``$VAR``
+    reference resolved from the environment at bridge-build time."""
+
+    name: str = ""
+    base_url: str = ""
+    api_key: str = ""
+    model: str = ""
 
 
 class DraftConfig(BaseModel):
     max_steps: int = 40
     replan_on_fail: bool = True
+    model: str | None = None  # T-050: null → inherit provider.model
 
 
 class ForgeConfig(BaseModel):
     step_timeout_s: float = 120
     max_retries: int = 2
+    model: str | None = None  # T-050: null → inherit provider.model
 
 
 class TemperConfig(BaseModel):
     adversarial: bool = True
     reruns: int = 1
+    model: str | None = None  # T-050: null → inherit provider.model
 
 
 class AgentsConfig(BaseModel):
@@ -96,7 +99,8 @@ class AgentsConfig(BaseModel):
 class SubagentsConfig(BaseModel):
     max_depth: int = 2
     max_concurrent: int = 8
-    default_model: str = "claude-haiku-4-5"
+    # T-050: no vendor default — null inherits provider.model
+    default_model: str | None = None
 
 
 class SkillsConfig(BaseModel):
@@ -165,6 +169,64 @@ class ArcenConfig(BaseModel):
         return redact_secrets(self.model_dump())
 
 
+# The provider/models values the old config shipped; anything else in a
+# legacy file is a genuine user override worth carrying across (T-049).
+_LEGACY_ROLE_DEFAULTS = {
+    "planner": "claude-sonnet-4-5",
+    "executor": "claude-sonnet-4-5",
+    "verifier": "claude-haiku-4-5",
+}
+_LEGACY_ROLE_AGENTS = {"planner": "draft", "executor": "forge", "verifier": "temper"}
+
+
+def migrate_legacy_config(raw: dict) -> dict:
+    """v0.1.4 (T-049): legacy provider dict-shape → the scalar shape, once,
+    on load.
+
+    ``default`` → ``name``; ``api_keys[<name>]`` → ``api_key``;
+    ``base_urls[<name>]`` → ``base_url``; the per-role ``models`` map only
+    survives where the user actually overrode the shipped Anthropic
+    defaults — all-equal overrides become ``provider.model``, mixed ones
+    map onto ``agents.<name>.model``. The claude-* seed values are dropped:
+    they never fit a custom endpoint.
+    """
+    if not isinstance(raw, dict):
+        return raw
+    provider = raw.get("provider")
+    if isinstance(provider, dict) and "name" not in provider:
+        name = str(provider.get("default") or "")
+        if name:
+            provider["name"] = name
+            keys = provider.get("api_keys")
+            if isinstance(keys, dict) and keys.get(name):
+                provider.setdefault("api_key", keys[name])
+            urls = provider.get("base_urls")
+            if isinstance(urls, dict) and urls.get(name):
+                provider.setdefault("base_url", urls[name])
+        models = provider.get("models")
+        if isinstance(models, dict):
+            agents = raw.setdefault("agents", {})
+            overrides: dict[str, str] = {
+                role: str(value)
+                for role, value in models.items()
+                if value and value != _LEGACY_ROLE_DEFAULTS.get(role)
+            }
+            roles = set(overrides)
+            if len(overrides) == 3 and len(set(overrides.values())) == 1:
+                provider.setdefault("model", next(iter(overrides.values())))
+            else:
+                for role in roles & set(_LEGACY_ROLE_AGENTS):
+                    slot = agents.setdefault(_LEGACY_ROLE_AGENTS[role], {})
+                    if isinstance(slot, dict):
+                        slot.setdefault("model", overrides[role])
+        for stale in ("default", "models", "api_keys", "base_urls"):
+            provider.pop(stale, None)
+    subagents = raw.get("subagents")
+    if isinstance(subagents, dict) and subagents.get("default_model") == "claude-haiku-4-5":
+        subagents["default_model"] = None  # shipped seed → inherit
+    return raw
+
+
 def deep_merge(base: dict, override: dict) -> dict:
     out = copy.deepcopy(base)
     for key, value in override.items():
@@ -188,7 +250,9 @@ def load_config(path: str | Path | None = None) -> ArcenConfig:
     raw = yaml.safe_load(file.read_text(encoding="utf-8")) or {}
     if not isinstance(raw, dict):
         raise ValueError(f"config {file} must be a YAML mapping")
-    return ArcenConfig.model_validate(deep_merge(DEFAULT_CONFIG, raw))
+    return ArcenConfig.model_validate(
+        deep_merge(DEFAULT_CONFIG, migrate_legacy_config(raw))
+    )
 
 
 def default_config_path() -> Path:
@@ -246,7 +310,10 @@ def redact_secrets(config: dict) -> dict:
 
     def walk(node: object, secret: bool) -> object:
         if isinstance(node, dict):
-            return {k: walk(v, secret or k in {"api_keys", "headers"}) for k, v in node.items()}
+            return {
+                k: walk(v, secret or k in {"api_keys", "api_key", "headers"})
+                for k, v in node.items()
+            }
         if isinstance(node, list):
             return [walk(v, secret) for v in node]
         if isinstance(node, str) and secret and not VAR_PATTERN.match(node) and node != "":

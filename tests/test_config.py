@@ -28,17 +28,105 @@ def test_yaml_loads_and_merges(tmp_path) -> None:
     cfg_file.write_text(
         """
 provider:
-  models:
-    planner: test-planner-model
+  name: custom
+  base_url: https://example.invalid/v1
+  model: test-model-for-all
+agents:
+  draft:
+    model: test-draft-model
+  temper:
+    model: test-temper-model
 subagents:
   max_depth: 3
 """,
         encoding="utf-8",
     )
     config = load_config(cfg_file)
-    assert config.provider.models["planner"] == "test-planner-model"  # overridden
-    assert config.provider.models["verifier"] == "claude-haiku-4-5"  # default kept
+    assert config.provider.name == "custom"  # overridden
+    assert config.provider.model == "test-model-for-all"
+    assert config.agents.draft.model == "test-draft-model"  # per-agent override
+    assert config.agents.forge.model is None  # default kept — inherits
+    assert config.agents.temper.model == "test-temper-model"
     assert config.subagents.max_depth == 3
+
+
+# -- T-049: legacy dict-shape config migrates to the scalar provider --------
+
+def test_legacy_config_migrates_to_scalar_provider(tmp_path) -> None:
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        """
+provider:
+  default: custom
+  api_keys:
+    custom: sk-legacy-key
+  base_urls:
+    custom: https://legacy.example/v1
+  models:
+    planner: claude-sonnet-4-5
+    executor: claude-sonnet-4-5
+    verifier: claude-haiku-4-5
+""",
+        encoding="utf-8",
+    )
+    config = load_config(cfg_file)
+    assert config.provider.name == "custom"
+    assert config.provider.api_key == "sk-legacy-key"
+    assert config.provider.base_url == "https://legacy.example/v1"
+    # the shipped claude-* role defaults are NOT carried over — the model
+    # stays empty (offline) instead of pointing a custom endpoint at anthropic
+    assert config.provider.model == ""
+    assert config.agents.draft.model is None
+
+
+def test_legacy_all_equal_model_overrides_become_provider_model(tmp_path) -> None:
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        """
+provider:
+  default: custom
+  models:
+    planner: my-model
+    executor: my-model
+    verifier: my-model
+""",
+        encoding="utf-8",
+    )
+    config = load_config(cfg_file)
+    assert config.provider.model == "my-model"
+    assert config.agents.draft.model is None  # inherited, not duplicated
+
+
+def test_legacy_mixed_model_overrides_map_onto_agents(tmp_path) -> None:
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        """
+provider:
+  default: custom
+  models:
+    planner: draft-model-x
+    executor: claude-sonnet-4-5
+    verifier: verifier-model-x
+""",
+        encoding="utf-8",
+    )
+    config = load_config(cfg_file)
+    assert config.provider.model == ""
+    assert config.agents.draft.model == "draft-model-x"
+    assert config.agents.forge.model is None  # the claude seed is dropped
+    assert config.agents.temper.model == "verifier-model-x"
+
+
+def test_no_vendor_defaults_ship_in_the_schema() -> None:
+    import json
+
+    dumped = json.dumps(DEFAULT_CONFIG)
+    assert "claude" not in dumped  # T-049/T-050: no Anthropic defaults anywhere
+    config = ArcenConfig()
+    assert config.provider.name == ""
+    assert config.provider.model == ""
+    assert config.agents.draft.model is None
+    assert config.subagents.default_model is None
 
 
 def test_validation_rejects_bad_types(tmp_path) -> None:
@@ -66,10 +154,11 @@ def test_resolve_secrets_missing_marks_degraded(monkeypatch) -> None:
 
 def test_redact_secrets_never_returns_values() -> None:
     cfg = {
-        "provider": {"api_keys": {"anthropic": "sk-literal-leak"}},
+        "provider": {"api_key": "sk-literal-leak", "api_keys": {"anthropic": "sk-dict-leak"}},
         "mcps": [{"name": "x", "transport": "http", "url": "u", "headers": {"Authorization": "Bearer leaked"}}],
     }
     view = redact_secrets(cfg)
+    assert view["provider"]["api_key"] == "<redacted>"  # T-049 scalar key too
     assert view["provider"]["api_keys"]["anthropic"] == "<redacted>"
     assert view["mcps"][0]["headers"]["Authorization"] == "<redacted>"
 

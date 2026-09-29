@@ -56,15 +56,15 @@ def cfg_client(tmp_path):
 
 def test_put_persists_to_config_yaml_and_reloads_bridge(cfg_client) -> None:
     cfg = cfg_client.get("/api/config").json()
-    cfg["provider"]["default"] = "openai"
-    cfg["provider"]["api_keys"]["openai"] = ""  # no key → bridge goes offline
+    cfg["provider"]["name"] = "openai"
+    cfg["provider"]["api_key"] = ""  # no key → bridge goes offline
     resp = cfg_client.put("/api/config", json=cfg)
     assert resp.status_code == 200
 
     # persisted to the tmp config.yaml (never the user's real file)
     path = server_app.STATE.config_path
     assert path.exists()
-    assert "default: openai" in path.read_text()
+    assert "name: openai" in path.read_text()
 
     # bridge reloaded in-memory: openai without a key → offline (None)
     assert server_app.STATE.llm is None
@@ -73,21 +73,80 @@ def test_put_persists_to_config_yaml_and_reloads_bridge(cfg_client) -> None:
     assert (path.stat().st_mode & 0o777) == 0o600
 
 
+def test_put_persists_provider_model_end_to_end(cfg_client) -> None:
+    """T-049: the Model Name the user types survives Save on disk and GET."""
+    cfg = cfg_client.get("/api/config").json()
+    cfg["provider"]["name"] = "custom"
+    cfg["provider"]["base_url"] = "https://inference.dahl.global/v1"
+    cfg["provider"]["api_key"] = "sk-dahl-test"
+    cfg["provider"]["model"] = "deepseek-ai/DeepSeek-V4-Flash-0731"
+    resp = cfg_client.put("/api/config", json=cfg)
+    assert resp.status_code == 200
+
+    # the disk file (chmod 600) carries the model the user typed
+    path = server_app.STATE.config_path
+    text = path.read_text()
+    assert "model: deepseek-ai/DeepSeek-V4-Flash-0731" in text
+    assert "name: custom" in text
+    assert "base_url: https://inference.dahl.global/v1" in text
+
+    # the bridge rebuilt with the dahl model, routed through the custom
+    # openai-compatible namespace (model carries a '/', so no prefix)
+    assert server_app.STATE.llm is not None
+    assert server_app.STATE.llm.model_for("planner") == "deepseek-ai/DeepSeek-V4-Flash-0731"
+
+    # GET returns the model (the key redacted)
+    fresh = cfg_client.get("/api/config").json()
+    assert fresh["provider"]["model"] == "deepseek-ai/DeepSeek-V4-Flash-0731"
+    assert fresh["provider"]["api_key"] == "<redacted>"
+
+
+def test_provider_ready_requires_all_four_fields() -> None:
+    """T-049 has_provider gate: name + base_url (custom) + api_key + model."""
+    from arcen.llm.bridge import provider_ready
+
+    base = {"name": "custom", "base_url": "https://x.invalid/v1", "api_key": "sk-1", "model": "m-1"}
+    ok, reason = provider_ready(ArcenConfig.model_validate({"provider": base}))
+    assert (ok, reason) == (True, "")
+
+    for field in ("name", "base_url", "api_key", "model"):
+        broken = dict(base)
+        broken[field] = ""
+        ok, reason = provider_ready(ArcenConfig.model_validate({"provider": broken}))
+        assert not ok
+        assert field in reason  # the reason names the actual gap
+
+    # native providers do not need a base_url; ollama needs no key
+    ok, _ = provider_ready(ArcenConfig.model_validate({"provider": {"name": "anthropic", "api_key": "k", "model": "m"}}))
+    assert ok
+    ok, _ = provider_ready(ArcenConfig.model_validate({"provider": {"name": "ollama", "base_url": "http://localhost:11434", "model": "llama3.2"}}))
+    assert ok
+
+
+def test_bridge_offline_when_model_missing() -> None:
+    """A key without a model is OFFLINE — never claude-* against custom."""
+    from arcen.llm.bridge import build_llm_client
+
+    partial = {"name": "custom", "base_url": "https://x.invalid/v1", "api_key": "sk-1", "model": ""}
+    assert build_llm_client(ArcenConfig.model_validate({"provider": partial})) is None
+
+
 def test_redacted_key_round_trip_never_wipes_a_key(cfg_client) -> None:
     # install a real key into the live state (as Settings save would)
     cfg = cfg_client.get("/api/config").json()
-    cfg["provider"]["api_keys"]["openai"] = "sk-live-abc123"
-    cfg["provider"]["default"] = "openai"
+    cfg["provider"]["name"] = "openai"
+    cfg["provider"]["model"] = "gpt-4o-mini"  # T-049: the bridge needs a model too
+    cfg["provider"]["api_key"] = "sk-live-abc123"
     cfg_client.put("/api/config", json=cfg)
 
     # a fresh GET shows <redacted>, never the literal
     fresh = cfg_client.get("/api/config").json()
-    assert fresh["provider"]["api_keys"]["openai"] == "<redacted>"
+    assert fresh["provider"]["api_key"] == "<redacted>"
 
     # PUT that redacted view back (untouched key field) → key survives
     resp = cfg_client.put("/api/config", json=fresh)
     assert resp.status_code == 200
-    assert server_app.STATE.config.provider.api_keys["openai"] == "sk-live-abc123"
+    assert server_app.STATE.config.provider.api_key == "sk-live-abc123"
     assert server_app.STATE.llm is not None  # bridge usable again
 
 
@@ -97,12 +156,20 @@ def test_test_endpoint_rejects_unknown_provider(cfg_client) -> None:
 
 
 def test_test_endpoint_reports_missing_key(cfg_client) -> None:
-    server_app.STATE.config.provider.api_keys.clear()
+    server_app.STATE.config.provider.api_key = ""
     resp = cfg_client.post("/api/config/test", json={"provider": "openai", "model": "gpt-4o-mini"})
     body = resp.json()
     assert resp.status_code == 200
     assert body["ok"] is False
     assert "no API key" in body["error"]
+
+
+def test_test_endpoint_no_vendor_model_default(cfg_client) -> None:
+    """T-049: an empty model is an error — never a claude-* fallback."""
+    resp = cfg_client.post("/api/config/test", json={"provider": "openai", "api_key": "sk-x"})
+    body = resp.json()
+    assert body["ok"] is False
+    assert "no model given" in body["error"]
 
 
 def test_test_endpoint_success(cfg_client, monkeypatch) -> None:
@@ -158,7 +225,8 @@ def test_test_endpoint_error_never_echoes_the_key(cfg_client, monkeypatch) -> No
 
 
 def test_test_endpoint_uses_stored_key_when_field_redacted(cfg_client, monkeypatch) -> None:
-    server_app.STATE.config.provider.api_keys["custom"] = "$ARCEN_TEST_KEY"
+    server_app.STATE.config.provider.name = "custom"
+    server_app.STATE.config.provider.api_key = "$ARCEN_TEST_KEY"
     os.environ["ARCEN_TEST_KEY"] = "sk-stored-123"
 
     def fake_completion(**kwargs):

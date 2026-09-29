@@ -10,6 +10,10 @@ import pytest
 
 from arcen.llm.client import ROLE_AGENTS, Client, LLMResponse, identity_block
 
+# T-049: the Client no longer invents vendor defaults — tests pass the
+# models the bridge would have resolved.
+_MODELS = {"planner": "m-planner", "executor": "m-executor", "verifier": "m-verifier"}
+
 
 def _fake_completion(text="ok", prompt_tokens=10, completion_tokens=5):
     calls: list[dict] = []
@@ -51,7 +55,7 @@ def test_identity_block_rejects_unknown_role() -> None:
 
 def test_mocked_provider_returns_completion() -> None:
     fake = _fake_completion(text="the plan")
-    client = Client(completion_fn=fake)
+    client = Client(models=dict(_MODELS), completion_fn=fake)
     resp = client.complete("planner", [{"role": "user", "content": "plan this"}])
     assert isinstance(resp, LLMResponse)
     assert resp.text == "the plan"
@@ -71,7 +75,7 @@ def test_per_role_model_mapping_honored() -> None:
 
 def test_identity_block_prepended_as_system() -> None:
     fake = _fake_completion()
-    client = Client(completion_fn=fake)
+    client = Client(models=dict(_MODELS), completion_fn=fake)
     msgs = [{"role": "user", "content": "hello"}]
     client.complete("verifier", msgs)
     sent = fake.calls[-1]["messages"]
@@ -84,7 +88,7 @@ def test_identity_block_prepended_as_system() -> None:
 def test_retry_on_transient_failure() -> None:
     fake = _fake_completion(text="recovered")
     fake.fail_first = True
-    client = Client(completion_fn=fake, max_retries=2)
+    client = Client(models=dict(_MODELS), completion_fn=fake, max_retries=2)
     resp = client.complete("executor", [{"role": "user", "content": "go"}])
     assert resp.text == "recovered"
     assert len(fake.calls) == 2
@@ -94,6 +98,20 @@ def test_exhausted_retries_raise() -> None:
     def always_fails(**kwargs):
         raise RuntimeError("provider down")
 
-    client = Client(completion_fn=always_fails, max_retries=1)
+    client = Client(models=dict(_MODELS), completion_fn=always_fails, max_retries=1)
     with pytest.raises(RuntimeError, match="provider down"):
         client.complete("planner", [{"role": "user", "content": "x"}])
+
+
+# -- T-049: no vendor defaults — a role with no model is a config error ----
+
+def test_model_for_without_models_raises_not_defaults_to_claude() -> None:
+    client = Client(completion_fn=_fake_completion())
+    with pytest.raises(ValueError, match="no model configured for role 'planner'"):
+        client.model_for("planner")
+
+
+def test_client_models_required_for_complete() -> None:
+    client = Client(completion_fn=_fake_completion())
+    with pytest.raises(ValueError, match="no model configured"):
+        client.complete("executor", [{"role": "user", "content": "x"}])
