@@ -276,18 +276,21 @@ export function SettingsView() {
         <label className="field">
           <span className="field-label">DRAFT model</span>
           <input type="text" list="model-suggestions" data-testid="draft-model"
+            placeholder="inherit from provider"
             value={String((agents.draft?.model as string | null) ?? '')}
             onChange={(e) => patchAgent('draft', 'model', e.target.value || null)} />
         </label>
         <label className="field">
           <span className="field-label">FORGE model</span>
           <input type="text" list="model-suggestions" data-testid="forge-model"
+            placeholder="inherit from provider"
             value={String((agents.forge?.model as string | null) ?? '')}
             onChange={(e) => patchAgent('forge', 'model', e.target.value || null)} />
         </label>
         <label className="field">
           <span className="field-label">TEMPER model</span>
           <input type="text" list="model-suggestions" data-testid="temper-model"
+            placeholder="inherit from provider"
             value={String((agents.temper?.model as string | null) ?? '')}
             onChange={(e) => patchAgent('temper', 'model', e.target.value || null)} />
         </label>

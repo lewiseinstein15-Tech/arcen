@@ -166,6 +166,25 @@ describe('T-036: settings view', () => {
     expect(body.agents.draft.model).toBeNull();
   });
 
+  it('T-050: AGENTS placeholders read "inherit from provider" when null', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/config')) {
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    const draft = await screen.findByTestId('draft-model');
+    expect(draft).toHaveAttribute('placeholder', 'inherit from provider');
+    expect(screen.getByTestId('forge-model')).toHaveAttribute('placeholder', 'inherit from provider');
+    expect(screen.getByTestId('temper-model')).toHaveAttribute('placeholder', 'inherit from provider');
+    // an override shows its value instead
+    expect(draft).toHaveValue('');
+  });
+
   it('Test Connection shows ok inline (and the toast flow stays separate)', async () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (String(url).includes('/api/config/test')) {

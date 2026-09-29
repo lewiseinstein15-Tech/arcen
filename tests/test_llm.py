@@ -115,3 +115,48 @@ def test_client_models_required_for_complete() -> None:
     client = Client(completion_fn=_fake_completion())
     with pytest.raises(ValueError, match="no model configured"):
         client.complete("executor", [{"role": "user", "content": "x"}])
+
+# -- T-050: agents inherit provider.model; the bridge prefixes per provider --
+
+from arcen.config import ArcenConfig
+from arcen.llm.bridge import build_llm_client, model_for
+
+
+def _cfg(provider: dict, agents: dict | None = None) -> ArcenConfig:
+    return ArcenConfig.model_validate({"provider": provider, "agents": agents or {}})
+
+
+def test_model_for_inherits_provider_model() -> None:
+    cfg = _cfg({"name": "custom", "base_url": "https://x/v1", "api_key": "k", "model": "all-model"})
+    assert model_for("draft", cfg) == "all-model"
+    assert model_for("forge", cfg) == "all-model"
+    assert model_for("temper", cfg) == "all-model"
+
+
+def test_model_for_agent_override_wins() -> None:
+    cfg = _cfg(
+        {"name": "custom", "base_url": "https://x/v1", "api_key": "k", "model": "all-model"},
+        {"temper": {"model": "verifier-only"}},
+    )
+    assert model_for("draft", cfg) == "all-model"
+    assert model_for("temper", cfg) == "verifier-only"
+
+
+def test_model_for_nothing_configured_raises() -> None:
+    cfg = _cfg({"name": "custom", "base_url": "https://x/v1", "api_key": "k", "model": ""})
+    with pytest.raises(ValueError, match="no model configured for agent 'draft'"):
+        model_for("draft", cfg)
+
+
+def test_bridge_prefixes_bare_models_per_provider() -> None:
+    cfg = _cfg({"name": "custom", "base_url": "https://x/v1", "api_key": "k", "model": "vendor-model"})
+    client = build_llm_client(cfg)
+    assert client is not None
+    assert client.model_for("planner") == "openai/vendor-model"  # custom → openai/
+    assert client.model_for("verifier") == "openai/vendor-model"
+
+    groq = build_llm_client(_cfg({"name": "groq", "api_key": "gsk", "model": "llama-3"}))
+    assert groq.model_for("executor") == "groq/llama-3"
+
+    slash = build_llm_client(_cfg({"name": "custom", "base_url": "https://x/v1", "api_key": "k", "model": "org/model"}))
+    assert slash.model_for("planner") == "org/model"  # already namespaced — bare

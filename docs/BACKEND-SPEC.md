@@ -75,7 +75,7 @@ Every component borrows from a named source. "What to edit" is the full allowed 
 | 11 | Sandbox | [OpenSandbox](https://github.com/alibaba/OpenSandbox) | `runtime/` — container lifecycle | One container per session; image pinning; host-filesystem quarantine |
 | 12 | Memory | [Letta](https://github.com/letta-ai/letta) + [Graphiti](https://github.com/getzep/graphiti) | `memory/` + `src/` — store + graph memory | Single SQLite file; the five GraphMem innovations (Part 5) |
 | 13 | Session format | [Claude Code](https://github.com/anthropics/claude-code) | `history.jsonl` format | Add event `seq`, `run_id`, `ts`; write-once append-only |
-| 14 | LLM bridge | [LiteLLM](https://github.com/BerriAI/litellm) | provider routing, retries, cost metering | Fixed per-role model mapping (planner/executor/verifier) |
+| 14 | LLM bridge | [LiteLLM](https://github.com/BerriAI/litellm) | provider routing, retries, cost metering | Per-role models resolve via `model_for`: `agents.<name>.model` else `provider.model` (T-049/T-050) |
 | 15 | Config | [pydantic-settings](https://github.com/pydantic/pydantic-settings) | YAML + env loading, validation | `$VAR` indirection via the credential vault (Part 8) |
 
 ---
@@ -138,36 +138,34 @@ The registry validates: unique names, no shadowing of MCP tool namespaces (`mcp.
 
 ## Part 4 — Config File
 
-`~/.arcen/config.yaml`. Full example:
+`~/.arcen/config.yaml`. Full example (v0.1.4 scalar provider — T-049/T-050;
+legacy dict-shape files migrate once on load):
 
 ```yaml
 provider:
-  default: anthropic
-  models:
-    planner: claude-sonnet-4-5
-    executor: claude-sonnet-4-5
-    verifier: claude-haiku-4-5
-  api_keys:
-    anthropic: $ANTHROPIC_API_KEY
-    openai: $OPENAI_API_KEY
-  base_urls:                 # optional, for proxies / local models
-    local: http://localhost:11434
+  name: custom               # custom | groq | deepseek | openai | anthropic | ollama
+  base_url: https://inference.dahl.global/v1   # OpenAI-compatible endpoint (custom/ollama)
+  api_key: $DAHL_API_KEY     # literal (file is chmod 600) or $VAR vault reference
+  model: deepseek-ai/DeepSeek-V4-Flash-0731    # the model for all agents
 
 agents:
   draft:
     max_steps: 40
     replan_on_fail: true
+    model: null              # null → inherit provider.model
   forge:
     step_timeout_s: 120
     max_retries: 2
+    model: null              # null → inherit provider.model
   temper:
     adversarial: true
     reruns: 1
+    model: null              # an explicit value overrides just this agent
 
 subagents:
   max_depth: 2
   max_concurrent: 8
-  default_model: claude-haiku-4-5
+  default_model: null        # null → inherit provider.model
 
 skills:
   paths: ["~/.arcen/skills", "./skills"]
@@ -435,7 +433,7 @@ Twelve steps, in order. Each step is observable: boot logs to stderr and, once t
 6. **Index skills** — walk skill paths, parse each `SKILL.md` frontmatter into the index; bodies stay on disk (progressive loading).
 7. **Declare MCPs** — apply state machine: `disabled` stays down, everything else `declarative`; zero network I/O.
 8. **Load plugins** — import enabled plugins, validate hook signatures, fire `on_boot`.
-9. **Build LLM bridge** — configure LiteLLM with per-role models and resolved credentials; probe nothing (first call is the probe).
+9. **Build LLM bridge** — configure LiteLLM with per-role models (agent override → provider.model inheritance) and resolved credentials; probe nothing (first call is the probe).
 10. **Warm sub-agent pool** — load sub-agent definitions (names, tool scopes, models); no processes spawned yet.
 11. **Start server** — FastAPI on `stream.port` (default 3002); mount `/api/run`, `/api/stream`, `/api/health`, `/api/config`, `/api/sessions`.
 12. **Ready** — emit `run.ready` on the boot stream; system accepts work.
