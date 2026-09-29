@@ -485,7 +485,7 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Evidence:** user screenshot — DRAFT/FORGE = claude-sonnet-4-5, TEMPER = claude-haiku-4-5 against a custom (dahl.global) endpoint: those model names 404 there.
 
 ### [T-051] Save button visibly works: status chips, no silent no-ops (BUG 3 — real bug)
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-049
 - **Deliverable:** persist on Save only (no autosave), and every Save state is visible next to the button: amber "unsaved changes" chip when any field differs from the loaded config (a typed key counts), "saving…" while the PUT is in flight, green "saved ✓" for 3s after success, red "error: <reason>" on failure. doSave never silently no-ops: a null config shows the load error instead of an inert button, and the PUT carries an abort timeout so a hung request cannot wedge the button forever.
 - **Test:** vitest — editing a field shows the unsaved chip; Save shows saving → saved ✓ (then reverts); a failing PUT shows the red error chip with the reason; an untouched form shows no unsaved chip.
@@ -493,7 +493,7 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Evidence:** user report — "it cant be saved in settings"; server log had no PUT /api/config at all, and the UI gave zero feedback that the click did nothing.
 
 ### [T-052] New-session 404 (BUG 4 — confirm/apply the spec'd behavior)
-- **Status:** [ ] pending
+- **Status:** [~] in progress
 - **Depends on:** none
 - **Deliverable:** fresh client-generated session ids must not 404 on replay endpoints. GET /api/sessions/{uuid}/events: file missing → 200 + `[]`; file exists → 200 + events; invalid uuid → 400. GET /api/sessions/{uuid}: file missing → 200 + `{ id, created: now, title: "", events: [] }` (new endpoint); invalid uuid → 400. No disk writes on read.
 - **Test:** pytest — unknown uuid events → 200 []; known session → events; `not-a-uuid` → 400; unknown uuid session detail → 200 empty shell with matching id.
