@@ -54,6 +54,15 @@ app = FastAPI(title="ARCEN", version="0.1.0")
 
 log = logging.getLogger("arcen.server")
 
+# T-055: under plain `./scripts/dev.sh` nothing configures logging, and
+# Python's last-resort handler drops INFO — the [config]/[sandbox] boot
+# lines would never reach the server log the user is told to read. Attach
+# a root handler ONLY when nothing else already did (the verification
+# scripts call logging.basicConfig themselves; uvicorn's own loggers keep
+# their handlers and never propagate here).
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO)
+
 
 class ServerState:
     """Everything the server owns. One per process."""

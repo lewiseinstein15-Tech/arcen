@@ -9,11 +9,17 @@ violation, and the API never returns secret values — only their names.
 
 Missing file → defaults + a ``CONFIG_DEFAULTED`` warning; every value
 has an API equivalent (GET/PUT /api/config).
+
+v0.1.5 (T-055): ``ARCEN_MODEL_*`` environment variables seed EMPTY
+provider slots at boot (config wins where non-empty; env only fills
+empty slots; the seeded file is written once so the Settings page has
+something to read from on the next restart).
 """
 
 from __future__ import annotations
 
 import copy
+import logging
 import os
 import re
 import warnings
@@ -24,6 +30,23 @@ import yaml
 from pydantic import BaseModel, Field
 
 VAR_PATTERN = re.compile(r"^\$[A-Z_]+$")
+
+log = logging.getLogger("arcen.config")
+
+# T-055: the env vars that seed an empty provider block at boot. The
+# user's contract: set these before boot and the Settings page shows
+# the values without any retyping — env is the source of truth on
+# first boot, the file is the source of truth after that.
+ENV_PROVIDER_VARS: dict[str, str] = {
+    "name": "ARCEN_MODEL_PROVIDER",
+    "base_url": "ARCEN_MODEL_BASE_URL",
+    "api_key": "ARCEN_MODEL_API_KEY",
+    "model": "ARCEN_MODEL_NAME",
+}
+
+# The provider the UI displays when nothing is configured (SettingsView
+# falls back to 'custom'); used when ARCEN_MODEL_PROVIDER is unset.
+DEFAULT_PROVIDER_NAME = "custom"
 
 DEFAULT_CONFIG: dict = {
     # T-049: the provider block is the four scalar fields Settings saves.
@@ -237,22 +260,95 @@ def deep_merge(base: dict, override: dict) -> dict:
     return out
 
 
+def mask_secret(key: str | None) -> str:
+    """Boot-log view of a credential: its shape, never its value (T-055).
+
+    ``dahl_9f2c...a71b`` style — first4...last4 — is enough for support
+    to confirm WHICH key is in play without leaking it. Short values are
+    masked entirely: 4+4 would reveal more than it hides.
+    """
+    if not key:
+        return "<none>"
+    key = str(key).strip()
+    if len(key) <= 8:
+        return "*" * len(key)
+    return f"{key[:4]}...{key[-4:]}"
+
+
+def seed_provider_from_env(raw: dict) -> tuple[dict, list[str]]:
+    """Fill EMPTY provider slots from ``ARCEN_MODEL_*`` env vars (T-055).
+
+    Precedence: a non-empty config value always wins; the env var fills
+    an empty slot; an unset env var leaves the slot as-is (the user must
+    fill it in Settings). ``provider.name`` additionally falls back to
+    ``custom`` — the provider the UI already displays — but that default
+    is NOT an env contribution and never triggers a file write.
+
+    Returns the mutated raw dict plus the list of fields an env var
+    actually filled — the caller persists the file only when that list
+    is non-empty, so a plain restart never rewrites the file.
+    """
+    provider = raw.get("provider")
+    if not isinstance(provider, dict):
+        provider = {}
+        raw["provider"] = provider
+    filled: list[str] = []
+    for field, var in ENV_PROVIDER_VARS.items():
+        if str(provider.get(field) or "").strip():
+            continue  # config wins where present
+        value = str(os.environ.get(var) or "").strip()
+        if not value:
+            continue  # env unset → leave empty; the user fills it in Settings
+        provider[field] = value
+        filled.append(field)
+    if not str(provider.get("name") or "").strip():
+        provider["name"] = DEFAULT_PROVIDER_NAME  # in-memory display default
+    return raw, filled
+
+
 def load_config(path: str | Path | None = None) -> ArcenConfig:
     """Read ~/.arcen/config.yaml (or an explicit path), validate, return.
 
     Missing file → defaults with a CONFIG_DEFAULTED warning (Part 10, step 1).
+
+    T-055: empty provider slots are then seeded from ``ARCEN_MODEL_*`` env
+    vars (config wins where non-empty). When an env var actually filled a
+    slot, the merged config is written back ONCE — the seeded file is what
+    makes the seeding survive restarts and gives the Settings page a file
+    to read from — and one boot line records it, api_key masked. With no
+    env contribution nothing is written (a restart never rewrites the
+    file, and the T-054 test-suite guard stays green).
     """
-    candidates = [Path(path)] if path else [default_config_path()]
-    file = next((c for c in candidates if c.exists()), None)
-    if file is None:
-        warnings.warn("config file not found; using defaults", UserWarning, stacklevel=2)
-        return ArcenConfig()  # CONFIG_DEFAULTED
-    raw = yaml.safe_load(file.read_text(encoding="utf-8")) or {}
-    if not isinstance(raw, dict):
-        raise ValueError(f"config {file} must be a YAML mapping")
-    return ArcenConfig.model_validate(
-        deep_merge(DEFAULT_CONFIG, migrate_legacy_config(raw))
-    )
+    file = Path(path).expanduser() if path else default_config_path()
+    if file.exists():
+        raw = yaml.safe_load(file.read_text(encoding="utf-8")) or {}
+        if not isinstance(raw, dict):
+            raise ValueError(f"config {file} must be a YAML mapping")
+    else:
+        warnings.warn(
+            "config file not found; using defaults", UserWarning, stacklevel=2
+        )
+        raw = {}  # CONFIG_DEFAULTED — then seeded from env below (T-055)
+    seeded, filled = seed_provider_from_env(migrate_legacy_config(raw))
+    config = ArcenConfig.model_validate(deep_merge(DEFAULT_CONFIG, seeded))
+    if filled:  # env contributed → persist the seeded file, exactly once
+        try:
+            save_config(file, config)
+        except OSError as exc:  # degrade — boot never aborts on a write failure
+            warnings.warn(
+                f"seeded config could not be written to {file}: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
+        else:
+            log.info(
+                "[config] seeded from env: provider=%s model=%s base_url=%s api_key=%s",
+                config.provider.name,
+                config.provider.model or "none",
+                config.provider.base_url or "none",
+                mask_secret(config.provider.api_key),
+            )
+    return config
 
 
 def default_config_path() -> Path:

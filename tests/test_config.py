@@ -188,3 +188,131 @@ def test_sandbox_backend_validated() -> None:
     assert ok.sandbox.backend == "process"
     with pytest.raises(ValidationError):
         ArcenConfig.model_validate({"sandbox": {"backend": "swarm"}})
+
+
+# -- T-055: env vars seed empty provider slots on boot -----------------------
+
+import logging  # noqa: E402
+
+from arcen.config import mask_secret, seed_provider_from_env  # noqa: E402
+
+ENV = {
+    "ARCEN_MODEL_PROVIDER": "custom",
+    "ARCEN_MODEL_BASE_URL": "https://inference.dahl.global/v1",
+    "ARCEN_MODEL_API_KEY": "dahl_9f2csecretvaluea71b",
+    "ARCEN_MODEL_NAME": "deepseek-ai/DeepSeek-V4-Flash-0731",
+}
+
+
+def _set_env(monkeypatch) -> None:
+    for key, value in ENV.items():
+        monkeypatch.setenv(key, value)
+
+
+def _clear_env(monkeypatch) -> None:
+    for key in ENV:
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_missing_file_seeds_from_env_and_writes(tmp_path, monkeypatch, caplog) -> None:
+    _set_env(monkeypatch)
+    cfg_file = tmp_path / "config.yaml"
+    with caplog.at_level(logging.INFO, logger="arcen.config"):
+        config = load_config(cfg_file)
+    assert config.provider.name == "custom"
+    assert config.provider.base_url == ENV["ARCEN_MODEL_BASE_URL"]
+    assert config.provider.api_key == ENV["ARCEN_MODEL_API_KEY"]
+    assert config.provider.model == ENV["ARCEN_MODEL_NAME"]
+    # the seeded file exists and carries the same provider block
+    assert cfg_file.exists()
+    import yaml
+
+    on_disk = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))["provider"]
+    assert on_disk["model"] == ENV["ARCEN_MODEL_NAME"]
+    assert on_disk["api_key"] == ENV["ARCEN_MODEL_API_KEY"]
+    # the boot line records the seed with the key MASKED, never in full
+    assert "[config] seeded from env:" in caplog.text
+    assert mask_secret(ENV["ARCEN_MODEL_API_KEY"]) in caplog.text
+    assert ENV["ARCEN_MODEL_API_KEY"] not in caplog.text
+
+
+def test_config_values_win_over_env(tmp_path, monkeypatch) -> None:
+    _set_env(monkeypatch)
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        """
+provider:
+  name: custom
+  base_url: https://config-wins.example/v1
+  model: my-model-from-config
+""",
+        encoding="utf-8",
+    )
+    config = load_config(cfg_file)
+    # non-empty config slots survive; env fills only the EMPTY api_key
+    assert config.provider.base_url == "https://config-wins.example/v1"
+    assert config.provider.model == "my-model-from-config"
+    assert config.provider.api_key == ENV["ARCEN_MODEL_API_KEY"]
+    import yaml
+
+    on_disk = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))["provider"]
+    assert on_disk["model"] == "my-model-from-config"  # persisted merge keeps it
+    assert on_disk["api_key"] == ENV["ARCEN_MODEL_API_KEY"]
+
+
+def test_restart_with_full_config_does_not_reseed(tmp_path, monkeypatch, caplog) -> None:
+    _set_env(monkeypatch)
+    cfg_file = tmp_path / "config.yaml"
+    with caplog.at_level(logging.INFO, logger="arcen.config"):
+        load_config(cfg_file)
+        assert "[config] seeded from env:" in caplog.text
+        first = cfg_file.read_bytes()
+        caplog.clear()
+        load_config(cfg_file)  # restart: the file now has everything
+    assert cfg_file.read_bytes() == first  # no rewrite on boot
+    assert "seeded from env" not in caplog.text  # config wins, silently
+
+
+def test_emptied_model_reseeds_only_that_field(tmp_path, monkeypatch) -> None:
+    _set_env(monkeypatch)
+    cfg_file = tmp_path / "config.yaml"
+    load_config(cfg_file)
+    import yaml
+
+    doc = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
+    kept_key, kept_url = doc["provider"]["api_key"], doc["provider"]["base_url"]
+    doc["provider"]["model"] = ""  # the user (or a tool) emptied one field
+    cfg_file.write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
+    config = load_config(cfg_file)  # restart → ONLY the empty slot re-seeds
+    assert config.provider.model == ENV["ARCEN_MODEL_NAME"]
+    assert config.provider.api_key == kept_key  # config values untouched
+    assert config.provider.base_url == kept_url
+
+
+def test_no_env_no_file_writes_nothing(tmp_path, monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    cfg_file = tmp_path / "config.yaml"
+    config = load_config(cfg_file)
+    assert not cfg_file.exists()  # no env contribution → the file is never written
+    assert config.provider.name == "custom"  # in-memory display default
+    assert config.provider.api_key == ""
+    assert config.provider.model == ""
+
+
+def test_mask_secret_never_leaks() -> None:
+    assert mask_secret(None) == "<none>"
+    assert mask_secret("") == "<none>"
+    assert mask_secret("short") == "*****"  # too short to show 4+4
+    long = "dahl_9f2csecretvaluea71b"
+    assert mask_secret(long) == "dahl...a71b"
+    assert long not in mask_secret(long)
+
+
+def test_seed_provider_from_env_is_pure_slots(monkeypatch) -> None:
+    monkeypatch.setenv("ARCEN_MODEL_NAME", "env-model")
+    monkeypatch.delenv("ARCEN_MODEL_API_KEY", raising=False)
+    raw: dict = {"provider": {"name": "groq", "model": ""}}
+    seeded, filled = seed_provider_from_env(raw)
+    assert seeded["provider"]["model"] == "env-model"
+    assert filled == ["model"]  # name was set → no custom fallback needed
+    assert seeded["provider"]["name"] == "groq"  # untouched
