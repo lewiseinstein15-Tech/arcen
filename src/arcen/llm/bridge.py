@@ -124,9 +124,22 @@ def build_llm_client(config: ArcenConfig) -> Any | None:
     def completion(**kwargs: Any):
         import litellm
 
+        # v0.1.6: ARCEN owns the retry policy (llm/client.py — fail-fast
+        # classes, exponential backoff). LiteLLM's internal retries and
+        # the provider SDK's own retry loop are DISABLED here — stacked
+        # retriers are what hung the UI for minutes with "Retrying
+        # request to /chat/completions in 10.0s" while the stream sat
+        # silent. One retry budget, one backoff, one place.
+        kwargs.setdefault("num_retries", 0)  # litellm's own retry loop
+        kwargs.setdefault("max_retries", 0)  # the provider SDK's (openai) retry loop
         kwargs.setdefault("api_key", api_key)
         if base_url:
             kwargs.setdefault("api_base", base_url)
         return litellm.completion(**kwargs)
 
-    return Client(models=models, completion_fn=completion)
+    return Client(
+        models=models,
+        completion_fn=completion,
+        max_retries=config.provider.max_retries,
+        retry_backoff_seconds=config.provider.retry_backoff_seconds,
+    )

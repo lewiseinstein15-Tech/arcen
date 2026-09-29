@@ -43,7 +43,7 @@ import re
 import sys
 from collections.abc import Callable
 
-from arcen.llm.client import Client
+from arcen.llm.client import Client, ProviderError
 from arcen.stream.events import Answer, Event, Plan, PlanUpdate, Think, to_line
 
 SYSTEM_HINT = """Return ONLY a JSON array of 1-6 steps for this goal, shaped:
@@ -191,6 +191,12 @@ def classify_intent(text: str, llm: Client | None = None) -> str:
     UNKNOWN. With no LLM (or a provider error) a deterministic heuristic
     keeps offline mode usable: greetings and self-questions DIRECT,
     search/weather phrasing RESEARCH, everything else CODE.
+
+    v0.1.6: a ``ProviderError`` (the call itself failed — 401, 5xx after
+    retries, timeout) is NOT swallowed into the heuristic. The heuristic
+    is for offline/ambiguous cases; a dead provider must kill the turn
+    with its real cause on the stream (run.error), not masquerade as a
+    classification result.
     """
     stripped = text.strip()
     if not stripped:
@@ -207,7 +213,9 @@ def classify_intent(text: str, llm: Client | None = None) -> str:
             if word is not None:
                 return word
             return UNKNOWN  # provider answered, but not with an intent
-        except Exception:  # noqa: BLE001 — provider down → heuristic
+        except ProviderError:
+            raise  # v0.1.6: the provider's cause travels to the stream
+        except Exception:  # noqa: BLE001 — non-provider noise → heuristic
             pass
 
     return _classify_heuristic(stripped)
@@ -324,6 +332,8 @@ class DraftPlanner:
                     identity=DIRECT_IDENTITY,
                 )
                 reply = resp.text.strip() or reply
+            except ProviderError:
+                raise  # v0.1.6: never answer a provider failure with a fake hello
             except Exception:  # noqa: BLE001 — provider down → offline reply
                 pass
         events.append(Answer(seq=0, text=reply, ts=0.0))
@@ -378,15 +388,25 @@ class DraftPlanner:
         An empty or malformed plan gets ONE retry with a stricter prompt;
         a second failure returns ``None`` and the caller answers honestly.
         There is no deterministic fallback and no goal-as-bash hack.
+
+        v0.1.6: a ``ProviderError`` is neither retried here nor turned
+        into the "I couldn't plan this" refusal — it propagates so the
+        turn dies with the provider's real cause (run.error on the
+        stream). The strict retry is for MALFORMED plans, not dead
+        providers.
         """
         if not self._has_provider():
             return None
         try:
             return self._decompose_llm(goal, depth, failed_step, hint)
+        except ProviderError:
+            raise  # v0.1.6: the cause belongs on the stream, not in a refusal
         except Exception:  # noqa: BLE001 — malformed/down → one strict retry
             pass
         try:
             return self._decompose_llm(goal, depth, failed_step, f"{hint}\n\n{STRICT_PLAN_HINT}")
+        except ProviderError:
+            raise
         except Exception:  # noqa: BLE001 — second failure → honest refusal
             return None
 

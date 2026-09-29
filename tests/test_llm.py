@@ -185,3 +185,206 @@ def test_custom_endpoint_namespaces_even_slash_models(monkeypatch) -> None:
     client.complete("planner", [{"role": "user", "content": "x"}])
     assert captured["model"] == "openai/deepseek-ai/DeepSeek-V4-Flash-0731"
     assert captured["api_base"] == "https://dahl.example/v1"
+
+
+# -- v0.1.6 BUG 2: fail-fast classes, exponential backoff, surfaced cause ----
+
+import openai as _openai
+import httpx as _httpx
+
+from arcen.llm.client import (
+    NO_RETRY_STATUSES,
+    RETRYABLE_STATUSES,
+    ProviderError,
+    classify_provider_failure,
+    format_provider_error,
+)
+
+
+def _status_error(status: int, message: str = "provider said no") -> Exception:
+    """A litellm-shaped status exception without litellm's constructor
+    quirks — status_code + body is all classify_provider_failure uses."""
+    exc = RuntimeError(message)
+    exc.status_code = status  # type: ignore[attr-defined]
+    exc.body = {"error": {"message": message}}  # type: ignore[attr-defined]
+    return exc
+
+
+def _timeout_error() -> Exception:
+    return _openai.APITimeoutError(request=_httpx.Request("POST", "https://prov/v1"))
+
+
+def test_no_retry_statuses_are_the_spec_four() -> None:
+    assert NO_RETRY_STATUSES == frozenset({400, 401, 403, 404})
+    assert RETRYABLE_STATUSES == frozenset({429, 500, 502, 503})
+
+
+def test_401_fails_fast_without_retry() -> None:
+    calls: list[int] = []
+
+    def failing(**kwargs):
+        calls.append(1)
+        raise _status_error(401, "invalid api key")
+
+    client = Client(models=dict(_MODELS), completion_fn=failing, max_retries=3)
+    with pytest.raises(ProviderError, match=r"provider error: 401 .*invalid api key"):
+        client.complete("planner", [{"role": "user", "content": "x"}])
+    assert len(calls) == 1, "a bad key must not be retried"
+
+
+def test_all_four_permanent_statuses_fail_fast() -> None:
+    for status in sorted(NO_RETRY_STATUSES):
+        calls: list[int] = []
+
+        def failing(**kwargs):
+            calls.append(1)
+            raise _status_error(status)
+
+        client = Client(models=dict(_MODELS), completion_fn=failing, max_retries=3)
+        with pytest.raises(ProviderError) as err:
+            client.complete("planner", [{"role": "user", "content": "x"}])
+        assert err.value.status == status
+        assert len(calls) == 1, f"status {status} must fail on the first call"
+
+
+def test_500_retries_three_times_with_exponential_backoff(monkeypatch) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr("arcen.llm.client.time.sleep", lambda s: sleeps.append(s))
+    calls: list[int] = []
+
+    def failing(**kwargs):
+        calls.append(1)
+        raise _status_error(500, "overloaded")
+
+    client = Client(
+        models=dict(_MODELS), completion_fn=failing, max_retries=3, retry_backoff_seconds=1.0
+    )
+    with pytest.raises(ProviderError) as err:
+        client.complete("planner", [{"role": "user", "content": "x"}])
+    assert len(calls) == 4, "1 initial call + 3 retries"
+    assert sleeps == [1.0, 2.0, 4.0], "exponential backoff 1s, 2s, 4s (spec C)"
+    assert str(err.value).startswith("provider error: 500")
+    assert "(after 4 attempts)" in str(err.value)
+
+
+def test_429_recovers_when_transient_clears(monkeypatch) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr("arcen.llm.client.time.sleep", lambda s: sleeps.append(s))
+    calls: list[int] = []
+
+    def flaky(**kwargs):
+        calls.append(1)
+        if len(calls) <= 2:
+            raise _status_error(429, "slow down")
+        resp = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="back"))],
+            usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1),
+        )
+        return resp
+
+    client = Client(models=dict(_MODELS), completion_fn=flaky, max_retries=3)
+    resp = client.complete("planner", [{"role": "user", "content": "x"}])
+    assert resp.text == "back"
+    assert len(calls) == 3 and sleeps == [1.0, 2.0]
+
+
+def test_timeout_fails_immediately_without_retry() -> None:
+    calls: list[int] = []
+
+    def hanging(**kwargs):
+        calls.append(1)
+        raise _timeout_error()
+
+    client = Client(models=dict(_MODELS), completion_fn=hanging, max_retries=3)
+    with pytest.raises(ProviderError, match=r"provider error: timeout after 60s"):
+        client.complete("planner", [{"role": "user", "content": "x"}])
+    assert len(calls) == 1, "a 60s-burned call is never re-burned (spec D)"
+
+
+def test_complete_defaults_to_60s_timeout() -> None:
+    captured: dict = {}
+
+    def fake(**kwargs):
+        captured.update(kwargs)
+        resp = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))],
+            usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1),
+        )
+        return resp
+
+    client = Client(models=dict(_MODELS), completion_fn=fake)
+    client.complete("planner", [{"role": "user", "content": "x"}])
+    assert captured["timeout"] == 60  # spec D: the per-call budget
+
+
+def test_first_failure_recorded_and_surfaced(monkeypatch) -> None:
+    """Spec A: the FIRST failure's status + body survive to the final
+    error even when the last attempt failed differently."""
+    sleeps: list[float] = []
+    monkeypatch.setattr("arcen.llm.client.time.sleep", lambda s: sleeps.append(s))
+    calls: list[int] = []
+
+    def failing(**kwargs):
+        calls.append(1)
+        raise _status_error(429, "quota exceeded until midnight")
+
+    client = Client(models=dict(_MODELS), completion_fn=failing, max_retries=1)
+    with pytest.raises(ProviderError) as err:
+        client.complete("planner", [{"role": "user", "content": "x"}])
+    assert "429" in str(err.value) and "quota exceeded until midnight" in str(err.value)
+
+
+def test_classify_and_format_shapes() -> None:
+    assert classify_provider_failure(_status_error(403))[0] == 403
+    assert classify_provider_failure(_timeout_error())[2] == "timeout"
+    assert classify_provider_failure(RuntimeError("mystery"))[2] == "unknown"
+    assert format_provider_error(401, "", "status", use_hint=True) == (
+        "provider error: 401 unauthorized — check your API key"
+    )
+    assert format_provider_error(None, "conn reset by peer", "connection") == (
+        "provider error: conn reset by peer"
+    )
+
+
+def test_bridge_disables_litellm_internal_retries() -> None:
+    """The bridge must suppress litellm's + the SDK's retry loops — the
+    stacked 10s backoffs that hung the UI are never coming back."""
+    import litellm as _litellm
+
+    cfg = _cfg({"name": "custom", "base_url": "https://x/v1", "api_key": "k", "model": "m"})
+    captured: dict = {}
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))],
+            usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1),
+        )
+
+    original = _litellm.completion
+    _litellm.completion = fake_completion
+    try:
+        client = build_llm_client(cfg)
+        assert client is not None
+        client.complete("planner", [{"role": "user", "content": "x"}])
+    finally:
+        _litellm.completion = original
+    assert captured["num_retries"] == 0
+    assert captured["max_retries"] == 0
+
+
+def test_bridge_carries_config_retry_policy() -> None:
+    cfg = _cfg(
+        {
+            "name": "custom",
+            "base_url": "https://x/v1",
+            "api_key": "k",
+            "model": "m",
+            "max_retries": 5,
+            "retry_backoff_seconds": 2.5,
+        }
+    )
+    client = build_llm_client(cfg)
+    assert client is not None
+    assert client.max_retries == 5
+    assert client.retry_backoff_seconds == 2.5

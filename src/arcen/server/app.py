@@ -41,6 +41,7 @@ from arcen.agents.forge import ForgeExecutor
 from arcen.agents.temper import TemperVerifier
 from arcen.config import ArcenConfig, default_config_path, load_config, resolve_secrets, save_config
 from arcen.llm.bridge import build_llm_client
+from arcen.llm.client import ProviderError, classify_provider_failure, format_provider_error
 from arcen.plugins.loader import PluginLoader
 from arcen.session.store import SessionStore
 from arcen.stream.emitter import StreamEmitter
@@ -361,6 +362,12 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
         else:
             emit(Answer(seq=0, text=f"Turn failed: verification did not pass after {executed} step(s).", ts=0.0))
             emit(RunDone(seq=0, status="failed", steps=executed, duration_s=duration, ts=0.0))
+    except ProviderError as exc:
+        # v0.1.6 BUG 2: the provider's cause lands on the stream in the
+        # spec wire format ("provider error: 401 unauthorized — check
+        # your API key") — the UI's spinner ends here, never a silent
+        # retry storm. run.error is terminal → the stream closes cleanly.
+        emit(RunError(seq=0, code="PROVIDER_ERROR", message=str(exc), ts=0.0))
     except Exception as exc:  # noqa: BLE001 — a turn never crashes the server
         emit(RunError(seq=0, code="TURN_FAILED", message=str(exc), ts=0.0))
 

@@ -21,7 +21,7 @@ import uvicorn
 
 import arcen.server.app as server_app
 from arcen.config import ArcenConfig, default_config_path
-from arcen.llm.client import LLMResponse
+from arcen.llm.client import LLMResponse, ProviderError
 from arcen.server.app import ServerState, app
 
 PORT = 3179
@@ -506,3 +506,115 @@ def test_session_detail_known_session_returns_meta(client) -> None:
     assert body["id"] == session
     assert body["events"] > 0
     assert body["title"] != ""
+
+
+# -- v0.1.6 BUG 2: the provider's cause lands on the stream and in Settings --
+
+class _DeadProviderLLM:
+    """A provider whose every call dies with the spec wire error — what
+    Client.complete now raises after its (bounded) retry policy."""
+
+    def is_available(self) -> bool:
+        return True
+
+    def complete(self, role, messages, **kwargs):
+        raise ProviderError("provider error: 401 invalid api key", status=401)
+
+def test_run_provider_error_event_on_stream(client) -> None:
+    """A dead provider must end the turn with run.error carrying the
+    provider's cause — never an eternal spinner, never a fake offline
+    hello, never a silent swallow."""
+    server_app.STATE.llm = _DeadProviderLLM()
+    try:
+        session = _new_session(client, "hello there")
+        events = _stream_until(client, session, want="run.error")
+    finally:
+        server_app.STATE.llm = _StubProviderLLM()
+    kinds = [e["type"] for e in events]
+    assert kinds[0] == "run.start"
+    assert "run.error" in kinds
+    assert "answer" not in kinds, "a provider failure must not be masked by an offline reply"
+    err = next(e for e in events if e["type"] == "run.error")
+    assert err["code"] == "PROVIDER_ERROR"
+    assert err["message"] == "provider error: 401 invalid api key"
+
+
+def test_run_error_stream_closes_cleanly(client) -> None:
+    """run.error is terminal → replay ends with the stream.done sentinel
+    (the UI's spinner stops the moment the cause is on screen)."""
+    server_app.STATE.llm = _DeadProviderLLM()
+    try:
+        session = _new_session(client, "echo doomed")
+        # wait for the turn to finish, then open a fresh stream: replay+close
+        time.sleep(1.0)
+        resp = client.get(f"/api/stream?session={session}")
+    finally:
+        server_app.STATE.llm = _StubProviderLLM()
+    assert resp.status_code == 200
+    lines = [json.loads(line) for line in resp.text.splitlines() if line.strip()]
+    assert lines[-1]["type"] == "stream.done"
+    assert any(line["type"] == "run.error" for line in lines)
+
+
+def test_config_test_surfaces_specific_provider_error(client, monkeypatch) -> None:
+    """Spec E: Test Connection shows 'provider error: 401 unauthorized —
+    check your API key' in one probe call — no stacked retries."""
+    import litellm
+
+    calls: list[int] = []
+
+    def failing_completion(**kwargs):
+        calls.append(1)
+        exc = RuntimeError("nope")
+        exc.status_code = 401  # type: ignore[attr-defined]
+        exc.body = {"error": {"message": "invalid api key"}}  # type: ignore[attr-defined]
+        raise exc
+
+    monkeypatch.setattr(litellm, "completion", failing_completion)
+    resp = client.post(
+        "/api/config/test",
+        json={"provider": "custom", "model": "m", "base_url": "http://x/v1", "api_key": "sk-bad"},
+    )
+    body = resp.json()
+    assert body["ok"] is False
+    assert body["error"] == "provider error: 401 unauthorized — check your API key"
+    assert len(calls) == 1, "the probe is one call — no internal retries"
+
+
+def test_config_test_probe_disables_internal_retries(client, monkeypatch) -> None:
+    """The probe's litellm call carries num_retries=0/max_retries=0 —
+    litellm's 10s backoff loop never runs for the button."""
+    import litellm
+
+    captured: dict = {}
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="pong"))],
+        )
+
+    monkeypatch.setattr(litellm, "completion", fake_completion)
+    resp = client.post(
+        "/api/config/test",
+        json={"provider": "custom", "model": "m", "base_url": "http://x/v1", "api_key": "sk-1"},
+    )
+    assert resp.json()["ok"] is True
+    assert captured["num_retries"] == 0 and captured["max_retries"] == 0
+
+
+def test_config_test_timeout_names_budget(client, monkeypatch) -> None:
+    """A hung probe reports its own budget, not a stack trace."""
+    import litellm
+
+    def hanging_completion(**kwargs):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(litellm, "completion", hanging_completion)
+    resp = client.post(
+        "/api/config/test",
+        json={"provider": "custom", "model": "m", "base_url": "http://x/v1", "api_key": "sk-1"},
+    )
+    body = resp.json()
+    assert body["ok"] is False
+    assert body["error"] == "provider error: timeout after 15s"

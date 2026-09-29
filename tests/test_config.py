@@ -316,3 +316,47 @@ def test_seed_provider_from_env_is_pure_slots(monkeypatch) -> None:
     assert seeded["provider"]["model"] == "env-model"
     assert filled == ["model"]  # name was set → no custom fallback needed
     assert seeded["provider"]["name"] == "groq"  # untouched
+
+
+# -- v0.1.6: the provider block owns the LLM retry policy --------------------
+
+def test_provider_retry_policy_defaults() -> None:
+    config = ArcenConfig()
+    assert config.provider.max_retries == 3
+    assert config.provider.retry_backoff_seconds == 1.0
+
+
+def test_provider_retry_policy_validation_bounds() -> None:
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError):
+        ArcenConfig.model_validate({"provider": {"max_retries": -1}})
+    with _pytest.raises(ValueError):
+        ArcenConfig.model_validate({"provider": {"retry_backoff_seconds": 60}})
+    ok = ArcenConfig.model_validate(
+        {"provider": {"max_retries": 0, "retry_backoff_seconds": 0}}
+    )
+    assert ok.provider.max_retries == 0  # 0 = fail on the first error, legally
+    assert ok.provider.retry_backoff_seconds == 0.0
+
+
+def test_provider_retry_policy_round_trips_through_yaml(tmp_path) -> None:
+    from arcen.config import load_config, save_config
+
+    file = tmp_path / "config.yaml"
+    cfg = ArcenConfig.model_validate(
+        {
+            "provider": {
+                "name": "custom",
+                "base_url": "https://x/v1",
+                "api_key": "k",
+                "model": "m",
+                "max_retries": 5,
+                "retry_backoff_seconds": 2.0,
+            }
+        }
+    )
+    save_config(file, cfg)
+    loaded = load_config(file)
+    assert loaded.provider.max_retries == 5
+    assert loaded.provider.retry_backoff_seconds == 2.0

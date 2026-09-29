@@ -14,6 +14,10 @@ v0.1.5 (T-055): ``ARCEN_MODEL_*`` environment variables seed EMPTY
 provider slots at boot (config wins where non-empty; env only fills
 empty slots; the seeded file is written once so the Settings page has
 something to read from on the next restart).
+
+v0.1.6: the provider block also owns the LLM retry policy —
+``provider.max_retries`` (default 3) and ``provider.retry_backoff_seconds``
+(default 1.0, exponential). See llm/client.py for the fail-fast classes.
 """
 
 from __future__ import annotations
@@ -57,6 +61,8 @@ DEFAULT_CONFIG: dict = {
         "base_url": "",  # OpenAI-compatible endpoint (custom / ollama)
         "api_key": "",  # literal or $VAR (credential vault indirection)
         "model": "",  # the model for all agents — agents.<name>.model overrides
+        "max_retries": 3,  # v0.1.6: transient-failure retries (429/5xx) — 4xx never retried
+        "retry_backoff_seconds": 1.0,  # v0.1.6: exponential base → 1s, 2s, 4s
     },
     "agents": {
         "draft": {"max_steps": 40, "replan_on_fail": True, "model": None},
@@ -87,12 +93,20 @@ DEFAULT_CONFIG: dict = {
 class ProviderConfig(BaseModel):
     """The provider Settings saves (T-049): four scalars, no per-vendor
     dicts, no shipped vendor defaults. ``api_key`` may be a ``$VAR``
-    reference resolved from the environment at bridge-build time."""
+    reference resolved from the environment at bridge-build time.
+
+    v0.1.6 retry policy (ARCEN owns retries — litellm's are disabled):
+    ``max_retries`` transient attempts after the first call (429/500/502/
+    503 only; 400/401/403/404 and timeouts fail immediately), backed off
+    exponentially by ``retry_backoff_seconds`` * 2^attempt → 1s, 2s, 4s.
+    """
 
     name: str = ""
     base_url: str = ""
     api_key: str = ""
     model: str = ""
+    max_retries: int = Field(default=3, ge=0, le=10)
+    retry_backoff_seconds: float = Field(default=1.0, ge=0, le=30)
 
 
 class DraftConfig(BaseModel):
