@@ -499,3 +499,11 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Test:** pytest — unknown uuid events → 200 []; known session → events; `not-a-uuid` → 400; unknown uuid session detail → 200 empty shell with matching id.
 - **Verification:** server log on a fresh session shows no 404 for /api/sessions/<uuid>/events.
 - **Evidence:** user server log — GET /api/sessions/18093cd7-…/events → 404 right after opening a fresh chat.
+
+### [T-053] Custom-endpoint models always route through their namespace (noticed while fixing, v0.1.4)
+- **Status:** [x] done — verified
+- **Depends on:** T-049
+- **Deliverable:** for custom (and groq/deepseek/ollama) endpoints, the model is ALWAYS prefixed with its LiteLLM namespace (`openai/org/model`) — a `/` in a model id like `deepseek-ai/DeepSeek-V4-Flash-0731` is not a vendor hint; unprefixed, LiteLLM guesses the vendor and never hits the configured `api_base`. Only native providers (anthropic/openai) send bare model names. Applies to both the bridge (`build_llm_client`) and the Test-Connection probe.
+- **Test:** pytest — bridge maps custom+org/model → `openai/org/model` and the completion call carries `api_base`; config-test probe prefixes the same way.
+- **Verification:** the phase-B live run — Test Connection green and real chat replies against a custom endpoint carrying the dahl model id.
+- **Evidence:** found live during the v0.1.4 phase-B verification: with the settings saved correctly, the Test-Connection probe still failed — the probe (and bridge) passed `deepseek-ai/…` bare and LiteLLM misrouted it. Caught by `wait_for_selector('[data-testid="test-ok"]')` timeout.

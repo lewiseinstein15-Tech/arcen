@@ -557,7 +557,10 @@ def test_config(payload: dict = Body(...)) -> dict:
         return {"ok": False, "error": "no API key configured for this provider"}
 
     prefix = LITELLM_PREFIX.get(provider, "")
-    full_model = model if "/" in model else prefix + model
+    # T-053: custom/ollama/groq/deepseek always route through their
+    # namespace — a model id containing "/" (org/model) is NOT a litellm
+    # vendor hint, it must hit the configured api_base.
+    full_model = model if provider not in LITELLM_PREFIX else prefix + model
     kwargs: dict = {
         "model": full_model,
         "messages": [{"role": "user", "content": "reply with the word: pong"}],

@@ -115,7 +115,11 @@ def build_llm_client(config: ArcenConfig) -> Any | None:
     models: dict[str, str] = {}
     for role, agent in ROLE_AGENT_NAMES.items():
         name = model_for(agent, config)
-        models[role] = name if "/" in name else prefix + name
+        # T-053: only native providers (anthropic/openai) go bare. A custom
+        # endpoint's model id may itself contain "/" (org/model) — routing
+        # it un-prefixed makes LiteLLM guess the vendor instead of using the
+        # configured api_base. Always through the namespace.
+        models[role] = name if provider.name not in LITELLM_PREFIX else prefix + name
 
     def completion(**kwargs: Any):
         import litellm

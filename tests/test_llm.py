@@ -158,5 +158,30 @@ def test_bridge_prefixes_bare_models_per_provider() -> None:
     groq = build_llm_client(_cfg({"name": "groq", "api_key": "gsk", "model": "llama-3"}))
     assert groq.model_for("executor") == "groq/llama-3"
 
-    slash = build_llm_client(_cfg({"name": "custom", "base_url": "https://x/v1", "api_key": "k", "model": "org/model"}))
-    assert slash.model_for("planner") == "org/model"  # already namespaced — bare
+
+# -- T-053: a "/" in a custom-endpoint model id is NOT a litellm vendor hint
+
+def test_custom_endpoint_namespaces_even_slash_models(monkeypatch) -> None:
+    """org/model on a custom endpoint must hit the configured api_base via
+    the openai/ namespace — unprefixed, LiteLLM guesses the vendor wrong."""
+    import litellm
+
+    captured: dict = {}
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))],
+            usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1),
+        )
+
+    monkeypatch.setattr(litellm, "completion", fake_completion)
+    cfg = _cfg({"name": "custom", "base_url": "https://dahl.example/v1", "api_key": "sk-1", "model": "deepseek-ai/DeepSeek-V4-Flash-0731"})
+    client = build_llm_client(cfg)
+    assert client is not None
+    assert client.model_for("planner") == "openai/deepseek-ai/DeepSeek-V4-Flash-0731"
+    client.complete("planner", [{"role": "user", "content": "x"}])
+    assert captured["model"] == "openai/deepseek-ai/DeepSeek-V4-Flash-0731"
+    assert captured["api_base"] == "https://dahl.example/v1"

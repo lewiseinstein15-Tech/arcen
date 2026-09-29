@@ -91,9 +91,9 @@ def test_put_persists_provider_model_end_to_end(cfg_client) -> None:
     assert "base_url: https://inference.dahl.global/v1" in text
 
     # the bridge rebuilt with the dahl model, routed through the custom
-    # openai-compatible namespace (model carries a '/', so no prefix)
+    # openai-compatible namespace (T-053: even with a "/" in the id)
     assert server_app.STATE.llm is not None
-    assert server_app.STATE.llm.model_for("planner") == "deepseek-ai/DeepSeek-V4-Flash-0731"
+    assert server_app.STATE.llm.model_for("planner") == "openai/deepseek-ai/DeepSeek-V4-Flash-0731"
 
     # GET returns the model (the key redacted)
     fresh = cfg_client.get("/api/config").json()
