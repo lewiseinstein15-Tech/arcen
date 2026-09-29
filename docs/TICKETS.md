@@ -515,3 +515,19 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Test:** pytest — the round-trip guard test; full suite runs with the real file byte-identical.
 - **Verification:** full pytest with a pre-existing real config → file untouched (verified by hash during the v0.1.4 closeout).
 - **Evidence:** found live during the v0.1.4 phase-B verification — the harness's saved dahl settings vanished between runs: `test_server._Server` never overrode `STATE.config_path`, so `test_config_put_round_trip`'s PUT persisted the suite's config (empty provider scalars, max_depth 3 — the exact fingerprint found on disk) over the user's real file. The process rule made it a ticket instead of a report line.
+
+### [T-055] Env vars must seed Settings on boot (v0.1.5)
+- **Status:** [~] in progress
+- **Depends on:** T-049
+- **Deliverable:** `ARCEN_MODEL_PROVIDER` / `ARCEN_MODEL_BASE_URL` / `ARCEN_MODEL_API_KEY` / `ARCEN_MODEL_NAME` seed the provider block at boot when no config file exists or its provider slots are empty. Precedence: a non-empty config value always wins; an env var only fills an empty slot; an unset env var leaves the slot empty (the user fills it in Settings). `provider.name` falls back to `custom` in memory (what the UI already displays). The seeded config is written to `~/.arcen/config.yaml` ONCE — only when an env var actually contributed — never rewritten on every boot. Boot logs one line: `[config] seeded from env: provider=… model=… base_url=… api_key=…` with the key masked `first4...last4` (never the full value). Boot log lines are visible under plain `./scripts/dev.sh` (a root handler attaches only when nothing configured logging).
+- **Test:** pytest — no file + env set → fields seeded, file written, log line carries the mask and never the raw key; config values win over env; restart with a full config writes nothing and logs nothing; a manually emptied `provider.model` re-seeds only that field; no env + no file → no file written, in-memory name is `custom` (keeps the T-054 real-file hash guard green).
+- **Verification:** live sandbox with the mock provider: boot with env → seed log + config.yaml on disk + Settings auto-populated + "hello" answered through the bridge; restart → no re-seed; emptied model → re-seeds only model; env unset + no file → Settings empty.
+- **Evidence:** user report — with only env vars set, Settings showed all-empty provider fields and chat answered "I need a model provider", because `load_config` never consulted `ARCEN_MODEL_*` and no config file existed for the UI to read.
+
+### [T-056] README Configuration example still shows the legacy dict shape (noticed while documenting T-055)
+- **Status:** [~] in progress
+- **Depends on:** T-049
+- **Deliverable:** the README "Configuration" section's YAML example predates the T-049 scalar provider rename — it shows `provider.default`, `api_keys`, `base_urls`, per-role `models` and a shipped `claude-haiku-4-5` subagent default that the schema no longer accepts. Rewrite it to the v0.1.4 scalar shape (name/base_url/api_key/model, agents inherit via null) and document the `ARCEN_MODEL_*` env seeding next to it.
+- **Test:** pytest — `test_no_vendor_defaults_ship_in_the_schema` already pins the schema; the README example is verified by eyeballing it against `DEFAULT_CONFIG`.
+- **Verification:** the README example validates against the shipped schema and matches the Part 4 spec example.
+- **Evidence:** found while adding the env-var docs — README line ~217 contradicts `src/arcen/config.py` (legacy shape + a claude-* default T-049 removed).
