@@ -8,6 +8,7 @@ streamed event lands on disk).
 import json
 import threading
 import time
+import uuid
 
 import httpx
 import pytest
@@ -107,7 +108,7 @@ def test_server_persists_every_event(tmp_path) -> None:
     while not server.started:
         time.sleep(0.05)
 
-    session = "s-disk-test"
+    session = str(uuid.uuid4())  # T-052: session ids are uuids
     with httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=30.0) as client:
         client.post("/api/run", json={"goal": "echo disk", "session": session})
         deadline = time.time() + 20

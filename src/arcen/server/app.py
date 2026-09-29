@@ -601,13 +601,44 @@ def sandbox_status() -> dict:
     return sandbox_state(STATE.config.sandbox.backend, STATE.config.sandbox.image)
 
 
+def _require_uuid(session_id: str) -> None:
+    """Session ids are uuids (T-052): anything malformed is a client bug — 400."""
+    try:
+        uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid session id") from None
+
+
 @app.get("/api/sessions/{session_id}/events")
 def session_events(session_id: str) -> list[dict]:
+    """Replay a session's events (T-052): a fresh client-generated uuid is
+    a normal empty session, not an error — file missing → 200 + [], file
+    present → 200 + events, malformed id → 400. No writes on read."""
+    _require_uuid(session_id)
     if session_id in STATE.emitters:
         return STATE.emitters[session_id].replay(0)
     if STATE.store.exists(session_id):
         return STATE.store.read(session_id)  # restart recovery: replay from disk
-    raise HTTPException(status_code=404, detail="unknown session")
+    return []  # a brand-new session id: empty is the truth, never a 404
+
+
+@app.get("/api/sessions/{session_id}")
+def session_detail(session_id: str) -> dict:
+    """One session's meta (T-052): unknown uuid → an empty shell
+    ({id, created: now, title: "", events: []}), known → its live meta;
+    malformed id → 400. Read-only: the shell is never persisted."""
+    _require_uuid(session_id)
+    if session_id not in STATE.sessions_meta and STATE.store.exists(session_id):
+        STATE.ensure_session(session_id)  # restart recovery: seed from disk
+    meta = STATE.sessions_meta.get(session_id)
+    if meta is None:
+        return {"id": session_id, "created": time.time(), "title": "", "events": 0}
+    return {
+        "id": session_id,
+        "created": meta.get("created_at") or 0.0,
+        "title": meta.get("title") or "",
+        "events": meta.get("events") or 0,
+    }
 
 
 def main() -> None:

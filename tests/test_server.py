@@ -10,6 +10,7 @@ plain HTTP — the same path as `uvicorn arcen.server.app:app --port 3002`.
 
 import json
 import time
+import uuid
 
 import httpx
 import pytest
@@ -94,7 +95,7 @@ def client(server):
 
 
 def _new_session(client: httpx.Client, goal: str) -> str:
-    session = f"s-{goal.split()[0]}-{time.time_ns() % 100000}"
+    session = str(uuid.uuid4())  # T-052: session ids are uuids (T-045 UI mints uuids)
     resp = client.post("/api/run", json={"goal": goal, "session": session})
     assert resp.status_code == 200, resp.text
     return session
@@ -327,8 +328,9 @@ def test_run_refuses_when_docker_pinned_but_daemon_absent(client, monkeypatch) -
 
     monkeypatch.setattr(runtime_mod, "_docker_client", lambda: None)
     server_app.STATE.config.sandbox.backend = "docker"
+    session = str(uuid.uuid4())
     try:
-        resp = client.post("/api/run", json={"goal": "true", "session": "s-refuse-docker"})
+        resp = client.post("/api/run", json={"goal": "true", "session": session})
     finally:
         server_app.STATE.config.sandbox.backend = "auto"
     assert resp.status_code == 409, resp.text
@@ -337,9 +339,10 @@ def test_run_refuses_when_docker_pinned_but_daemon_absent(client, monkeypatch) -
         "Sandbox backend is set to docker, but no docker daemon is reachable. "
         "Either start docker or change the backend in Settings → Sandbox."
     )
-    # nothing was planned: the refusal session has no run events
-    events = client.get("/api/sessions/s-refuse-docker/events")
-    assert events.status_code == 404, "no session was created for a refused run"
+    # nothing was planned: the refusal session stays an empty truth (T-052)
+    events = client.get(f"/api/sessions/{session}/events")
+    assert events.status_code == 200
+    assert events.json() == [], "no session was created for a refused run"
 
 
 def test_run_allows_auto_when_daemon_absent(client, monkeypatch) -> None:
@@ -387,3 +390,46 @@ def test_sessions_sorted_newest_first(client) -> None:
     assert ids == ["s-order-2", "s-order-1", "s-order-3"]  # 900 → 500 → 100
     created = [s["created_at"] for s in sessions]
     assert created == sorted(created, reverse=True)
+
+
+# -- T-052: a fresh client-generated session is an empty truth, not a 404 ----
+
+def test_events_for_unknown_uuid_is_200_empty(client) -> None:
+    session = str(uuid.uuid4())
+    resp = client.get(f"/api/sessions/{session}/events")
+    assert resp.status_code == 200
+    assert resp.json() == []  # never a 404 for a brand-new id
+    # nothing was written to disk by the read
+    assert not server_app.STATE.store.exists(session)
+
+
+def test_events_for_invalid_id_is_400(client) -> None:
+    resp = client.get("/api/sessions/not-a-uuid/events")
+    assert resp.status_code == 400
+    assert "invalid session id" in resp.json()["detail"]
+
+
+def test_session_detail_unknown_uuid_is_empty_shell(client) -> None:
+    session = str(uuid.uuid4())
+    resp = client.get(f"/api/sessions/{session}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == session
+    assert body["created"] > 0
+    assert body["title"] == ""
+    assert body["events"] == 0
+    assert not server_app.STATE.store.exists(session)  # read-only
+
+
+def test_session_detail_invalid_id_is_400(client) -> None:
+    resp = client.get("/api/sessions/also-not-a-uuid")
+    assert resp.status_code == 400
+
+
+def test_session_detail_known_session_returns_meta(client) -> None:
+    session = _new_session(client, "echo meta")
+    _stream_until(client, session)
+    body = client.get(f"/api/sessions/{session}").json()
+    assert body["id"] == session
+    assert body["events"] > 0
+    assert body["title"] != ""
