@@ -465,3 +465,37 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Test:** `pytest tests/test_screenshot_guard.py` + the harness run twice back-to-back on a fresh session — both runs capture distinct turns; a run whose turn never fires fails loudly (non-zero, reason printed)
 - **Verification:** harness cannot silently re-screenshot a replayed/stale stream
 - **Evidence:** v0.1.2 report — "ChatView replay-of-history initially fooled the screenshot harness into matching a stale answer — harness now baselines message count and polls the wire for run.done."
+
+## v0.1.4 — settings persistence + agent model inheritance (user-reported: custom provider save never lands)
+
+### [T-049] Settings save: `provider.model` persisted end-to-end (BUG 1 — real bug)
+- **Status:** [~] in progress
+- **Depends on:** none
+- **Deliverable:** the Model Name the user types must survive Save and drive every agent. Config gains a first-class scalar provider block — `provider.name`, `provider.base_url`, `provider.api_key`, `provider.model` — written to `~/.arcen/config.yaml` on PUT /api/config and read when the LLM bridge is built. The Model Name input binds to `provider.model` (controlled, not the derived "common value of three role fields"). The legacy dict shape (`default`/`models`/`api_keys`/`base_urls`) is migrated once on load: `default`→`name`, `api_keys[<name>]`→`api_key`, `base_urls[<name>]`→`base_url`; legacy role models only map onto agent models when the user actually overrode the Anthropic defaults. `has_provider` gates on ALL of name/base_url/api_key/model being set (api_key waived for keyless providers, base_url required for custom/ollama) — a missing model means offline, never claude-* against a custom endpoint.
+- **Test:** pytest — PUT /api/config persists `provider.model` to the config file and GET returns it; legacy config.yaml migrates to the scalar shape; bridge offline when model empty. vitest — typing a Model Name and saving PUTs `provider.model`.
+- **Verification:** save through the live UI → `cat ~/.arcen/config.yaml` shows `name/base_url/api_key/model`; "hello" against a custom endpoint no longer answers "I need a model provider" when the four fields are set.
+- **Evidence:** user screenshots — Settings filled (Provider=custom, Base URL=https://inference.dahl.global/v1, API key set, Model Name EMPTY with the "model for all agents" placeholder), then "hello" answered "I need a model provider…". Server log shows GET /api/config only — no PUT. Root cause chain: (a) no `provider.model` exists in the schema — the input was a derived view over the three per-role models whose shipped defaults (claude-sonnet-4-5 ×2, claude-haiku-4-5) are never all equal, so the input showed the placeholder over stale Anthropic values; (b) the user's Save never reached the server and the UI made that invisible (see T-051); (c) has_provider only checked "a bridge exists" — it never looked at the model at all.
+
+### [T-050] Agent models inherit `provider.model` (BUG 2 — real bug)
+- **Status:** [ ] pending
+- **Depends on:** T-049
+- **Deliverable:** no hardcoded Anthropic defaults anywhere in the config schema. `agents.draft.model` / `agents.forge.model` / `agents.temper.model` default to null = "inherit `provider.model`"; `model_for(agent_name)` (llm/bridge.py) returns the agent's own model or falls back to `provider.model`; `subagents.default_model` becomes null-with-inherit too. The Settings AGENTS fields show placeholder "inherit from provider" when empty and send null (not a claude default) on Save. The per-role `provider.models` map and the claude-* seed in llm/client.py DEFAULT_MODELS stop being config-shipped defaults.
+- **Test:** pytest — model_for("draft") inherits provider.model; an explicit agents.draft.model wins; bridge prefixes non-slash models per provider. vitest — AGENTS placeholders read "inherit from provider"; empty agent field PUTs null.
+- **Verification:** with only provider.model set, all three agents plan/execute/verify with that model; setting TEMPER model overrides just TEMPER.
+- **Evidence:** user screenshot — DRAFT/FORGE = claude-sonnet-4-5, TEMPER = claude-haiku-4-5 against a custom (dahl.global) endpoint: those model names 404 there.
+
+### [T-051] Save button visibly works: status chips, no silent no-ops (BUG 3 — real bug)
+- **Status:** [ ] pending
+- **Depends on:** T-049
+- **Deliverable:** persist on Save only (no autosave), and every Save state is visible next to the button: amber "unsaved changes" chip when any field differs from the loaded config (a typed key counts), "saving…" while the PUT is in flight, green "saved ✓" for 3s after success, red "error: <reason>" on failure. doSave never silently no-ops: a null config shows the load error instead of an inert button, and the PUT carries an abort timeout so a hung request cannot wedge the button forever.
+- **Test:** vitest — editing a field shows the unsaved chip; Save shows saving → saved ✓ (then reverts); a failing PUT shows the red error chip with the reason; an untouched form shows no unsaved chip.
+- **Verification:** on a live save the chip sequence unsaved → saving… → saved ✓ is visible in screenshots; a failed save is loud, never silent.
+- **Evidence:** user report — "it cant be saved in settings"; server log had no PUT /api/config at all, and the UI gave zero feedback that the click did nothing.
+
+### [T-052] New-session 404 (BUG 4 — confirm/apply the spec'd behavior)
+- **Status:** [ ] pending
+- **Depends on:** none
+- **Deliverable:** fresh client-generated session ids must not 404 on replay endpoints. GET /api/sessions/{uuid}/events: file missing → 200 + `[]`; file exists → 200 + events; invalid uuid → 400. GET /api/sessions/{uuid}: file missing → 200 + `{ id, created: now, title: "", events: [] }` (new endpoint); invalid uuid → 400. No disk writes on read.
+- **Test:** pytest — unknown uuid events → 200 []; known session → events; `not-a-uuid` → 400; unknown uuid session detail → 200 empty shell with matching id.
+- **Verification:** server log on a fresh session shows no 404 for /api/sessions/<uuid>/events.
+- **Evidence:** user server log — GET /api/sessions/18093cd7-…/events → 404 right after opening a fresh chat.
