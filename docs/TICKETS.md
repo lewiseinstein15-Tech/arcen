@@ -440,7 +440,8 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Evidence:** v0.1.2 report — "The default UI session id is the deterministic s-ui on a fresh browser context — sessions accumulate there across runs." Every user's first session id was identical; ids collide across users/machines; old events leak into new sessions; the drawer merges everything into one giant session.
 
 ### [T-046] Session list per user (follows T-045)
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
+- **Note:** DONE — ui/tests/session-isolation.test.tsx (2 tests) pins cross-context isolation: two simulated fresh browser contexts (full storage + store wipe between) mint distinct UUIDs; each context's message POSTs to its own id ("hello from A" → idA, "hello from B" → idB); NO wire call of either context ever references the other's session (runs, streams, polls, replays). Reload isolation pinned too: context A restored from localStorage keeps idA after a second context exists and never fetches idB. Drawer history stays per-user because ids no longer collide; the drawer list itself remains the server's session list by design (FRONTEND-SPEC Part 8/11). vitest 77 passed (75+2), tsc clean, pytest 259 passed.
 - **Depends on:** T-045
 - **Deliverable:** cross-context isolation is guaranteed and pinned by a test: two fresh browser contexts generate distinct session ids, a message sent in each is POSTed to that context's own id, and neither context ever reads or streams the other's session. The drawer's per-context history stays un-merged because ids no longer collide (localStorage-scoped state + unique ids); the drawer list itself remains the server's session list by design (FRONTEND-SPEC Part 8/11).
 - **Test:** `npx vitest run` — simulate two fresh browser contexts (clear storage + reset store between), send a message in each, assert distinct ids and that no fetch of context A touches context B's session (and vice versa)
