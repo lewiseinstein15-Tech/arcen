@@ -650,6 +650,11 @@ def test_config(payload: dict = Body(...)) -> dict:
         "messages": [{"role": "user", "content": "reply with the word: pong"}],
         "max_tokens": 8,
         "timeout": 15,
+        # v0.1.6: the probe answers in ONE call — no litellm retries, no
+        # SDK retries. A bad key reports "401 unauthorized" in seconds,
+        # not after minutes of stacked "Retrying request" backoffs.
+        "num_retries": 0,
+        "max_retries": 0,
     }
     if api_key:
         kwargs["api_key"] = api_key
@@ -660,7 +665,9 @@ def test_config(payload: dict = Body(...)) -> dict:
         text = (resp.choices[0].message.content or "").strip()
         return {"ok": True, "model": full_model, "sample": text[:40]}
     except Exception as exc:  # noqa: BLE001 — report, never crash
-        message = str(exc)
+        status, brief, kind = classify_provider_failure(exc)
+        # spec E: the button shows the specific, fix-it-shaped error
+        message = format_provider_error(status, brief, kind, kwargs["timeout"], use_hint=True)
         if api_key:
             message = message.replace(api_key, "<redacted>")  # never echo the key
         return {"ok": False, "error": message[:300]}
