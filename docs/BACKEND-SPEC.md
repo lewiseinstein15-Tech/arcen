@@ -345,6 +345,9 @@ class CostGuard(Plugin):
 
 ## Part 8 — Credential Vault
 
+> (Note: earlier tickets sometimes referred to Part 8 as 'sandbox' — the
+> sandbox lives in Part 4. Part 8 is the credential vault.)
+
 ARCEN runs untrusted code, streams everything to disk, and replays sessions. A literal secret that reaches a session file is a leaked credential. The vault makes that impossible by construction:
 
 1. **Reference.** Config, tool args, and prompts refer to secrets only by `$VAR` name. The vault compiles the set of referenced names at boot.
