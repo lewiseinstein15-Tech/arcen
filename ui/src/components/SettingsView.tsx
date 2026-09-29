@@ -9,7 +9,7 @@
 // wipe a key. Saving persists to ~/.arcen/config.yaml and reloads the
 // provider bridge in-memory.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Toast } from './Toast';
 
 const PROVIDERS = ['custom', 'groq', 'deepseek', 'openai', 'anthropic', 'ollama'] as const;
@@ -50,12 +50,18 @@ interface TestState {
   message?: string;
 }
 
+// T-051: every Save state is visible — no silent no-ops.
+type SaveState = { kind: 'clean' | 'saved' | 'error'; message?: string };
+
 export function SettingsView() {
   const [cfg, setCfg] = useState<Record<string, unknown> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [test, setTest] = useState<TestState>({ status: 'idle' });
   const [toast, setToast] = useState<{ message: string; kind: 'ok' | 'err' } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>({ kind: 'clean' });
+  const savedCfgRef = useRef<Record<string, unknown> | null>(null); // last server view
+  const savedTimer = useRef<number | null>(null);
   const [sandboxStatus, setSandboxStatus] = useState<SandboxStatus | null>(null);
 
   // local (UI-only) general preferences
@@ -69,7 +75,10 @@ export function SettingsView() {
         const res = await fetch('/api/config');
         if (!res.ok) throw new Error(`config load failed (${res.status})`);
         const body = (await res.json()) as Record<string, unknown>;
-        if (alive) setCfg(body);
+        if (alive) {
+          setCfg(body);
+          savedCfgRef.current = body; // the server view Save is measured against
+        }
       } catch (err) {
         if (alive) setLoadError(String(err));
       }
@@ -122,6 +131,14 @@ export function SettingsView() {
     });
   };
 
+  // T-051: dirty when the form differs from the last saved server view,
+  // or when a typed key has not been sent yet.
+  const dirty = useMemo(() => {
+    if (savedCfgRef.current == null) return false;
+    if (keyDraft !== undefined && keyDraft !== '') return true;
+    return JSON.stringify(cfg) !== JSON.stringify(savedCfgRef.current);
+  }, [cfg, keyDraft]);
+
   const doTest = useCallback(async () => {
     setTest({ status: 'testing' });
     try {
@@ -149,6 +166,7 @@ export function SettingsView() {
   const doSave = useCallback(async () => {
     if (!cfg) return; // a null config renders the loading/error view — no inert button
     setSaving(true);
+    setSaveState({ kind: 'clean' });
     try {
       const payload = structuredClone(cfg);
       const p = (payload.provider ?? {}) as Record<string, unknown>;
@@ -161,19 +179,29 @@ export function SettingsView() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(20_000), // a hung PUT must not wedge the button
       });
       if (!res.ok) {
         const detail = await res.text();
         throw new Error(detail.slice(0, 160) || String(res.status));
       }
       // adopt the server's redacted view so the key field stays consistent
-      setCfg((await res.json()) as Record<string, unknown>);
+      const saved = (await res.json()) as Record<string, unknown>;
+      setCfg(saved);
+      savedCfgRef.current = saved;
       localStorage.setItem(VERBOSITY_KEY, verbosity);
       localStorage.setItem(AUTOSCROLL_KEY, autoScroll ? 'on' : 'off');
       setToast({ message: 'Saved', kind: 'ok' });
       setKeyDraft(undefined);
+      setSaveState({ kind: 'saved' }); // "saved ✓" shows for 3s (T-051)
+      if (savedTimer.current !== null) window.clearTimeout(savedTimer.current);
+      savedTimer.current = window.setTimeout(() => setSaveState({ kind: 'clean' }), 3000);
     } catch (err) {
-      setToast({ message: `Error: ${String(err)}`, kind: 'err' });
+      const reason = err instanceof DOMException && err.name === 'TimeoutError'
+        ? 'save timed out after 20s — is the server running?'
+        : String(err);
+      setToast({ message: `Error: ${reason}`, kind: 'err' });
+      setSaveState({ kind: 'error', message: reason }); // red chip stays until retried
     } finally {
       setSaving(false);
     }
@@ -440,6 +468,28 @@ export function SettingsView() {
       </fieldset>
 
       <div className="field-row settings-save-row">
+        {/* T-051: the Save status chip — unsaved (amber) / saving / saved ✓
+            (green, 3s) / error (red, with the reason). Persist on Save only. */}
+        {saving && (
+          <div className="settings-chip settings-chip-amber" data-testid="save-chip" data-chip="amber" role="status">
+            saving…
+          </div>
+        )}
+        {!saving && !dirty && saveState.kind === 'saved' && (
+          <div className="settings-chip settings-chip-green" data-testid="save-chip" data-chip="green" role="status">
+            saved ✓
+          </div>
+        )}
+        {!saving && saveState.kind === 'error' && (
+          <div className="settings-chip settings-chip-red" data-testid="save-chip" data-chip="red" role="alert">
+            error: {saveState.message}
+          </div>
+        )}
+        {!saving && dirty && saveState.kind !== 'error' && (
+          <div className="settings-chip settings-chip-amber" data-testid="save-chip" data-chip="amber" role="status">
+            unsaved changes
+          </div>
+        )}
         <button type="button" className="settings-btn settings-save" data-testid="settings-save" onClick={() => void doSave()} disabled={saving}>
           {saving ? 'saving…' : 'Save'}
         </button>

@@ -477,3 +477,85 @@ describe('T-043: sandbox state surfaced', () => {
     expect(chip).toHaveAttribute('data-chip', 'amber');
   });
 });
+
+// T-051 — the Save button visibly works: every state is a chip next to it.
+describe('T-051: save status chips', () => {
+  function chipFetch(putBodies: string[], putStatus = 200) {
+    return vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes('/api/config') && init?.method === 'PUT') {
+        putBodies.push(String(init.body));
+        return Promise.resolve(
+          putStatus === 200
+            ? new Response(JSON.stringify(configFixture()), { status: 200 })
+            : new Response('provider rejected', { status: putStatus }),
+        );
+      }
+      if (String(url).includes('/api/config')) {
+        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+      }
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    });
+  }
+
+  it('an untouched form shows no chip; an edit shows amber "unsaved changes"', async () => {
+    const putBodies: string[] = [];
+    vi.stubGlobal('fetch', chipFetch(putBodies));
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+    await screen.findByTestId('provider-select');
+    expect(screen.queryByTestId('save-chip')).not.toBeInTheDocument(); // clean
+
+    fireEvent.change(await screen.findByTestId('model-input'), {
+      target: { value: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
+    });
+    const chip = screen.getByTestId('save-chip');
+    expect(chip).toHaveTextContent('unsaved changes');
+    expect(chip).toHaveAttribute('data-chip', 'amber');
+  });
+
+  it('a typed key alone counts as unsaved', async () => {
+    const putBodies: string[] = [];
+    vi.stubGlobal('fetch', chipFetch(putBodies));
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    fireEvent.change(await screen.findByTestId('api-key-input'), { target: { value: 'sk-new' } });
+    expect(screen.getByTestId('save-chip')).toHaveTextContent('unsaved changes');
+  });
+
+  it('save success shows green "saved ✓", then reverts after 3s', async () => {
+    const putBodies: string[] = [];
+    vi.stubGlobal('fetch', chipFetch(putBodies));
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+    fireEvent.change(await screen.findByTestId('model-input'), { target: { value: 'm-2' } });
+    fireEvent.click(screen.getByTestId('settings-save'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('save-chip')).toHaveTextContent('saved ✓');
+    });
+    expect(screen.getByTestId('save-chip')).toHaveAttribute('data-chip', 'green');
+    await waitFor(
+      () => {
+        expect(screen.queryByTestId('save-chip')).not.toBeInTheDocument();
+      },
+      { timeout: 4000 },
+    );
+  }, 8000);
+
+  it('a failing PUT shows the red error chip with the reason', async () => {
+    const putBodies: string[] = [];
+    vi.stubGlobal('fetch', chipFetch(putBodies, 500));
+    render(<App />);
+    fireEvent.click(screen.getByTestId('nav-settings'));
+    await screen.findByTestId('settings-view');
+    fireEvent.change(await screen.findByTestId('model-input'), { target: { value: 'm-2' } });
+    fireEvent.click(screen.getByTestId('settings-save'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('save-chip')).toHaveTextContent('error:');
+    });
+    expect(screen.getByTestId('save-chip')).toHaveAttribute('data-chip', 'red');
+  });
+});
