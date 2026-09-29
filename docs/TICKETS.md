@@ -406,3 +406,58 @@ Non-issues from the v0.1.1 report, recorded here so they are never re-litigated 
 - **Evidence:** v0.1.1 report — "Mock provider had the same no-args bug — its plans carried no args, so it now models a real planner (this would have bitten your laptop testing too)."
 
 
+## v0.1.3 — close "noticed while fixing" (flagged in the v0.1.2 report)
+
+### Process — "noticed while fixing" is a ticket, never a paragraph
+
+Going forward, any item logged under a release report's "Noticed while
+fixing" (P7) becomes a TICKET — not a report line, not "informational":
+
+- Fixable now → add T-NNN, fix it, mark [x], push.
+- Not fixable now → add T-NNN, mark [ ], add a one-line reason why it is
+  deferred, and push the ticket.
+- Never leave it as a paragraph in a report.
+
+This closes the pattern where real bugs sit unactioned in a report.
+
+**v0.1.2 P7 disposition** (every item, with its ticket id):
+
+| v0.1.2 P7 item | Disposition |
+|---|---|
+| Ticket pointer mismatch ("Part 8 (sandbox)") | T-047 |
+| Deterministic session id "s-ui" | T-045 |
+| Screenshot harness staleness | T-048 |
+| plan.update assertion shape | [x] handled by tests (v0.1.2 replan suite, tests/test_draft.py) |
+| vitest chip branch-order bug | [x] handled by tests (v0.1.2 chip tests, caught + fixed the order) |
+
+### [T-045] Deterministic session id "s-ui" (real bug)
+- **Status:** [ ] todo
+- **Depends on:** none
+- **Deliverable:** no hardcoded default session id anywhere. On first load (no stored session id) the UI generates a fresh `crypto.randomUUID()` and persists it (`localStorage['arcen.activeId']` — the repo's canonical key for the ticket's "arcen.currentSession") and uses it everywhere — stream, run, session store. The old "s-ui" survives only as a migration target: a context still pinned to it loads those events once, then rotates to a fresh id for the next turn. Tests stop using s-ui fixtures (deterministic fixture ids or generated UUIDs).
+- **Test:** `npx vitest run` — fresh context generates a UUID (never "s-ui"); reload keeps the same id; "+ New chat" generates a new UUID; two fresh contexts get different UUIDs; a legacy "s-ui" context replays once then rotates
+- **Verification:** fresh browser context → stored id is a UUID, not "s-ui"; server log shows no "session=s-ui" runs after the first turn
+- **Evidence:** v0.1.2 report — "The default UI session id is the deterministic s-ui on a fresh browser context — sessions accumulate there across runs." Every user's first session id was identical; ids collide across users/machines; old events leak into new sessions; the drawer merges everything into one giant session.
+
+### [T-046] Session list per user (follows T-045)
+- **Status:** [ ] todo
+- **Depends on:** T-045
+- **Deliverable:** cross-context isolation is guaranteed and pinned by a test: two fresh browser contexts generate distinct session ids, a message sent in each is POSTed to that context's own id, and neither context ever reads or streams the other's session. The drawer's per-context history stays un-merged because ids no longer collide (localStorage-scoped state + unique ids); the drawer list itself remains the server's session list by design (FRONTEND-SPEC Part 8/11).
+- **Test:** `npx vitest run` — simulate two fresh browser contexts (clear storage + reset store between), send a message in each, assert distinct ids and that no fetch of context A touches context B's session (and vice versa)
+- **Verification:** the isolation test fails if either context reuses the other's id (guard against regression to a shared default)
+- **Evidence:** v0.1.2 report — "sessions accumulate there across runs"; T-045 removes the shared id, T-046 proves the isolation
+
+### [T-047] Ticket pointer correction (housekeeping)
+- **Status:** [ ] todo
+- **Depends on:** none
+- **Deliverable:** every spec pointer that means sandbox says Part 4 (config/sandbox), not Part 8 (credential vault). Part 8 (Credential Vault) gets the one-line note: "(Note: earlier tickets sometimes referred to Part 8 as 'sandbox' — the sandbox lives in Part 4. Part 8 is the credential vault.)" The T-043 deliverable line is corrected to name Part 4. No code change.
+- **Test:** `grep -rn "Part 8" docs/` — no remaining reference means sandbox; the Part 8 header note is present
+- **Verification:** all sandbox pointers read Part 4; vault references still read Part 8
+- **Evidence:** v0.1.2 report — "Ticket pointer mismatch: 'BACKEND-SPEC Part 8 (sandbox)' — Part 8 is the Credential Vault; the sandbox lives in Part 4."
+
+### [T-048] Screenshot harness staleness guard (test-only fix)
+- **Status:** [ ] todo
+- **Depends on:** none
+- **Deliverable:** the screenshot harness refuses to capture a stale turn. Before any screenshot: (a) the last rendered message count must be strictly greater than the baseline count for the session, and (b) the wire must show a fresh run.done for the current turn (seq beyond the baseline). Either check failing → the harness refuses to capture and exits non-zero with the reason. Guard logic is unit-tested so the refusal path itself is pinned.
+- **Test:** `pytest tests/test_screenshot_guard.py` + the harness run twice back-to-back on a fresh session — both runs capture distinct turns; a run whose turn never fires fails loudly (non-zero, reason printed)
+- **Verification:** harness cannot silently re-screenshot a replayed/stale stream
+- **Evidence:** v0.1.2 report — "ChatView replay-of-history initially fooled the screenshot harness into matching a stale answer — harness now baselines message count and polls the wire for run.done."
