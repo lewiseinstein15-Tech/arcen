@@ -14,6 +14,12 @@ Boots the mock provider (:9377) + backend (:3002, custom provider → mock)
 
 Every shot is backed by PASS/FAIL checks against the live wire — no
 staged screenshots.
+
+T-048: turn-backed captures (01, 02) go through the screenshot_guard —
+the capture only happens when the rendered message count grew past the
+pre-send baseline AND the wire carries a fresh terminal event (seq
+beyond the baseline). A stale stream is refused: no capture, reason
+printed, non-zero exit.
 """
 
 from __future__ import annotations
@@ -26,11 +32,15 @@ import time
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import screenshot_guard
+
 ROOT = Path(__file__).resolve().parent.parent
 SHOTS = ROOT / "ui" / "screenshots" / "v0.1.2"
 MOCK_PORT = 9377
 BASE = "http://127.0.0.1:3002"
 CHECKS: list[tuple[str, bool]] = []
+REFUSALS: list[str] = []
 
 
 def check(name, ok, detail=""):
@@ -70,10 +80,11 @@ def write_provider_config(path: Path) -> None:
     save_config(path, cfg)
 
 
-def send_and_wait(page, goal: str, want: str, timeout=90) -> str:
+def send_and_wait(page, goal: str, want: str, timeout=90) -> tuple[str, int]:
     """Send a goal through the UI composer; wait until a NEW bot message
     (rendered after this send) contains `want`. The UI replays persisted
-    history on load, so the pre-send message count is the baseline."""
+    history on load, so the pre-send message count is the baseline —
+    returned alongside the answer for the T-048 staleness guard."""
     page.fill('[data-testid="composer"] textarea', goal)
     baseline = page.locator(".bot-message").count()
     page.keyboard.press("Enter")
@@ -83,9 +94,29 @@ def send_and_wait(page, goal: str, want: str, timeout=90) -> str:
         if page.locator(".bot-message").count() > baseline:
             text = page.locator(".bot-message").last.inner_text()
             if want in text:
-                return text
+                return text, baseline
         time.sleep(0.3)
-    return text
+    return text, baseline
+
+
+def guarded_capture(page, path: Path, shot: str, baseline_count: int, wire_events: list[dict]) -> None:
+    """T-048: refuse to capture a stale turn. The wire events must show a
+    terminal event for the CURRENT turn (seq beyond a fresh-session
+    baseline of 0) and the rendered message count must have grown."""
+    baseline = screenshot_guard.TurnBaseline(rendered_count=baseline_count, max_seq=0)
+    try:
+        screenshot_guard.assert_fresh_turn(
+            baseline,
+            rendered_count=page.locator(".bot-message").count(),
+            wire_events=wire_events,
+        )
+        check(f"{shot} guard: fresh turn (count grew past {baseline_count}, terminal on wire)", True)
+    except screenshot_guard.StaleTurnError as e:
+        check(f"{shot} guard: fresh turn", False, e.reason)
+        REFUSALS.append(shot)
+        print(f"  [REFUSED] {shot} screenshot — {e.reason}")
+        return
+    page.screenshot(path=str(path))
 
 
 def wait_wire_done(sid: str, timeout=20) -> list[dict]:
@@ -163,7 +194,7 @@ def main() -> int:
             page.wait_for_selector('[data-testid="composer"] textarea', timeout=20000)
 
             # -- 01: flaky task — fail → plan.update → corrected steps → Done
-            answer = send_and_wait(page, "run the flaky task: prove replan works", "Done.")
+            answer, base1 = send_and_wait(page, "run the flaky task: prove replan works", "Done.")
             check("01 turn completed ok (answer carries 'Done.')", "Done." in answer, answer[:90].replace("\n", " / "))
             # the default UI session persists across runs — analyze ONLY the
             # turn this harness just drove (events after the last run.start)
@@ -180,12 +211,12 @@ def main() -> int:
             check("01 corrected steps executed after the replan", len(ok_cmd) >= 1)
             dones = [e for e in events if e.get("type") == "run.done"]
             check("01 run.done status ok", bool(dones) and dones[-1].get("status") == "ok")
-            page.screenshot(path=str(SHOTS / "01-replan-continues.png"))
+            guarded_capture(page, SHOTS / "01-replan-continues.png", "01", base1, events)
 
             # -- 02: doomed task — 2 replans, clean terminal summary
             page.click('[data-testid="new-chat-btn"]')
             page.wait_for_selector('[data-testid="composer"] textarea', timeout=15000)
-            answer2 = send_and_wait(page, "run the doomed task", "replanned twice")
+            answer2, base2 = send_and_wait(page, "run the doomed task", "replanned twice")
             check("02 terminal summary says 'replanned twice, still failing'",
                   "replanned twice, still failing" in answer2, answer2[:110])
             sessions2 = json.loads(urllib.request.urlopen(f"{BASE}/api/sessions", timeout=5).read())
@@ -197,9 +228,11 @@ def main() -> int:
             dones2 = [e for e in events2 if e.get("type") == "run.done"]
             check("02 exactly 2 plan.update events (bounded)", len(updates2) == 2, f"count={len(updates2)}")
             check("02 run.done status failed", bool(dones2) and dones2[-1].get("status") == "failed")
-            page.screenshot(path=str(SHOTS / "02-replan-terminal.png"))
+            guarded_capture(page, SHOTS / "02-replan-terminal.png", "02", base2, events2)
 
             # -- 03: Settings → SANDBOX: boot-detected state + amber chip
+            # (no chat turn involved — the T-048 turn guard does not apply;
+            # this shot is pinned by its own sandbox-state checks below)
             page.click('[data-testid="nav-settings"]')
             page.wait_for_selector('[data-testid="settings-sandbox"]', timeout=15000)
             state = page.locator('[data-testid="sandbox-state"]').inner_text()
@@ -230,6 +263,9 @@ def main() -> int:
     for name, ok in CHECKS:
         print(f"  [{'PASS' if ok else 'FAIL'}] {name}")
     print(f"{len(CHECKS) - failed}/{len(CHECKS)} checks")
+    if REFUSALS:
+        print(f"captures refused by the T-048 staleness guard: {', '.join(REFUSALS)}")
+        return 1
     return 1 if failed else 0
 
 
