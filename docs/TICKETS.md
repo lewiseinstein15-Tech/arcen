@@ -431,7 +431,8 @@ This closes the pattern where real bugs sit unactioned in a report.
 | vitest chip branch-order bug | [x] handled by tests (v0.1.2 chip tests, caught + fixed the order) |
 
 ### [T-045] Deterministic session id "s-ui" (real bug)
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
+- **Note:** DONE — sessionStore.ts owns id generation: resolveInitialSessionId() (stored id, else a fresh crypto.randomUUID() persisted to localStorage["arcen.activeId"] — the repo's canonical key for the ticket's "arcen.currentSession"), ensureActiveSession() (idempotent store seed used by App — no hardcoded fallback anywhere), rotateLegacySession() (a context pinned to "s-ui" replays its events once in ChatView.boot, then rotates to a fresh UUID; "s-ui" is never persisted nor sent again and stays in the drawer as history). ChatView takes a required sessionId and resets the stream when boot finds the session nowhere (no cross-id bleed). All "s-ui" literals removed from src except LEGACY_SESSION_ID; test fixtures use "test-session-a"/UUIDs. New ui/tests/session-id.test.tsx (4 tests): fresh context → UUID persisted (no wire request carries "s-ui"), reload reuses the stored id, legacy s-ui replays exactly once then rotates and the next turn POSTs the rotated id, two fresh contexts get different UUIDs. vitest 75 passed (71+4), tsc build clean, pytest 259 passed. Commit 5074c2c.
 - **Depends on:** none
 - **Deliverable:** no hardcoded default session id anywhere. On first load (no stored session id) the UI generates a fresh `crypto.randomUUID()` and persists it (`localStorage['arcen.activeId']` — the repo's canonical key for the ticket's "arcen.currentSession") and uses it everywhere — stream, run, session store. The old "s-ui" survives only as a migration target: a context still pinned to it loads those events once, then rotates to a fresh id for the next turn. Tests stop using s-ui fixtures (deterministic fixture ids or generated UUIDs).
 - **Test:** `npx vitest run` — fresh context generates a UUID (never "s-ui"); reload keeps the same id; "+ New chat" generates a new UUID; two fresh contexts get different UUIDs; a legacy "s-ui" context replays once then rotates
@@ -439,7 +440,7 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Evidence:** v0.1.2 report — "The default UI session id is the deterministic s-ui on a fresh browser context — sessions accumulate there across runs." Every user's first session id was identical; ids collide across users/machines; old events leak into new sessions; the drawer merges everything into one giant session.
 
 ### [T-046] Session list per user (follows T-045)
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** T-045
 - **Deliverable:** cross-context isolation is guaranteed and pinned by a test: two fresh browser contexts generate distinct session ids, a message sent in each is POSTed to that context's own id, and neither context ever reads or streams the other's session. The drawer's per-context history stays un-merged because ids no longer collide (localStorage-scoped state + unique ids); the drawer list itself remains the server's session list by design (FRONTEND-SPEC Part 8/11).
 - **Test:** `npx vitest run` — simulate two fresh browser contexts (clear storage + reset store between), send a message in each, assert distinct ids and that no fetch of context A touches context B's session (and vice versa)
