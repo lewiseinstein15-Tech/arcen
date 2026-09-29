@@ -2,15 +2,18 @@
 
 Proves: /api/health returns 200 with {"ok": true}; a run streams all key
 events in order over NDJSON; Last-Event-ID resume re-emits from seq;
-unknown sessions 404; config API is redacted.
+v0.1.6 — a valid session that exists nowhere streams 200 + held (never
+a 404), a malformed id is 400; config API is redacted.
 
 Runs the actual ASGI server (uvicorn, thread) on 127.0.0.1 and speaks
 plain HTTP — the same path as `uvicorn arcen.server.app:app --port 3002`.
 """
 
 import json
+import threading
 import time
 import uuid
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -124,9 +127,70 @@ def test_health_returns_ok(client) -> None:
     assert resp.json() == {"ok": True}
 
 
-def test_unknown_session_404(client) -> None:
+def test_stream_malformed_session_400(client) -> None:
+    """v0.1.6: a malformed id is a client bug — 400, the same contract as
+    /api/sessions/{id} (T-052). A valid id is NEVER rejected (below)."""
     resp = client.get("/api/stream?session=nope")
-    assert resp.status_code == 404
+    assert resp.status_code == 400
+    assert "invalid session id" in resp.json()["detail"]
+
+
+def test_stream_new_session_is_200_held(client) -> None:
+    """v0.1.6 BUG 1: a client-minted uuid with no run yet is an empty
+    truth — 200 + held NDJSON, never the 404 the laptop logged six times
+    before the first POST /api/run."""
+    session = str(uuid.uuid4())
+    with client.stream("GET", f"/api/stream?session={session}") as resp:
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("application/x-ndjson")
+        assert not server_app.STATE.store.exists(session)  # the hold writes nothing
+
+
+def test_stream_idle_hold_pings(client, monkeypatch) -> None:
+    """The held stream stays alive: silence past the ping interval emits
+    stream.ping keepalives — proxy/NAT idle timeouts never kill the hold
+    mid-wait, and the seq-less frame is invisible to the UI store."""
+    monkeypatch.setattr(server_app, "STREAM_PING_INTERVAL", 1.0)
+    session = str(uuid.uuid4())
+    with client.stream("GET", f"/api/stream?session={session}") as resp:
+        assert resp.status_code == 200
+        line = next(resp.iter_lines())
+        assert json.loads(line)["type"] == "stream.ping"
+
+
+def test_stream_held_then_run_delivers_live(client) -> None:
+    """v0.1.6 BUG 1 end-to-end: a stream opened BEFORE the run attaches
+    within a poll tick, then delivers the turn live and closes after
+    run.done + stream.done — zero 404s, zero refresh, no missed event."""
+    session = str(uuid.uuid4())
+    lines: list[str] = []
+    reader_err: list[str] = []
+
+    def reader() -> None:
+        try:
+            with httpx.Client(base_url=BASE, timeout=httpx.Timeout(30.0, read=20.0)) as rc:
+                with rc.stream("GET", f"/api/stream?session={session}") as resp:
+                    assert resp.status_code == 200
+                    for line in resp.iter_lines():
+                        lines.append(line)
+                        if '"stream.done"' in line:
+                            return
+        except Exception as exc:  # noqa: BLE001
+            reader_err.append(repr(exc))
+
+    thread = threading.Thread(target=reader, daemon=True)
+    thread.start()
+    time.sleep(0.6)  # past two attach ticks — held, nothing emitted
+    assert not lines, "a held stream must not emit before the run starts"
+    resp = client.post("/api/run", json={"goal": "echo held-live", "session": session})
+    assert resp.status_code == 200
+    thread.join(timeout=15)
+    assert not reader_err, reader_err
+    events = [json.loads(ln) for ln in lines if ln.strip()]
+    kinds = [e["type"] for e in events]
+    assert kinds[0] == "run.start"
+    assert kinds[-1] == "stream.done" and "run.done" in kinds
+    assert "stream.ping" not in kinds  # attached before the slow clock fired
 
 
 def test_run_streams_full_turn_in_order(client) -> None:
@@ -281,7 +345,7 @@ def test_run_without_provider_refuses_cleanly(client) -> None:
 
 
 def test_interrupt_run(client) -> None:
-    session = f"s-interrupt-{time.time_ns() % 100000}"
+    session = str(uuid.uuid4())  # v0.1.6: stream ids are uuids (400 otherwise)
     run = client.post("/api/run", json={"goal": "sleep 5", "session": session}).json()
     time.sleep(0.4)
     resp = client.delete(f"/api/run/{run['run_id']}")

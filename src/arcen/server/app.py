@@ -6,9 +6,14 @@ Endpoints (Part 10): /api/run, /api/stream, /api/health, /api/config,
 - stream: NDJSON, Content-Type application/x-ndjson, one JSON object per
   line; every event carries seq + ts; ``Last-Event-ID`` replays from that
   seq — optional, garbage/future values replay fresh (never a 400);
-  409 + oldest seq when compacted away, 404 for sessions that exist
-  nowhere (memory AND disk). After a terminal event the stream emits a
-  ``{type:"stream.done"}`` transport frame and closes — replay+close.
+  409 + oldest seq when compacted away. v0.1.6: a valid session that
+  exists nowhere (memory AND disk) is an EMPTY TRUTH, not a 404 — the
+  stream returns 200 and HOLDS, attaches the moment the session is born
+  (POST /api/run), delivers live, and closes after the terminal event;
+  ``{type:"stream.ping"}`` heartbeats keep the idle hold alive. A
+  malformed id is a client bug → 400. After a terminal event the stream
+  emits a ``{type:"stream.done"}`` transport frame and closes —
+  replay+close.
 - config: GET returns the redacted view (names, never secret values);
   PUT updates the live config.
 - runs: POST /api/run starts a turn in a worker thread and returns the
@@ -413,63 +418,126 @@ TERMINAL_EVENTS = frozenset({"run.done", "run.error"})
 # Transport frame, NOT one of the 17 frozen events — tells the client the
 # stream closed cleanly after a terminal event (replay+close contract).
 STREAM_DONE_LINE = '{"type":"stream.done"}\n'
+# Transport frame, NOT one of the 17 frozen events — keepalive for an idle
+# held stream. Proxy/NAT idle timeouts kill silent connections; the UI's
+# store drops seq-less frames, so the ping is invisible to the app.
+STREAM_PING_LINE = '{"type":"stream.ping"}\n'
+STREAM_PING_INTERVAL = 15.0  # seconds of silence between pings
+# How often a held stream re-checks whether its (valid, but nowhere-yet)
+# session came into existence — POST /api/run creates it, and live
+# delivery must start within a tick of the first event, not a poll
+# interval later.
+ATTACH_POLL_INTERVAL = 0.25
+
+
+def _resume_start(last_event_id: str | None, emitter: StreamEmitter) -> int:
+    """Normalized replay start for a live attach (v0.1.6).
+
+    Garbage and negative hints → fresh replay from 0 (never a 400); a hint
+    ahead of the emitter (client seq from a previous server process) →
+    fresh replay from 0; a hint behind the compaction horizon → -1, which
+    the caller surfaces as 409 + oldest seq while the headers can still
+    carry a status. A brand-new emitter buffers nothing, so any positive
+    hint is "ahead" — the stale-id reconnect replays from the top.
+    """
+    if not last_event_id:
+        return 0
+    try:
+        last_id = int(last_event_id)
+    except ValueError:
+        return 0  # garbage resume hint — replay fresh, never a 400
+    if 0 < last_id + 1 < emitter.oldest_seq:
+        return -1  # compacted away — caller decides (409 while headers allow)
+    last_id = max(last_id, 0)  # negative garbage → fresh
+    if last_id > emitter.last_seq:
+        last_id = 0  # client ahead (server restart) → full replay from 0
+    return last_id
 
 
 @app.get("/api/stream")
 def get_stream(session: str, last_event_id: str | None = Header(default=None)) -> StreamingResponse:
     """Live NDJSON event stream — replay-first, close-after-turn.
 
-    Resume contract (the stream never rejects a valid session):
-    - unknown session (not in memory AND not on disk)  → 404
+    Resume contract (v0.1.6 — the stream never rejects a valid session):
+    - malformed session id (not a uuid)                 → 400 (client bug)
+    - session in memory or on disk                      → 200 replay + live
+    - valid session that exists NOWHERE                 → 200 HELD stream:
+      the empty-session truth (a client-minted uuid before its first
+      /api/run is early, not wrong). The hold polls for the session's
+      birth — POST /api/run attaches it within ~0.25s, replays everything
+      the turn already emitted, then delivers live until the terminal
+      event, then stream.done + close. ``stream.ping`` heartbeats every
+      15s of silence keep proxies from killing the idle hold. NEVER 404.
     - garbage or future Last-Event-ID (client seq from
       before a server restart)                          → fresh replay from 0, still 200
     - Last-Event-ID behind the compaction horizon       → 409 + oldest seq
     - nothing pending and no active turn                → replay + stream.done + close 200
     """
-    if not STATE.ensure_session(session):
-        raise HTTPException(status_code=404, detail="unknown session")
-    emitter = STATE.emitters[session]
+    _require_uuid(session)  # T-052 contract: session ids are uuids
 
-    last_id = 0
-    if last_event_id:
-        try:
-            last_id = int(last_event_id)
-        except ValueError:
-            last_id = 0  # garbage resume hint — replay fresh, never a 400
-        if 0 < last_id + 1 < emitter.oldest_seq:
+    emitter_now = STATE.emitters.get(session)
+    if emitter_now is None:
+        # restart recovery first — a disk-backed log must attach directly,
+        # not through the hold phase (existing synchronous behavior)
+        STATE.ensure_session(session)
+        emitter_now = STATE.emitters.get(session)
+
+    start_seq = 0
+    if emitter_now is not None:
+        start_seq = _resume_start(last_event_id, emitter_now)
+        if start_seq < 0:  # behind the compaction horizon
             return JSONResponse(
                 status_code=409,
-                content={"error": "compacted", "oldest": emitter.oldest_seq},
+                content={"error": "compacted", "oldest": emitter_now.oldest_seq},
             )
-        last_id = max(last_id, 0)  # negative garbage → fresh
-        if last_id > emitter.last_seq:
-            last_id = 0  # client ahead (server restart) → full replay from 0
+    # A nowhere-yet session has no buffer to be compacted against — the
+    # hold phase replays from 0 at attach time (a stale Last-Event-ID
+    # against a fresh emitter is "ahead" by definition → fresh).
 
     async def gen():
         import asyncio
 
         loop = asyncio.get_running_loop()
         live: asyncio.Queue = asyncio.Queue()
+        emitter = STATE.emitters.get(session)
+        # -- hold phase (v0.1.6): the session does not exist yet ----------
+        # Poll for its birth instead of 404ing. Fast attach ticks keep
+        # live delivery live; pings on the slow clock keep the hold alive.
+        if emitter is None:
+            last_ping = loop.time()
+            while emitter is None:
+                await asyncio.sleep(ATTACH_POLL_INTERVAL)
+                if STATE.ensure_session(session):
+                    emitter = STATE.emitters[session]
+                elif loop.time() - last_ping >= STREAM_PING_INTERVAL:
+                    yield STREAM_PING_LINE
+                    last_ping = loop.time()
+            start = _resume_start(last_event_id, emitter)
+            if start < 0:
+                start = 0  # headers are already sent — replay the safe superset
+        else:
+            start = start_seq
         # subscribe BEFORE replaying so no event is lost in between
         unsubscribe = emitter.subscribe(
             lambda wire: loop.call_soon_threadsafe(live.put_nowait, wire)
         )
         try:
-            replayed = emitter.replay(last_id)
+            replayed = emitter.replay(start)
             for wire in replayed:
                 yield emitter.to_line(wire) + "\n"
-            high_water = replayed[-1]["seq"] if replayed else last_id
+            high_water = replayed[-1]["seq"] if replayed else start
             terminal = bool(replayed) and replayed[-1]["type"] in TERMINAL_EVENTS
             if terminal and not STATE.active_runs.get(session):
                 yield STREAM_DONE_LINE  # turn already over → replay + close, never a hang
                 return
             while True:
                 try:
-                    wire = await asyncio.wait_for(live.get(), timeout=15)
+                    wire = await asyncio.wait_for(live.get(), timeout=STREAM_PING_INTERVAL)
                 except asyncio.TimeoutError:
                     if terminal and not STATE.active_runs.get(session):
                         yield STREAM_DONE_LINE
                         return
+                    yield STREAM_PING_LINE  # idle hold keepalive
                     continue  # hold the connection open — a turn may still start
                 if wire["seq"] <= high_water:
                     continue  # already replayed
