@@ -493,7 +493,7 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Evidence:** user report — "it cant be saved in settings"; server log had no PUT /api/config at all, and the UI gave zero feedback that the click did nothing.
 
 ### [T-052] New-session 404 (BUG 4 — confirm/apply the spec'd behavior)
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** none
 - **Deliverable:** fresh client-generated session ids must not 404 on replay endpoints. GET /api/sessions/{uuid}/events: file missing → 200 + `[]`; file exists → 200 + events; invalid uuid → 400. GET /api/sessions/{uuid}: file missing → 200 + `{ id, created: now, title: "", events: [] }` (new endpoint); invalid uuid → 400. No disk writes on read.
 - **Test:** pytest — unknown uuid events → 200 []; known session → events; `not-a-uuid` → 400; unknown uuid session detail → 200 empty shell with matching id.
