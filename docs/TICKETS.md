@@ -477,7 +477,7 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Evidence:** user screenshots — Settings filled (Provider=custom, Base URL=https://inference.dahl.global/v1, API key set, Model Name EMPTY with the "model for all agents" placeholder), then "hello" answered "I need a model provider…". Server log shows GET /api/config only — no PUT. Root cause chain: (a) no `provider.model` exists in the schema — the input was a derived view over the three per-role models whose shipped defaults (claude-sonnet-4-5 ×2, claude-haiku-4-5) are never all equal, so the input showed the placeholder over stale Anthropic values; (b) the user's Save never reached the server and the UI made that invisible (see T-051); (c) has_provider only checked "a bridge exists" — it never looked at the model at all.
 
 ### [T-050] Agent models inherit `provider.model` (BUG 2 — real bug)
-- **Status:** [~] in progress
+- **Status:** [x] done — verified
 - **Depends on:** T-049
 - **Deliverable:** no hardcoded Anthropic defaults anywhere in the config schema. `agents.draft.model` / `agents.forge.model` / `agents.temper.model` default to null = "inherit `provider.model`"; `model_for(agent_name)` (llm/bridge.py) returns the agent's own model or falls back to `provider.model`; `subagents.default_model` becomes null-with-inherit too. The Settings AGENTS fields show placeholder "inherit from provider" when empty and send null (not a claude default) on Save. The per-role `provider.models` map and the claude-* seed in llm/client.py DEFAULT_MODELS stop being config-shipped defaults.
 - **Test:** pytest — model_for("draft") inherits provider.model; an explicit agents.draft.model wins; bridge prefixes non-slash models per provider. vitest — AGENTS placeholders read "inherit from provider"; empty agent field PUTs null.
@@ -485,7 +485,7 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Evidence:** user screenshot — DRAFT/FORGE = claude-sonnet-4-5, TEMPER = claude-haiku-4-5 against a custom (dahl.global) endpoint: those model names 404 there.
 
 ### [T-051] Save button visibly works: status chips, no silent no-ops (BUG 3 — real bug)
-- **Status:** [ ] pending
+- **Status:** [~] in progress
 - **Depends on:** T-049
 - **Deliverable:** persist on Save only (no autosave), and every Save state is visible next to the button: amber "unsaved changes" chip when any field differs from the loaded config (a typed key counts), "saving…" while the PUT is in flight, green "saved ✓" for 3s after success, red "error: <reason>" on failure. doSave never silently no-ops: a null config shows the load error instead of an inert button, and the PUT carries an abort timeout so a hung request cannot wedge the button forever.
 - **Test:** vitest — editing a field shows the unsaved chip; Save shows saving → saved ✓ (then reverts); a failing PUT shows the red error chip with the reason; an untouched form shows no unsaved chip.
