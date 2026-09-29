@@ -51,7 +51,7 @@ describe('T-032: optimistic pending turn', () => {
     // the generating indicator names DRAFT while nothing has streamed yet
     expect(screen.getByTestId('generating')).toHaveTextContent('DRAFT is thinking…');
 
-    resolveRun(new Response(JSON.stringify({ run_id: 'r-1', session: 's-ui' }), { status: 200 }));
+    resolveRun(new Response(JSON.stringify({ run_id: 'r-1', session: 'test-session-a' }), { status: 200 }));
     await waitFor(() => {
       expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/api/run'))).toBe(true);
     });

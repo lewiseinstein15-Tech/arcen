@@ -90,7 +90,7 @@ describe('F-03: composer send', () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (String(url).includes('/api/run')) {
         return Promise.resolve(
-          new Response(JSON.stringify({ run_id: 'r-1', session: 's-ui' }), { status: 200 }),
+          new Response(JSON.stringify({ run_id: 'r-1', session: 'test-session-a' }), { status: 200 }),
         );
       }
       if (String(url).includes('/api/sessions') || String(url).includes('/api/stream')) {

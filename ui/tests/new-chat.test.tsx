@@ -33,7 +33,7 @@ describe('T-035: new chat buttons', () => {
   it('click with a non-empty stream → new session id, stream cleared, drawer keeps the old chat', async () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (String(url).includes('/api/run')) {
-        return Promise.resolve(new Response(JSON.stringify({ run_id: 'r-1', session: 's-ui' }), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({ run_id: 'r-1', session: 'test-session-a' }), { status: 200 }));
       }
       if (String(url).includes('/api/sessions')) {
         return Promise.resolve(new Response('[]', { status: 200 }));
@@ -53,8 +53,8 @@ describe('T-035: new chat buttons', () => {
 
     const activeId = useSessionStore.getState().activeId;
     expect(activeId).not.toBeNull();
-    expect(activeId).not.toBe('s-ui'); // fresh session id (uuid)
-    expect(activeId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(activeId).not.toBe('test-session-a'); // not a shared/hardcoded id
+    expect(activeId).toMatch(/^[0-9a-f-]{36}$/); // T-045: generated UUID
     expect(useStreamStore.getState().events).toHaveLength(0); // stream cleared
     // the composer regains focus (new chat is ready to type into)
     await waitFor(() => {

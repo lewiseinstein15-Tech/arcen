@@ -18,6 +18,7 @@ import { foldEvents } from '../stream/fold';
 import { consumeStream, submitRun } from '../stream/reader';
 import { useAutoScroll } from '../stream/useAutoScroll';
 import { loadDraft, saveDraft, saveLastSeq } from '../state/persist';
+import { rotateLegacySession } from '../state/sessionStore';
 import { BlockFor } from '../events';
 import { fmtTime } from '../events/render';
 import type { ArcenEvent } from '../types/events';
@@ -30,7 +31,7 @@ const MAX_FAILURES = 5; // stop retrying after 5 consecutive failures
 const POLL_AFTER_FAILURES = 3; // failover: poll /events every 1s from here on
 const POLL_MS = 1000;
 
-export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
+export function ChatView({ sessionId }: { sessionId: string }) {
   const events = useStreamStore((s) => s.events);
   const status = useStreamStore((s) => s.status);
   const pendingTurn = useStreamStore((s) => s.pendingTurn);
@@ -134,11 +135,21 @@ export function ChatView({ sessionId = 's-ui' }: { sessionId?: string }) {
           } else if (alive) {
             useStreamStore.getState().reset(); // fresh/empty chat (T-035 session switch)
           }
+        } else if (alive) {
+          // session exists nowhere (404): an empty stream is the truth —
+          // never carry events from another id into this chat (T-045)
+          useStreamStore.getState().reset();
         }
       } catch {
         // replay is best-effort; the live stream still works
       }
       if (!alive) return;
+      // T-045 legacy migration: a context still pinned to 's-ui' has now
+      // loaded its old events once — rotate to a fresh generated id for
+      // the next turn. The rotation swaps the active id (persisted), which
+      // remounts this view on the fresh chat; 's-ui' stays in the drawer
+      // as history. No-op for every non-legacy id.
+      if (rotateLegacySession(sessionId) !== sessionId) return;
       // a session that exists nowhere has nothing to stream — the first
       // send() attaches after POST /api/run creates it (no 404 spinning)
       if (exists) await attach(seen);
