@@ -458,7 +458,7 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Evidence:** v0.1.2 report — "Ticket pointer mismatch: 'BACKEND-SPEC Part 8 (sandbox)' — Part 8 is the Credential Vault; the sandbox lives in Part 4."
 
 ### [T-048] Screenshot harness staleness guard (test-only fix)
-- **Status:** [ ] todo
+- **Status:** [~] in progress
 - **Depends on:** none
 - **Deliverable:** the screenshot harness refuses to capture a stale turn. Before any screenshot: (a) the last rendered message count must be strictly greater than the baseline count for the session, and (b) the wire must show a fresh run.done for the current turn (seq beyond the baseline). Either check failing → the harness refuses to capture and exits non-zero with the reason. Guard logic is unit-tested so the refusal path itself is pinned.
 - **Test:** `pytest tests/test_screenshot_guard.py` + the harness run twice back-to-back on a fresh session — both runs capture distinct turns; a run whose turn never fires fails loudly (non-zero, reason printed)
