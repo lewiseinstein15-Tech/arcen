@@ -210,6 +210,36 @@ Rules:
 1. **Secrets use `$VAR`.** Any value matching `^\$[A-Z_]+$` is resolved from the process environment by the credential vault (Part 8) at boot. Literal secrets in the config file are a spec violation.
 2. **Every value has an API equivalent.** Anything readable in the YAML is exposed via `GET /api/config` and mutable via `PUT /api/config` — the file is never the only interface. Secret values are never returned by the API, only their variable names.
 
+### Env seeding on boot (v0.1.5, T-055)
+
+The server/UI can be pointed at a model entirely from the environment. Four
+variables seed EMPTY provider slots at boot:
+
+| config slot       | env var                  |
+|-------------------|--------------------------|
+| `provider.name`   | `ARCEN_MODEL_PROVIDER`   |
+| `provider.base_url` | `ARCEN_MODEL_BASE_URL` |
+| `provider.api_key`  | `ARCEN_MODEL_API_KEY`  |
+| `provider.model`    | `ARCEN_MODEL_NAME`     |
+
+Precedence: **a non-empty config value always wins; an env var only fills an
+empty slot; an unset env var leaves the slot empty** (the user fills it in
+Settings). `provider.name` falls back to `custom` — what the UI already
+displays — but that default is not an env contribution and never triggers a
+write. When at least one env var actually filled a slot, the merged config is
+written to `~/.arcen/config.yaml` **once** (chmod 600, same as Settings →
+Save) so the seeding survives restarts, and boot logs exactly one line:
+
+```
+[config] seeded from env: provider=custom model=deepseek-ai/DeepSeek-V4-Flash-0731 base_url=https://inference.dahl.global/v1 api_key=dahl_...a71b
+```
+
+The `api_key` is masked `first4...last4` (`mask_secret`); values of eight
+characters or fewer are masked entirely; it is never logged in full. A boot
+where the config already has every slot filled writes nothing and logs
+nothing — the file, not the environment, is the source of truth after the
+first seeded boot.
+
 ### Sandbox backends (T-043)
 
 > Note: the v0.1.2 ticket pointed at "Part 8 (sandbox)"; Part 8 is the

@@ -35,6 +35,20 @@ arcen "fix the failing test in tests/test_pay.py"
 
 Every step DRAFT plans, FORGE runs, and TEMPER checks streams to your terminal as one JSON object per line. When TEMPER fails the work, DRAFT re-plans — you watch it happen.
 
+### Pointing the server/UI at a model with env vars
+
+Running `arcen serve` or `./scripts/dev.sh`? Set the `ARCEN_MODEL_*` variables before boot and the Settings page shows them already filled — no retyping, no "I need a model provider" on the first message:
+
+```bash
+export ARCEN_MODEL_PROVIDER="custom"                                 # or groq / deepseek / openai / anthropic / ollama
+export ARCEN_MODEL_BASE_URL="https://inference.dahl.global/v1"       # your OpenAI-compatible endpoint (custom/ollama)
+export ARCEN_MODEL_API_KEY="dahl_..."                                # seeded into the masked key field
+export ARCEN_MODEL_NAME="deepseek-ai/DeepSeek-V4-Flash-0731"         # the model for all agents
+./scripts/dev.sh
+```
+
+On boot ARCEN seeds any EMPTY provider slot from these vars (a value already in `~/.arcen/config.yaml` always wins) and writes the seeded file once, logging one line with the key masked — `[config] seeded from env: provider=custom model=… base_url=… api_key=dahl_...a71b`. After that first boot the file is the source of truth: restarts don't re-seed, and unsetting the env vars won't unconfigure the server.
+
 ### Running the dev stack (backend + UI)
 
 The UI proxies `/api/*` to the backend on port **3002** — so the backend must be up FIRST, or Vite spams `ECONNREFUSED`. Two shells:
@@ -211,33 +225,33 @@ arcen resume r-01J9                                     # replay or continue a s
 
 ## Configuration
 
-ARCEN reads `~/.arcen/config.yaml`. Secrets are referenced by `$VAR` name — never literals:
+ARCEN reads `~/.arcen/config.yaml` (seeded from `ARCEN_MODEL_*` env vars on first boot — see Quick Start above). The provider block is four scalars; a literal API key is allowed (the file is chmod 600), and a `$VAR` reference is resolved from your environment at boot:
 
 ```yaml
 provider:
-  default: anthropic
-  models:
-    planner: claude-sonnet-4-5      # DRAFT
-    executor: claude-sonnet-4-5     # FORGE
-    verifier: claude-haiku-4-5      # TEMPER
-  api_keys:
-    anthropic: $ANTHROPIC_API_KEY   # resolved from your environment at boot
-    openai: $OPENAI_API_KEY
+  name: custom                                   # custom | groq | deepseek | openai | anthropic | ollama
+  base_url: https://inference.dahl.global/v1     # OpenAI-compatible endpoint (custom/ollama)
+  api_key: $DAHL_API_KEY                         # literal (chmod 600 file) or $VAR vault reference
+  model: deepseek-ai/DeepSeek-V4-Flash-0731      # the model for all agents
 
 agents:
   draft:
     max_steps: 40
     replan_on_fail: true
+    model: null                                  # null → inherit provider.model
   forge:
     step_timeout_s: 120
+    max_retries: 2
+    model: null                                  # null → inherit provider.model
   temper:
     adversarial: true
     reruns: 1
+    model: null                                  # an explicit value overrides just this agent
 
 subagents:
   max_depth: 2
   max_concurrent: 8
-  default_model: claude-haiku-4-5
+  default_model: null    # null → inherit provider.model
 
 stream:
   port: 3002
