@@ -69,6 +69,17 @@ Or start both cleanly with one command — the script backgrounds the backend, t
 
 npm shortcuts are wired at the repo root too: `npm run dev:backend`, `npm run dev:frontend`, `npm run dev` (both).
 
+### Terminal UI (TUI)
+
+Prefer the terminal? The optional `tui` extra installs a full-screen [Textual](https://textual.textualize.io/) client that talks to the same server — same held NDJSON stream, same frozen 17 events, same sandbox/config views.
+
+```bash
+pip install 'arcen[tui]'
+arcen-tui            # one command, one terminal — spawns a local server if needed
+```
+
+On launch it attaches to a running server when one is reachable, otherwise it starts and manages a local `uvicorn` child itself (port 3002 or a free fallback, logs in `~/.arcen/tui-server.log`) and stops it on quit; `arcen-tui --no-serve` forces attach-only mode. Submit goals from the composer, watch DRAFT/FORGE/TEMPER narrate every step with color-coded events and inline diffs, browse past sessions in the sidebar, interrupt a run with `Ctrl+X`, and open the redacted config/sandbox modal with `Ctrl+O`. Global shortcuts are Ctrl-prefixed so normal typing is never stolen; `Ctrl+H` lists them all. Full reference: [docs/TUI.md](docs/TUI.md).
+
 ## The Sandbox: Docker or Honest Fallback
 
 ARCEN executes FORGE's commands inside a sandbox — one per session, zero host binds, network off, resources capped. Two backends, selected automatically at session start:

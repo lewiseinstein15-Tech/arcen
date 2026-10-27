@@ -33,9 +33,13 @@ mcp = [
 sandbox = [
     "docker>=7.1",
 ]
+tui = [
+    "textual>=0.86",
+]
 
 [project.scripts]
 arcen = "arcen.server.app:main"
+arcen-tui = "arcen.tui:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/arcen"]
