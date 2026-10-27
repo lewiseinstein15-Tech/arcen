@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ARCEN — Architecture</title>
+<style>
+  :root {
+    --bg: #0A0B0D;
+    --panel: #121418;
+    --panel-2: #16191F;
+    --border: #2A2E35;
+    --text: #E6E8EB;
+    --muted: #9AA0A8;
+    --faint: #6B7178;
+    --accent: #FF6B5C;
+    --draft: #FF6B5C;
+    --forge: #5B9DFF;
+    --temper: #4CC38A;
+    --sub: #B58CFF;
+    --warn: #E8B34B;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.45;
+    padding: 40px 28px 64px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  /* ---------- header ---------- */
+  header { display: flex; align-items: center; gap: 18px; margin-bottom: 10px; }
+  header .logo { flex: 0 0 auto; }
+  header h1 { margin: 0; font-size: 30px; letter-spacing: 0.5px; }
+  header .tag { color: var(--accent); font-weight: 600; }
+  .subtitle { color: var(--muted); margin: 0 0 6px; font-size: 15px; }
+  .meta { color: var(--faint); font-size: 12.5px; margin-bottom: 34px; }
+  .meta code { color: var(--muted); }
+
+  h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 2.2px;
+    color: var(--faint); margin: 44px 0 16px; font-weight: 700;
+    display: flex; align-items: center; gap: 10px;
+  }
+  h2::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+  /* ---------- generic cards ---------- */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .card h3 {
+    margin: 0 0 4px; font-size: 15px; display: flex; align-items: center; gap: 8px;
+  }
+  .card .path {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px; color: var(--faint); margin-bottom: 10px;
+  }
+  .card p.note { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+  .chip {
+    display: inline-block; font-size: 11.5px; padding: 3px 9px;
+    border-radius: 999px; border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--muted); margin: 3px 4px 0 0;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .chip.hot { color: var(--text); border-color: #3a404a; }
+  .chip.accent { color: var(--accent); border-color: rgba(255,107,92,.45); }
+
+  /* ---------- arrows ---------- */
+  .arrow { display: flex; flex-direction: column; align-items: center; margin: 6px 0; }
+  .arrow .line { width: 2px; height: 22px; background: var(--faint); }
+  .arrow .head {
+    width: 0; height: 0; border-left: 6px solid transparent;
+    border-right: 6px solid transparent; border-top: 8px solid var(--faint);
+  }
+  .arrow .label {
+    font-size: 11px; color: var(--muted); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px;
+    margin-bottom: 6px; font-family: ui-monospace, Menlo, Consolas, monospace;
+    white-space: nowrap;
+  }
+  .arrow.right { flex-direction: row; margin: 0; }
+  .arrow.right .line { width: 26px; height: 2px; }
+  .arrow.right .head {
+    border-top: 6px solid transparent; border-bottom: 6px solid transparent;
+    border-left: 8px solid var(--faint); border-right: none;
+  }
+  .arrow.right .label { margin: 0 0 0 6px; white-space: normal; }
+
+  /* ---------- section 1: system view ---------- */
+  .zone-title { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--faint); margin-bottom 8px; }
+  .grid-3 { display: grid; grid-template-columns: 1.15fr 1.15fr 0.9fr; gap: 14px; }
+  .grid-3 .card { height: 100%; }
+  .routes { display: flex; flex-wrap: wrap; }
+  .ext-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .ext-row .card { border-style: dashed; }
+  .runtime-bar {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  }
+  .backend-ok { border-left: 3px solid var(--temper); }
+  .backend-deg { border-left: 3px solid var(--warn); }
+  .pill { font-size: 10.5px; padding: 2px 7px; border-radius: 999px; font-weight: 700; letter-spacing: .8px; }
+  .pill.ok { background: rgba(76,195,138,.14); color: var(--temper); }
+  .pill.deg { background: rgba(232,179,75,.14); color: var(--warn); }
+
+  /* ---------- section 2: layers ---------- */
+  .layer {
+    display: grid; grid-template-columns: 90px 1fr; border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; margin-bottom: 10px; background: var(--panel);
+  }
+  .layer .lvl {
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    padding: 18px 10px; font-weight: 800; font-size: 13px; letter-spacing: 1px;
+    border-right: 1px solid var(--border);
+  }
+  .layer .lvl small { font-weight: 500; color: var(--faint); font-size: 10.5px; margin-top: 3px; letter-spacing: 1.2px; }
+  .layer .body { padding: 14px 18px; }
+  .layer .body strong { font-size: 14.5px; }
+  .layer .body .desc { color: var(--muted); font-size: 12.5px; margin: 3px 0 8px; }
+  .l1 { background: rgba(255,107,92,.10); color: var(--draft); }
+  .l2 { background: rgba(181,140,255,.10); color: var(--sub); }
+  .l3 { background: rgba(91,157,255,.10); color: var(--forge); }
+  .l4 { background: rgba(76,195,138,.10); color: var(--temper); }
+
+  /* ---------- section 3: agent loop ---------- */
+  .loop-row { display: grid; grid-template-columns: 1fr 40px 1fr 40px 1fr 40px 0.8fr; align-items: stretch; }
+  .agent {
+    border-radius: 12px; padding: 16px 14px; border: 1px solid var(--border);
+    background: var(--panel); text-align: center; position: relative;
+  }
+  .agent .role { font-size: 11px; letter-spacing: 2px; font-weight: 700; opacity: .85; }
+  .agent .name { font-size: 21px; font-weight: 800; margin: 4px 0 6px; letter-spacing: 1px; }
+  .agent .job { font-size: 12px; color: var(--muted); }
+  .agent .ev { margin-top: 10px; }
+  .agent.draft { border-top: 3px solid var(--draft); }
+  .agent.forge { border-top: 3px solid var(--forge); }
+  .agent.temper { border-top: 3px solid var(--temper); }
+  .agent.answer { border-top: 3px solid var(--text); }
+  .agent.draft .name { color: var(--draft); }
+  .agent.forge .name { color: var(--forge); }
+  .agent.temper .name { color: var(--temper); }
+  .sub-agent {
+    margin: 10px auto 0; max-width: 260px; border: 1px dashed rgba(181,140,255,.5);
+    border-radius: 10px; padding: 10px 12px; background: rgba(181,140,255,.07);
+    text-align: center;
+  }
+  .sub-agent .t { color: var(--sub); font-weight: 700; font-size: 12.5px; letter-spacing: 1px; }
+  .sub-agent .d { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+  /* feedback rail (fail -> re-plan) */
+  .feedback {
+    margin: 14px 6% 0; border-left: 2px solid var(--accent);
+    border-right: 2px solid var(--accent); border-bottom: 2px solid var(--accent);
+    border-radius: 0 0 10px 10px; height: 34px; position: relative;
+  }
+  .feedback .fb-label {
+    position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+    background: var(--bg); border: 1px solid rgba(255,107,92,.5); color: var(--accent);
+    font-size: 11px; padding: 2px 10px; border-radius: 6px; white-space: nowrap;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .feedback::before, .feedback::after {
+    content: ""; position: absolute; top: -7px;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-bottom: 7px solid var(--accent);
+  }
+  .feedback::before { left: -6px; }
+  .feedback::after { right: -6px; }
+  .stream-bar {
+    margin-top: 18px; border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 18px; background: linear-gradient(90deg, rgba(255,107,92,.07), transparent 60%);
+  }
+  .stream-bar strong { color: var(--accent); font-size: 13px; letter-spacing: .5px; }
+  .stream-bar .evs { margin-top: 8px; }
+
+  /* ---------- legend / table ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: 1.4px; }
+  td code { color: var(--accent); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
+  td:first-child { color: var(--text); white-space: nowrap; }
+  td { color: var(--muted); }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  footer { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--faint); font-size: 11.5px; }
+  @media (max-width: 900px) {
+    .grid-3, .ext-row, .runtime-bar { grid-template-columns: 1fr; }
+    .loop-row { grid-template-columns: 1fr; }
+    .arrow.right { flex-direction: column; }
+    .arrow.right .line { width: 2px; height: 22px; }
+    .arrow.right .head { border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid var(--faint); border-bottom: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <svg class="logo" width="52" height="52" viewBox="0 0 120 120" aria-label="ARCEN logo">
+      <rect width="120" height="120" rx="24" fill="#0A0B0D" stroke="#2A2E35" stroke-width="1.5"/>
+      <path d="M60 24 L94 94 H80.5 L60 51 L39.5 94 H26 Z" fill="#FF6B5C"/>
+      <rect x="47" y="72" width="26" height="7" rx="2" fill="#E6E8EB"/>
+      <circle cx="60" cy="36" r="3" fill="#E6E8EB"/>
+    </svg>
+    <div>
+      <h1>ARCEN <span class="tag">Architecture</span></h1>
+      <p class="subtitle">Agentic reasoning · Code · Engineer — plans with DRAFT, builds with FORGE, verifies with TEMPER, narrating every step on a live NDJSON stream.</p>
+    </div>
+  </header>
+  <p class="meta">Self-contained diagram · no external resources · companion Mermaid source: <code>docs/architecture-diagram.md</code> · narrative doc: <code>docs/ARCHITECTURE.md</code></p>
+
+  <!-- ============================================================= -->
+  <h2>1 · System &amp; deployment view</h2>
+
+  <!-- CLIENT -->
+  <div class="card">
+    <h3>Browser — ARCEN UI &nbsp;<span class="chip">React 19 · Vite · TypeScript · Zustand</span></h3>
+    <div class="path">ui/ · dev server :5173 — Vite proxies /api/* → http://localhost:3002</div>
+    <div>
+      <span class="chip hot">components/ ChatView · Sidebar · Composer · Header · SettingsView · Drawer · Toast</span>
+      <span class="chip hot">events/ renderers — Think · Answer · Spawn · FileDiff · RunStart blocks</span>
+      <span class="chip hot">stream/ reader.ts — NDJSON fetch reader · useAutoScroll · fold</span>
+      <span class="chip">state/ 8 Zustand stores — session · stream · chatActions · persist</span>
+      <span class="chip">markdown/ Mermaid · Shiki code · KaTeX</span>
+    </div>
+  </div>
+
+  <div class="arrow">
+    <span class="label">POST /api/run &nbsp;·&nbsp; GET /api/stream (application/x-ndjson, resume: Last-Event-ID) &nbsp;·&nbsp; PUT /api/config</span>
+    <div class="line"></div><div class="head"></div>
+  </div>
+
+  <!-- SERVER -->
+  <div class="card">
+    <h3>API server — FastAPI / Uvicorn &nbsp;<span class="chip accent">:3002</span></h3>
+    <div class="path">src/arcen/server/app.py</div>
+    <div class="routes">
+      <span class="chip hot">GET /api/health</span>
+      <span class="chip hot">POST /api/run</span>
+      <span class="chip hot">DELETE /api/run/{run_id}</span>
+      <span class="chip hot">GET /api/stream</span>
+      <span class="chip hot">GET · PUT /api/config</span>
+      <span class="chip hot">POST /api/config/test</span>
+      <span class="chip hot">GET /api/sessions</span>
+      <span class="chip hot">GET /api/sessions/{id}/events</span>
+      <span class="chip hot">GET /api/sandbox/status</span>
+    </div>
+    <p class="note"><strong style="color:var(--text)">run_turn()</strong> orchestrates one turn; <strong style="color:var(--text)">StreamEmitter</strong> fans events to every connected client; plugin middleware wraps each tool dispatch (<code>before_tool / after_tool</code>).</p>
+  </div>
+
+  <div class="arrow"><div class="line"></div><div class="head"></div></div>
+
+  <!-- ENGINE / CAPABILITY / PERSISTENCE -->
+  <div class="grid-3">
+    <div class="card">
+      <h3 style="color:var(--draft)">Agent engine</h3>
+      <div class="path">src/arcen/agents/ · src/arcen/subagents/</div>
+      <span class="chip" style="color:var(--draft);border-color:rgba(255,107,92,.4)">DRAFT — planner (draft.py)</span>
+      <span class="chip" style="color:var(--forge);border-color:rgba(91,157,255,.4)">FORGE — executor (forge.py)</span>
+      <span class="chip" style="color:var(--temper);border-color:rgba(76,195,138,.4)">TEMPER — verifier (temper.py)</span>
+      <span class="chip" style="color:var(--sub);border-color:rgba(181,140,255,.4)">subagents/ — on-demand, depth ≤ 2, max 8 concurrent</span>
+      <p class="note">Only 3 core agents decide; everything else is a torn-down sub-agent.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="color:var(--forge)">Capability layer</h3>
+      <div class="path">src/arcen/tools/ · skills/ · mcp/ · plugins/ · memory/</div>
+      <span class="chip hot">tools/ bash · file · http · search · code · math · text · data · system · proc — schema-generated, registry.toml</span>
+      <span class="chip hot">skills/ SKILL.md folders, indexed at boot, loaded progressively</span>
+      <span class="chip hot">mcp/ lazy 3-state client — declarative → connecting → connected (stdio · http)</span>
+      <span class="chip hot">plugins/ hooks — on_boot · before_tool · after_tool · on_spawn · on_error · on_shutdown</span>
+      <span class="chip hot">memory/ entity graph in SQLite — decay · consolidation · temporal validity</span>
+    </div>
+
+    <div class="card">
+      <h3>Local persistence — <code style="font-size:12px">~/.arcen/</code></h3>
+      <div class="path">local-first · no cloud dependency</div>
+      <span class="chip hot">config.yaml — provider, agents, MCPs, plugins (chmod 600, $VAR vault refs, ARCEN_MODEL_* env seeding)</span>
+      <span class="chip hot">memory.db — SQLite entity graph (memory/graph.py · store.py)</span>
+      <span class="chip hot">sessions/&lt;id&gt;.jsonl — append-only event log, Claude Code format, replayable forever</span>
+      <p class="note">Resume: a reconnecting client sends <code>Last-Event-ID: &lt;seq&gt;</code> and the server replays from that point.</p>
+    </div>
+  </div>
+
+  <div class="arrow"><div class="line"></div><div class="head"></div></div>
+
+  <!-- SANDBOX RUNTIME -->
+  <div class="runtime-bar">
+    <div class="card backend-ok">
+      <h3>Sandbox backend · docker &nbsp;<span class="pill ok">ISOLATED</span></h3>
+      <div class="path">src/arcen/sandbox/runtime.py · docker/sandbox/</div>
+      <p class="note">One container <strong style="color:var(--text)">per session</strong> — network off, zero host binds, resources capped. Pinned image <code>ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0</code>, auto-pulled at most once per boot, only known-good refs.</p>
+    </div>
+    <div class="card backend-deg">
+      <h3>Fallback backend · process &nbsp;<span class="pill deg">DEGRADED: TRUE</span></h3>
+      <div class="path">quarantine root /tmp/arcen-s-&lt;id&gt;</div>
+      <p class="note">No daemon or image absent → per-session quarantine root, path escapes refused, env scrubbed. Confinement, not isolation — the runtime and UI never overclaim. Mid-session container failure degrades instead of crashing.</p>
+    </div>
+  </div>
+
+  <div class="arrow"><span class="label">outbound, only from where lazily allowed</span><div class="line"></div><div class="head"></div></div>
+
+  <!-- EXTERNAL -->
+  <div class="ext-row">
+    <div class="card">
+      <h3>LLM providers</h3>
+      <div class="path">src/arcen/llm/bridge.py · client.py — one LiteLLM bridge</div>
+      <span class="chip">anthropic</span><span class="chip">openai</span><span class="chip">groq</span>
+      <span class="chip">deepseek</span><span class="chip">custom (OpenAI-compatible)</span><span class="chip">ollama</span>
+      <p class="note">Fail-fast provider errors with bounded retries; deterministic fallback keeps planning alive when unconfigured.</p>
+    </div>
+    <div class="card">
+      <h3>MCP servers</h3>
+      <div class="path">src/arcen/mcp/client.py — Model Context Protocol</div>
+      <span class="chip">stdio transport (npx …)</span>
+      <span class="chip">http transport (Bearer $VAR)</span>
+      <p class="note">Connected lazily — zero network I/O at boot; first tool call triggers the connect. Exposed through McpBridgeTool like any native tool.</p>
+    </div>
+    <div class="card">
+      <h3>Docker daemon + GHCR</h3>
+      <div class="path">.github/workflows/sandbox-image.yml</div>
+      <span class="chip">docker.from_env() probe — never raises</span>
+      <span class="chip">ARCEN_SANDBOX_IMAGE override</span>
+      <p class="note">Image built and pushed on every push to main; unknown refs fall back to process with zero network attempts.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>2 · The four-layer architecture</h2>
+
+  <div class="layer">
+    <div class="lvl l1">L1<small>AGENTS</small></div>
+    <div class="body">
+      <strong>DRAFT · FORGE · TEMPER — the only three agents that decide</strong>
+      <div class="desc">Planner opens every turn and re-plans on failure · executor runs one tool step at a time · verifier tests adversarially and reports pass/fail.</div>
+      <span class="chip">src/arcen/agents/draft.py</span><span class="chip">forge.py</span><span class="chip">temper.py</span>
+    </div>
+  </div>
+  <div class="layer">
+    <div class="lvl l2">L2<small>SUB-AGENTS</small></div>
+    <div class="body">
+      <strong>500+ task-named sub-agents, spawned on demand (TEST-READER, MIGRATOR, …)</strong>
+      <div class="desc">Fan out for research, exploration and bulk edits; depth cap = 2, concurrency cap = 8; torn down when done; observations report back into the same stream.</div>
+      <span class="chip">src/arcen/subagents/agent.py</span><span class="chip">events: spawn · spawn.done</span>
+    </div>
+  </div>
+  <div class="layer">
+    <div class="lvl l3">L3<small>CAPABILITY</small></div>
+    <div class="body">
+      <strong>Skills (10k+) · Tools (1k+) · MCPs (300+) · Plugins (100+) · Memory graph</strong>
+      <div class="desc">One Tool Protocol with JSON Schema generated from type hints · progressive SKILL.md loading · lazy MCP state machine · six plugin hook points · SQLite entity graph with decay and consolidation.</div>
+      <span class="chip">src/arcen/tools/</span><span class="chip">skills/</span><span class="chip">mcp/</span><span class="chip">plugins/</span><span class="chip">memory/</span>
+    </div>
+  </div>
+  <div class="layer">
+    <div class="lvl l4">L4<small>RUNTIME</small></div>
+    <div class="body">
+      <strong>Per-session Docker sandbox (or honest process fallback) · FastAPI · NDJSON stream · session jsonl · config vault</strong>
+      <div class="desc">Everything executes inside the sandbox; every event is append-only to the session log and fanned out over HTTP as one JSON object per line with seq + ts.</div>
+      <span class="chip">src/arcen/sandbox/</span><span class="chip">server/</span><span class="chip">stream/</span><span class="chip">session/</span><span class="chip">config.py</span>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>3 · The agent turn loop &amp; event flow</h2>
+
+  <div class="loop-row">
+    <div>
+      <div class="agent draft">
+        <div class="role">PLANNER</div>
+        <div class="name">DRAFT</div>
+        <div class="job">Breaks the goal into steps, narrates thoughts, spawns sub-agents, re-plans on failure.</div>
+        <div class="ev"><span class="chip">think</span><span class="chip">plan</span><span class="chip">plan.update</span></div>
+      </div>
+      <div class="sub-agent">
+        <div class="t">SUB-AGENTS · depth ≤ 2</div>
+        <div class="d">spawn → parallel research / edits → spawn.done with observations</div>
+      </div>
+    </div>
+
+    <div class="arrow right"><div class="line"></div><div class="head"></div></div>
+
+    <div class="agent forge">
+      <div class="role">EXECUTOR</div>
+      <div class="name">FORGE</div>
+      <div class="job">One tool call at a time through the plugin-wrapped registry; returns observations.</div>
+      <div class="ev"><span class="chip">command</span><span class="chip">command.done</span><span class="chip">file.diff</span></div>
+    </div>
+
+    <div class="arrow right"><div class="line"></div><div class="head"></div></div>
+
+    <div class="agent temper">
+      <div class="role">VERIFIER</div>
+      <div class="name">TEMPER</div>
+      <div class="job">Adversarial checks and test reruns; emits an honest pass or fail.</div>
+      <div class="ev"><span class="chip">verify.start</span><span class="chip">step.pass</span><span class="chip">step.fail</span></div>
+    </div>
+
+    <div class="arrow right"><div class="line"></div><div class="head"></div></div>
+
+    <div class="agent answer">
+      <div class="role" style="color:var(--faint)">OUTPUT</div>
+      <div class="name" style="font-size:17px">ANSWER</div>
+      <div class="job">Prose where every claim is backed by a streamed step.</div>
+      <div class="ev"><span class="chip">answer</span><span class="chip">usage</span><span class="chip">run.done</span></div>
+    </div>
+  </div>
+
+  <div class="feedback">
+    <span class="fb-label">✗ step.fail → back to DRAFT · plan.update · retry loop (bounded)</span>
+  </div>
+
+  <div class="stream-bar">
+    <strong>⬢ StreamEmitter — NDJSON over HTTP</strong>
+    <p class="note" style="margin:4px 0 0">Content-Type <code>application/x-ndjson</code> · one JSON object per line · every event carries <code>seq</code> + <code>ts</code> · 17 frozen event types · resume with <code>Last-Event-ID</code> · mirrored append-only to <code>~/.arcen/sessions/&lt;id&gt;.jsonl</code></p>
+    <div class="evs">
+      <span class="chip">run.start</span><span class="chip">think</span><span class="chip">plan</span><span class="chip">plan.update</span>
+      <span class="chip">spawn</span><span class="chip">spawn.done</span><span class="chip">command</span><span class="chip">command.done</span>
+      <span class="chip">file.diff</span><span class="chip">verify.start</span><span class="chip">step.pass</span><span class="chip">step.fail</span>
+      <span class="chip">answer</span><span class="chip">memory</span><span class="chip">usage</span><span class="chip">run.done</span><span class="chip accent">run.error</span>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>4 · Code map — concept to source</h2>
+  <table>
+    <tr><th>Concern</th><th>Source path</th><th>What it does</th></tr>
+    <tr><td>HTTP + turn orchestration</td><td><code>src/arcen/server/app.py</code></td><td>FastAPI app, all /api routes, run_turn() engine, stream fan-out, plugin-wrapped registry</td></tr>
+    <tr><td>Core agents</td><td><code>src/arcen/agents/{draft,forge,temper}.py</code></td><td>Planner, executor, verifier — each also runnable as a CLI entry point</td></tr>
+    <tr><td>Sub-agents</td><td><code>src/arcen/subagents/agent.py</code></td><td>Depth-capped, concurrency-capped task agents spawned by DRAFT</td></tr>
+    <tr><td>Tools</td><td><code>src/arcen/tools/</code></td><td>Ten tool modules + registry.py / registry.toml; JSON Schema from type hints</td></tr>
+    <tr><td>Skills</td><td><code>src/arcen/skills/loader.py</code> · <code>skills/&lt;name&gt;/SKILL.md</code></td><td>Boot-time index, frontmatter-first progressive loading</td></tr>
+    <tr><td>MCP</td><td><code>src/arcen/mcp/{client,bridge}.py</code></td><td>Lazy stdio/http client with three-state machine, bridged as native tools</td></tr>
+    <tr><td>Plugins</td><td><code>src/arcen/plugins/{loader,redact_secrets}.py</code></td><td>Six lifecycle hooks; redact-secrets is the reference plugin</td></tr>
+    <tr><td>Memory</td><td><code>src/arcen/memory/{graph,store}.py</code></td><td>SQLite entity graph — decay, consolidation, conflicts, temporal validity</td></tr>
+    <tr><td>LLM bridge</td><td><code>src/arcen/llm/{bridge,client}.py</code></td><td>Provider gating, LiteLLM model mapping, bounded-retry fail-fast, deterministic fallback</td></tr>
+    <tr><td>Sandbox</td><td><code>src/arcen/sandbox/runtime.py</code> · <code>docker/sandbox/</code></td><td>auto / docker / process backends; honest degraded reporting</td></tr>
+    <tr><td>Stream contract</td><td><code>src/arcen/stream/{events,emitter}.py</code></td><td>17 frozen event dataclasses and the NDJSON emitter with resume</td></tr>
+    <tr><td>Sessions</td><td><code>src/arcen/session/store.py</code></td><td>Append-only jsonl persistence and replay for ~/.arcen/sessions</td></tr>
+    <tr><td>Config</td><td><code>src/arcen/config.py</code></td><td>~/.arcen/config.yaml, env seeding, $VAR resolution</td></tr>
+    <tr><td>Frontend</td><td><code>ui/src/{components,events,state,stream,markdown}/</code></td><td>React 19 UI, Zustand stores, NDJSON reader, per-event render blocks</td></tr>
+  </table>
+
+  <div class="legend">
+    <span><i class="dot" style="background:var(--draft)"></i>DRAFT / planning</span>
+    <span><i class="dot" style="background:var(--forge)"></i>FORGE / execution &amp; capability</span>
+    <span><i class="dot" style="background:var(--temper)"></i>TEMPER / verification &amp; runtime</span>
+    <span><i class="dot" style="background:var(--sub)"></i>Sub-agents</span>
+    <span><i class="dot" style="background:var(--warn)"></i>Degraded-mode warning</span>
+  </div>
+
+  <footer>
+    ARCEN v0.1.x · generated from source inspection (src/arcen, ui, docker, docs) · MIT License · © 2026 lewiseinstein15-Tech
+  </footer>
+
+</div>
+</body>
+</html>
