@@ -5,5 +5,13 @@ Scaffolded at TUI-01; implementations arrive in TUI-04 (shell), TUI-05
 """
 
 from arcen.tui.views.rail import PHASES, RailState, RunStateRail
+from arcen.tui.views.stream import BackToLive, Narration, StreamView
 
-__all__ = ["PHASES", "RailState", "RunStateRail"]
+__all__ = [
+    "PHASES",
+    "BackToLive",
+    "Narration",
+    "RailState",
+    "RunStateRail",
+    "StreamView",
+]

@@ -48,6 +48,18 @@ def _browser_env() -> dict[str, str]:
 # The child PTY lives in the server thread's event loop.
 _child: dict[str, PtyProcess] = {}
 
+# xterm-style byte sequences for the keys --send-at can inject.
+KEY_SEQUENCES: dict[str, bytes] = {
+    "pageup": b"\x1b[5~",
+    "pagedown": b"\x1b[6~",
+    "home": b"\x1b[1~",
+    "end": b"\x1b[4~",
+    "up": b"\x1b[A",
+    "down": b"\x1b[B",
+    "enter": b"\r",
+    "ctrl+c": b"\x03",
+}
+
 
 def _spawn(argv: list[str], env: dict[str, str], cols: int, rows: int) -> PtyProcess:
     child_env = dict(os.environ)
@@ -135,6 +147,9 @@ def _index_html(cols: int, rows: int, font_size: int) -> str:
   ws.binaryType = 'arraybuffer';
   ws.onmessage = (ev) => term.write(new Uint8Array(ev.data));
   term.onData((d) => ws.send(d));
+  // Inject a key sequence (base64 bytes) from the screenshot driver.
+  window.__send = (b64) => ws.send(
+      Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
   window.__ready = true;
 </script></body></html>"""
 
@@ -188,11 +203,15 @@ def shoot(
     font_size: int,
     scale: int,
     extra_env: dict[str, str],
+    sends: list[tuple[float, str]] | None = None,
 ) -> None:
+    import base64
+
     from playwright.sync_api import sync_playwright
 
     _runner, url = _start_server(argv, extra_env)
     out.parent.mkdir(parents=True, exist_ok=True)
+    sends = sorted(sends or [])
     try:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True, env=_browser_env())
@@ -202,7 +221,15 @@ def shoot(
             )
             page.goto(f"{url}/?cols={cols}&rows={rows}&fs={font_size}")
             page.wait_for_function("window.__ready === true")
-            page.wait_for_timeout(int(wait * 1000))
+            elapsed = 0.0
+            for at_seconds, key in sends:
+                delay = max(0.0, at_seconds - elapsed)
+                page.wait_for_timeout(int(delay * 1000))
+                elapsed += delay
+                sequence = KEY_SEQUENCES[key]
+                page.evaluate("([b]) => window.__send(b)", [base64.b64encode(sequence).decode()])
+            remaining = max(0.0, wait - elapsed)
+            page.wait_for_timeout(int(remaining * 1000))
             page.locator("#term").screenshot(path=str(out))
             browser.close()
     finally:
@@ -222,6 +249,9 @@ def main() -> int:
                         help="device pixel ratio (2 = Retina-sharp)")
     parser.add_argument("--env", action="append", default=[],
                         help="extra env var KEY=VAL, repeatable")
+    parser.add_argument("--send-at", action="append", default=[], metavar="SEC:KEY",
+                        help=f"inject a key at SEC seconds, repeatable; "
+                             f"keys: {', '.join(KEY_SEQUENCES)}")
     parser.add_argument("--out", type=pathlib.Path, required=True)
     parser.add_argument("command", nargs=argparse.REMAINDER,
                         help="-- <command> [args…]")
@@ -235,8 +265,15 @@ def main() -> int:
         key, _, value = pair.partition("=")
         extra_env[key] = value
 
+    sends: list[tuple[float, str]] = []
+    for spec in args.send_at:
+        at, _, key = spec.partition(":")
+        if not at or key not in KEY_SEQUENCES:
+            parser.error(f"--send-at expects SEC:KEY with key in {sorted(KEY_SEQUENCES)}")
+        sends.append((float(at), key))
+
     shoot(argv, args.out, args.cols, args.rows, args.wait,
-          args.font_size, args.scale, extra_env)
+          args.font_size, args.scale, extra_env, sends)
     print(f"wrote {args.out.relative_to(REPO) if args.out.is_relative_to(REPO) else args.out}")
     return 0
 

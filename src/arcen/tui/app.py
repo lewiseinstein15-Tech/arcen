@@ -28,13 +28,14 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical
 from textual.widgets import Static
 
 from arcen.tui import keys
 from arcen.tui.theme import PHASE_COLORS
 from arcen.tui.theme import TOKENS as _T
 from arcen.tui.views.rail import RunStateRail
+from arcen.tui.views.stream import STREAM_CSS, BackToLive, StreamView
 
 # local aliases — every value traces back to a frozen theme token
 INK: str = _T["ink"]
@@ -183,17 +184,13 @@ class ArcenApp(App):
     CSS = f"""
     Screen {{ background: {INK}; }}
     #shell {{ layout: horizontal; height: 1fr; }}
-    #stream {{
-        width: 1fr;
-        height: 1fr;
-        background: {INK};
-        scrollbar-size: 1 1;
-    }}
+    #stream-column {{ width: 1fr; height: 1fr; }}
     #rail {{ width: {RAIL_WIDTH}; height: 1fr; padding: 0 0 0 1; }}
     Header {{ height: auto; margin: 0 0 1 0; }}
     Footer {{ height: auto; margin: 1 0 0 0; }}
     /* Narrow terminals: rail collapses and the spine takes full width. */
     App.narrow #rail {{ display: none; }}
+    {STREAM_CSS}
     """
 
     def __init__(self, headless_mode: bool = False) -> None:
@@ -208,9 +205,11 @@ class ArcenApp(App):
         self.footer = Footer()
         yield self.header
         with Horizontal(id="shell"):
-            with VerticalScroll(id="stream"):
-                # TUI-06 mounts the real narration spine here.
-                yield Static(id="stream-empty")
+            with Vertical(id="stream-column"):
+                with StreamView(id="stream"):
+                    # The demo/adapter mounts the narration stack here.
+                    yield Static(id="stream-empty")
+                yield BackToLive(" ↓ back to live ", id="back-to-live")
             yield RunStateRail(id="rail")
         yield self.footer
 

@@ -29,6 +29,8 @@ bash scripts/setup_terminal_shot.sh
 python scripts/terminal_shot.py --cols 132 --rows 44 --wait 20 \
     --out docs/verify/<TICKET>-real.png -- arcen-tui --demo
 # narrow / other commands: --cols 80 --rows 24, and --env KEY=VAL (repeatable)
+# inject real keystrokes into the PTY (scroll/pause/resume evidence):
+#   --send-at 6.0:pageup --send-at 9.4:end   (keys: pageup/pagedown/home/end/…)
 ```
 
 ### Two kinds of frame
@@ -80,3 +82,10 @@ no server or sockets — through a complete narrated turn.
 | `TUI-05-real-narrow.png` | **Real terminal** 80×24: rail collapsed |
 | `TUI-05-real-terminal-sheet.png` | All four real-terminal rail frames in one 2×2 image |
 | `TUI-05-full-suite.png` | Full repository suite after TUI-05: **416 passed, 1 skipped** |
+| `TUI-06.png` | TUI-06 ticket tests, verbose: **46 passed, 1 skipped** (stream + rail + shell + demo + entry) |
+| `TUI-06-real-paused.png` | **Real terminal**: PageUp pauses follow — view pinned to top while run continues; back-to-live pill visible |
+| `TUI-06-real-resume.png` | **Real terminal**: End re-engages follow — back at live edge, pill hidden |
+| `TUI-06-real-live.png` | **Real terminal**: normal auto-follow streaming, no scroll input |
+| `TUI-06-real-narrow-paused.png` | **Real terminal** 80×24: paused with rail collapsed |
+| `TUI-06-real-terminal-sheet.png` | All four scroll-rule frames in one 2×2 image |
+| `TUI-06-full-suite.png` | Full repository suite after TUI-06: **424 passed, 1 skipped** |

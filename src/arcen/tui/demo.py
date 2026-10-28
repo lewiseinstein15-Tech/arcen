@@ -22,17 +22,16 @@ import asyncio
 import sys
 
 from rich import box
-from rich.console import Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Horizontal, VerticalScroll
-from textual.widgets import Static
+from textual.containers import Horizontal, Vertical
 
 from arcen.tui.app import ArcenApp, Footer, Header
 from arcen.tui.theme import TOKENS as _T
 from arcen.tui.views.rail import RunStateRail
+from arcen.tui.views.stream import BackToLive, Narration, StreamView
 
 # local aliases — every value traces back to a frozen theme token
 INK: str = _T["ink"]
@@ -145,35 +144,6 @@ def spine_break() -> Text:
     return Text(" │", style=LINE)
 
 
-class Narration(Static):
-    def __init__(self) -> None:
-        super().__init__()
-        self.items: list = []
-        self._scroll: VerticalScroll | None = None
-
-    def bind_scroll(self, parent: VerticalScroll) -> None:
-        self._scroll = parent
-
-    def _sync(self) -> None:
-        # update() re-renders AND re-measures; plain refresh() would keep the
-        # initial zero-item size and clip the whole narration.
-        self.update(Group(*self.items) if self.items else Text(""))
-        if self._scroll is not None:
-            self.app.call_after_refresh(
-                lambda: self._scroll.scroll_end(animate=False)
-            )
-
-    def push(self, renderable) -> None:
-        self.items.append(renderable)
-        self._sync()
-
-    def replace_last(self, renderable) -> None:
-        self.items[-1] = renderable
-        self._sync()
-
-    def render(self):
-        return Group(*self.items) if self.items else Text("")
-
 
 # ── card builders ───────────────────────────────────────────────────────────
 def goal_card() -> Table:
@@ -275,11 +245,8 @@ def answer_card() -> Table:
 class DemoApp(ArcenApp):
     """Scripted run through the real shell chrome and responsive layout."""
 
-    # Shell CSS owns ids, chrome and collapse rules; only the demo's
-    # narration widget needs a rule of its own.
-    CSS = ArcenApp.CSS + """
-    Narration { width: 1fr; height: auto; padding: 0 1; }
-    """
+    # Shell CSS owns ids/chrome/collapse; the stream component owns its own
+    # layout, so the demo adds no stylesheet of its own.
 
     def __init__(
         self,
@@ -317,8 +284,10 @@ class DemoApp(ArcenApp):
         self.footer = Footer()
         yield self.header
         with Horizontal(id="shell"):
-            with VerticalScroll(id="stream"):
-                yield self.narration
+            with Vertical(id="stream-column"):
+                with StreamView(id="stream"):
+                    yield self.narration
+                yield BackToLive(" ↓ back to live ", id="back-to-live")
             yield self.rail
         yield self.footer
 
@@ -437,7 +406,7 @@ class DemoApp(ArcenApp):
     def on_mount(self) -> None:
         super().on_mount()  # clock interval + responsive collapse rule
         self._signal_phase("boot")
-        self.narration.bind_scroll(self.query_one("#stream", VerticalScroll))
+        self.narration.bind_stream(self.query_one("#stream", StreamView))
         asyncio.create_task(self.driver())
 
 
