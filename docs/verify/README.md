@@ -22,7 +22,26 @@ python scripts/capture_demo.py <TICKET>
 
 # app-shell frames: wide rail, collapsed rail, bare shell (TUI-04+)
 python scripts/capture_shell.py <TICKET>
+
+# REAL TERMINAL pixels — actual command in a PTY, xterm.js in headless
+# Chromium (not a Textual SVG export). One-time browser setup:
+bash scripts/setup_terminal_shot.sh
+python scripts/terminal_shot.py --cols 132 --rows 44 --wait 20 \
+    --out docs/verify/<TICKET>-real.png -- arcen-tui --demo
+# narrow / other commands: --cols 80 --rows 24, and --env KEY=VAL (repeatable)
 ```
+
+### Two kinds of frame
+
+* **SVG exports** (`capture_demo.py`, `capture_shell.py`) — Textual renders
+  its own widget tree to SVG, rasterized with CairoSVG. Deterministic and
+  fast, but a library render, not a terminal.
+* **Real-terminal frames** (`terminal_shot.py`, filenames contain `real`) —
+  the installed command runs in a real PTY with real termios sizing; bytes
+  flow over a websocket into xterm.js inside headless Chromium, which is
+  then screenshot. These show genuine terminal rasterization (glyphs,
+  scrollbars, 256/truecolor handling) and are the primary visual evidence
+  from TUI-04 onward.
 
 The pytest helper replays output through Rich and writes an SVG terminal
 recording plus a CairoSVG PNG on the ARCEN dark ink (`#0B0E14`). The app
@@ -47,5 +66,10 @@ no server or sockets — through a complete narrated turn.
 | `TUI-03-full-suite.png` | Full repository suite after TUI-03: **389 passed, 1 skipped** |
 | `TUI-04.png` | TUI-04 ticket tests, verbose: **22 passed, 1 skipped** (shell + demo + entry) |
 | `TUI-04-shell-wide.png` / `-narrow.png` / `-empty.png` | **Real headless app captures** — redesigned shell at 132×44 (rail beside spine), 80×24 (rail collapsed, full-width spine), and the bare `ARCEN_TUI=new` shell (IDLE, placeholder rail) |
-| `TUI-04-contact-sheet.png` | All three shell frames in one labeled image |
+| `TUI-04-contact-sheet.png` | All three SVG shell frames in one labeled image |
+| `TUI-04-real-demo-wide.png` | **Real terminal** (132×44 PTY → xterm.js → Chromium): demo finished, DONE |
+| `TUI-04-real-demo-mid.png` | **Real terminal**, caught mid-run at TEMPER: step 3/4, live verify row |
+| `TUI-04-real-demo-narrow.png` | **Real terminal** 80×24 PTY: rail collapsed, narration full width |
+| `TUI-04-real-shell-empty.png` | **Real terminal**: bare `ARCEN_TUI=new` shell, IDLE, no server attached |
+| `TUI-04-real-terminal-sheet.png` | All four real-terminal frames in one labeled 2×2 image |
 | `TUI-04-full-suite.png` | Full repository suite after TUI-04: **400 passed, 1 skipped** |

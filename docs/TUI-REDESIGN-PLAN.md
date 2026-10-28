@@ -143,7 +143,7 @@ tickets. Commit prefix `TUI-NN:`.
 
 | Ticket | Size | Deliverable | Verification |
 |---|---|---|---|
-| **TUI-04** App shell ✅ | M | `app.py`: `ArcenApp` shell with `Header` (wordmark/session/model/quarantine/clock/phase pill via `PHASE_COLORS`), `Footer` (frozen `FOOTER_HINTS` + LIVE blink that settles on `run.done`), `ShellRail` placeholder, two-column `#shell` with `#stream` + `#rail`, responsive collapse under 100 cols (`on_resize` + `.narrow` class); demo refactored to subclass the shell; `ARCEN_TUI=new` now boots the real shell | 10 new pilot/render tests in `test_tui_shell.py`; widget tree asserted at 132×44 (rail) and 80×24 (collapsed), incl. dynamic resize across the 99/100 boundary; entry routing test updated; frames `TUI-04-shell-{wide,narrow,empty}.png`; full suite 400 passed, 1 skipped |
+| **TUI-04** App shell ✅ | M | `app.py`: `ArcenApp` shell with `Header` (wordmark/session/model/quarantine/clock/phase pill via `PHASE_COLORS`), `Footer` (frozen `FOOTER_HINTS` + LIVE blink that settles on `run.done`), `ShellRail` placeholder, two-column `#shell` with `#stream` + `#rail`, responsive collapse under 100 cols (`on_resize` + `.narrow` class); demo refactored to subclass the shell; `ARCEN_TUI=new` now boots the real shell | 10 new pilot/render tests in `test_tui_shell.py`; widget tree asserted at 132×44 (rail) and 80×24 (collapsed), incl. dynamic resize across the 99/100 boundary; entry routing test updated; frames `TUI-04-shell-{wide,narrow,empty}.png` plus **real-terminal** captures `TUI-04-real-*.png` (PTY → xterm.js → headless Chromium via `scripts/terminal_shot.py`); full suite 400 passed, 1 skipped |
 | **TUI-05** Run-state rail | M | `views/rail.py`: step counter, phase tracker, context meter, spend, tools, environment, harness ref | state-dict → rendered rail assertions |
 | **TUI-06** Narration spine + scroll rules | S | `views/stream.py`: auto-scroll only when user is at bottom; scroll-up pauses, "↓ back to live" affordance | pilot scroll test |
 
@@ -200,6 +200,11 @@ parallelizes. Estimated total: ~10–12 focused working days.
 - **Visual snapshots optional and env-gated** (`ARCEN_SNAPSHOT=1`), because
   SVG golden files are brittle across font installs; structural assertions
   are the default gate.
+- **Real-terminal screenshots are the primary visual evidence** (from
+  TUI-04): `scripts/terminal_shot.py` runs the actual installed command in a
+  PTY and screenshots xterm.js in headless Chromium, so each ticket shows
+  genuine terminal pixels — wide, narrow/collapsed, and mid-run — not only
+  Textual SVG exports.
 - **Untouched guarantees:** the 12 launcher tests and existing client tests
   keep passing from TUI-01 onward; the 357-test backend suite never changes
   for this work.
