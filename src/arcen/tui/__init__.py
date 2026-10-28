@@ -26,6 +26,7 @@ its frozen 17-event NDJSON contract. Textual is an optional dependency:
 from __future__ import annotations
 
 import os
+import sys
 
 __all__ = ["main"]
 
@@ -56,6 +57,18 @@ def main(argv: list[str] | None = None) -> int:
             "ARCEN TUI needs the optional Textual dependency.\n"
             "Install it with:  pip install 'arcen[tui]'"
         ) from None
+
+    # Console scripts call main() with no args, so fall back to the real
+    # process command line; explicit argv (tests, library use) wins.
+    if argv is None:
+        argv = sys.argv[1:]
+    argv = list(argv)
+    if "--demo" in argv:
+        # Scripted self-streaming demo — works with no server and, without
+        # a TTY, renders headlessly and exits 0 (CI and the test harness).
+        from arcen.tui.demo import run_demo
+
+        return run_demo([arg for arg in argv if arg != "--demo"])
 
     impl = _selected_impl()
     if impl == _IMPL_NEW:

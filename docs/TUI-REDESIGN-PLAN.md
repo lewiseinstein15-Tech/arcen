@@ -137,7 +137,7 @@ tickets. Commit prefix `TUI-NN:`.
 |---|---|---|---|
 | **TUI-01** Branch + skeleton ✅ | S | `feat/tui-redesign`; old modules moved to `tui/_legacy/`; new `cards/`, `views/` dirs; legacy stays the default behind the `ARCEN_TUI` env flag; new shell refused cleanly pre-TUI-04 | 5 new entry tests + all 357 prior tests green (362 total); wheel contains all TUI modules; `arcen-tui --help` resolves through legacy |
 | **TUI-02** Theme + key map ✅ | M | `theme.py` (13 prototype tokens, computed xterm-256 fallbacks, phase/status/card semantic maps, CSS custom-property block, font stack), `keys.py` (frozen global/composer/modal bindings, scoped Textual factory, footer hints) | 21 new tests (`test_tui_theme.py` 14, `test_tui_keys.py` 7); every token resolves at truecolor and 256; palette sheet `docs/verify/TUI-02-palette.png`; full suite 383 passed |
-| **TUI-03** Headless test harness | M | pilot harness ported from `prototype/capture.py`; `--demo` wiring; CairoSVG snapshot helper under `tests/` (skipped without the extra) | headless run of demo app exits 0 in CI without a TTY |
+| **TUI-03** Headless test harness + `--demo` ✅ | M | `tui/demo.py` (prototype ported onto theme tokens; durable phase checkpoints), `arcen-tui --demo` routing incl. no-TTY headless exit, `tests/_tui_snapshot.py` SVG/PNG helper, `scripts/capture_demo.py` reusable frame capture; fixes: console-script argv routing, transient-phase wait race | 6 new demo tests + 1 regression; demo runs headless with no server spawned; frames in `docs/verify/TUI-03-demo-*.png`; full suite 389 passed, 1 skipped (env-gated snapshot) |
 
 ### Phase 1 — Shell
 

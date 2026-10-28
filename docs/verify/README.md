@@ -13,6 +13,9 @@ python scripts/verify_shot.py <TICKET> "<test command>"
 # real running-app capture (headless pilot, full scripted turn)
 python scripts/verify_tui.py
 # then rasterize docs/tui-screenshot*.svg with CairoSVG
+
+# redesigned-shell demo frames (mission-control prototype, TUI-03+)
+python scripts/capture_demo.py <TICKET>
 ```
 
 The pytest helper replays output through Rich and writes an SVG terminal
@@ -31,3 +34,6 @@ no server or sockets — through a complete narrated turn.
 | `TUI-02.png` | TUI-02 ticket tests, verbose: **21 passed** (14 theme token/fallback tests + 7 key-map tests) |
 | `TUI-02-palette.png` | Visual swatch sheet — all 13 tokens with hex, xterm-256 code, luminance, and the phase/status/card semantic mappings |
 | `TUI-02-full-suite.png` | Full repository suite after TUI-02: **383 passed** |
+| `TUI-03.png` | TUI-03 ticket tests, verbose: **11 passed, 1 skipped** (snapshot test is env-gated) |
+| `TUI-03-demo-forge.png` / `demo-forge-mid.png` / `demo-finished.png` | Real headless frames of the maintained `arcen-tui --demo` app at three checkpoints |
+| `TUI-03-full-suite.png` | Full repository suite after TUI-03: **389 passed, 1 skipped** |
