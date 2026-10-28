@@ -7,6 +7,9 @@ test**, saved here as `<TICKET>.png` (with the source `.svg` alongside).
 ## Regenerate
 
 ```bash
+# one-time on a fresh machine: Fira Code font + CairoSVG + fontTools
+bash scripts/setup_capture.sh
+
 # pytest-style verification (SVG + PNG, forced ANSI colors)
 python scripts/verify_shot.py <TICKET> "<test command>"
 
@@ -36,4 +39,6 @@ no server or sockets — through a complete narrated turn.
 | `TUI-02-full-suite.png` | Full repository suite after TUI-02: **383 passed** |
 | `TUI-03.png` | TUI-03 ticket tests, verbose: **11 passed, 1 skipped** (snapshot test is env-gated) |
 | `TUI-03-demo-forge.png` / `demo-forge-mid.png` / `demo-finished.png` | Real headless frames of the maintained `arcen-tui --demo` app at three checkpoints |
+| `TUI-03-contact-sheet.png` | All three demo checkpoints in one image with labels |
+| `TUI-03-test-evidence.png` | Ticket tests + full-suite frames in one image |
 | `TUI-03-full-suite.png` | Full repository suite after TUI-03: **389 passed, 1 skipped** |
