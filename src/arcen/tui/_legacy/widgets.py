@@ -15,7 +15,7 @@ from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Input, Label, ListItem, ListView, RichLog, Static
 
-from arcen.tui import render
+from arcen.tui._legacy import render
 
 # ---------------------------------------------------------------- event log
 

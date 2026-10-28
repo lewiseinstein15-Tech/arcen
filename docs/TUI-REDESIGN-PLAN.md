@@ -129,9 +129,12 @@ tickets. Commit prefix `TUI-NN:`.
 
 ### Phase 0 — Scaffolding (no user-visible change)
 
+> Progress: **TUI-01 done — verified** (362 passed; evidence
+> `docs/verify/TUI-01.png`, `docs/verify/TUI-01-full-suite.png`).
+
 | Ticket | Size | Deliverable | Verification |
 |---|---|---|---|
-| **TUI-01** Branch + skeleton | S | `feat/tui-redesign`; old modules moved to `tui/_legacy/`; new package dirs; `arcen-tui` still launches the legacy app via a feature flag | `pytest` green; `arcen-tui` boots |
+| **TUI-01** Branch + skeleton ✅ | S | `feat/tui-redesign`; old modules moved to `tui/_legacy/`; new `cards/`, `views/` dirs; legacy stays the default behind the `ARCEN_TUI` env flag; new shell refused cleanly pre-TUI-04 | 5 new entry tests + all 357 prior tests green (362 total); wheel contains all TUI modules; `arcen-tui --help` resolves through legacy |
 | **TUI-02** Theme + key map | M | `theme.py` (all prototype tokens, 256-color fallbacks), `keys.py` (frozen bindings incl. `^C ^G / ^R ?`) | `test_tui_theme.py`: every token resolves at truecolor and 256 |
 | **TUI-03** Headless test harness | M | pilot harness ported from `prototype/capture.py`; `--demo` wiring; CairoSVG snapshot helper under `tests/` (skipped without the extra) | headless run of demo app exits 0 in CI without a TTY |
 

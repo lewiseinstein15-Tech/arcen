@@ -34,7 +34,7 @@ from arcen.stream.events import (
     VerifyStart,
     to_dict,
 )
-from arcen.tui import render
+from arcen.tui._legacy import render
 
 console = Console(width=120, record=True)
 

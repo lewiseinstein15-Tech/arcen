@@ -14,9 +14,9 @@ pytest.importorskip("textual")
 from rich.console import Console
 from textual.widgets import ListView
 
-from arcen.tui.app import ArcenTUI
+from arcen.tui._legacy.app import ArcenTUI
 from arcen.tui.client import new_session_id
-from arcen.tui.widgets import ConfigScreen, HelpScreen
+from arcen.tui._legacy.widgets import ConfigScreen, HelpScreen
 
 
 def _turn_events(session: str) -> list[dict]:

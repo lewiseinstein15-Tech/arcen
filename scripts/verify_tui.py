@@ -19,9 +19,9 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
-from arcen.tui.app import ArcenTUI
+from arcen.tui._legacy.app import ArcenTUI
 from arcen.tui.client import new_session_id
-from arcen.tui.widgets import ConfigScreen
+from arcen.tui._legacy.widgets import ConfigScreen
 
 DOCS = pathlib.Path(__file__).resolve().parents[1] / "docs"
 

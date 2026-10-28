@@ -1,0 +1,5 @@
+"""Top-level TUI views — narration spine, run-state rail, modals, composer.
+
+Scaffolded at TUI-01; implementations arrive in TUI-04 (shell), TUI-05
+(rail), TUI-06 (spine), TUI-13 (composer), TUI-14/15 (drawer/modals).
+"""

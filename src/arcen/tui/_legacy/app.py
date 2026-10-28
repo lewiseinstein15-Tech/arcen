@@ -20,21 +20,21 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import ListView
 
-from arcen.tui.client import (
-    DEFAULT_BASE_URL,
-    TERMINAL_EVENTS,
-    ArcenAPIError,
-    ArcenClient,
-    new_session_id,
-)
-from arcen.tui.render import error_banner, welcome
-from arcen.tui.widgets import (
+from arcen.tui._legacy.render import error_banner, welcome
+from arcen.tui._legacy.widgets import (
     Composer,
     ConfigScreen,
     EventLog,
     HelpScreen,
     SessionSidebar,
     StatusBar,
+)
+from arcen.tui.client import (
+    DEFAULT_BASE_URL,
+    TERMINAL_EVENTS,
+    ArcenAPIError,
+    ArcenClient,
+    new_session_id,
 )
 
 HEALTH_INTERVAL = 5.0  # seconds between liveness probes
