@@ -32,6 +32,7 @@ from textual.widgets import Static
 
 from arcen.tui.app import ArcenApp, Footer, Header
 from arcen.tui.theme import TOKENS as _T
+from arcen.tui.views.rail import RunStateRail
 
 # local aliases — every value traces back to a frozen theme token
 INK: str = _T["ink"]
@@ -174,81 +175,6 @@ class Narration(Static):
         return Group(*self.items) if self.items else Text("")
 
 
-class Rail(Static):
-    def __init__(self) -> None:
-        super().__init__()
-        self.steps_done = 0
-        self.steps_total = len(PLAN)
-        self.phase_idx = 0
-        self.tokens = 0
-        self.cost = 0.0
-        self.tools: list[str] = []
-
-    def render(self):
-        phases = ["DRAFT", "FORGE", "TEMPER", "DONE"]
-        colors = [ACCENT, CYAN, AMBER, EMERALD]
-        timeline = Text()
-        for i, phase in enumerate(phases):
-            if i < self.phase_idx:
-                timeline.append("● ", style=colors[i]).append(phase, style=EMERALD)
-            elif i == self.phase_idx:
-                timeline.append("◐ ", style=f"bold {colors[i]}")
-                timeline.append(phase, style=f"bold {colors[i]}")
-            else:
-                timeline.append("○ ", style=LINE).append(phase, style=MUTED)
-            if i < len(phases) - 1:
-                timeline.append("\n")
-
-        frac = self.steps_done / max(self.steps_total, 1)
-        width = 16
-        filled = round(frac * width)
-        bar = Text()
-        bar.append("█" * filled, style=ACCENT)
-        bar.append("░" * (width - filled), style=LINE)
-
-        tok_frac = min(self.tokens / 128_000, 1.0)
-        tbar = Text()
-        tbar.append("█" * round(tok_frac * width), style=CYAN)
-        tbar.append("░" * (width - round(tok_frac * width)), style=LINE)
-
-        chips = Text()
-        for tool in sorted(set(self.tools)):
-            chips.append(f" {tool} ", style=f"bold {CYAN} on {PANEL}")
-            chips.append(" ")
-
-        grid = Table.grid(expand=True)
-        grid.add_column()
-        grid.add_row(Text("RUN PROGRESS", style=f"bold {MUTED}"))
-        grid.add_row(Text(
-            f"step {self.steps_done}/{self.steps_total}", style=f"bold {BODY}"
-        ))
-        grid.add_row(bar)
-        grid.add_row(Text(""))
-        grid.add_row(Text("PHASES", style=f"bold {MUTED}"))
-        grid.add_row(timeline)
-        grid.add_row(Text(""))
-        grid.add_row(Text("CONTEXT WINDOW", style=f"bold {MUTED}"))
-        grid.add_row(tbar)
-        grid.add_row(Text(f"{self.tokens:,} / 128,000 tok", style=MUTED))
-        grid.add_row(Text(""))
-        grid.add_row(Text("SPEND", style=f"bold {MUTED}"))
-        grid.add_row(Text(f"${self.cost:.4f}", style=BODY))
-        grid.add_row(Text(""))
-        grid.add_row(Text("TOOLS", style=f"bold {MUTED}"))
-        grid.add_row(chips if chips else Text("—", style=MUTED))
-        grid.add_row(Text(""))
-        grid.add_row(Text("ENVIRONMENT", style=f"bold {MUTED}"))
-        grid.add_row(Text("sandbox  ", style=MUTED).append("proc-quarantine", style=MONO))
-        grid.add_row(Text("network  ", style=MUTED).append("off", style=EMERALD))
-        grid.add_row(Text("workdir  ", style=MUTED).append("/tmp/arcen-s-8f2a41", style=MONO))
-        grid.add_row(Text(""))
-        grid.add_row(Text("HARNESS", style=f"bold {MUTED}"))
-        grid.add_row(Text("adopted@a1f3c9", style=f"italic {ACCENT}"))
-
-        return Panel(grid, box=box.ROUNDED, border_style=LINE, style=PANEL,
-                     padding=(1, 2), title=Text(" run state ", style=f"bold {MUTED}"))
-
-
 # ── card builders ───────────────────────────────────────────────────────────
 def goal_card() -> Table:
     return card(Text(GOAL, style=BODY), "you · goal", MUTED, spine="◆")
@@ -380,7 +306,13 @@ class DemoApp(ArcenApp):
             quarantine="quarantine · net off",
         )
         self.narration = Narration()
-        self.rail = Rail()
+        self.rail = RunStateRail(
+            steps_total=len(PLAN),
+            sandbox="proc-quarantine",
+            network="off",
+            workdir="/tmp/arcen-s-8f2a41",
+            harness="adopted@a1f3c9",
+        )
         self.rail.id = "rail"
         self.footer = Footer()
         yield self.header

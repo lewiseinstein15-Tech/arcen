@@ -73,3 +73,10 @@ no server or sockets — through a complete narrated turn.
 | `TUI-04-real-shell-empty.png` | **Real terminal**: bare `ARCEN_TUI=new` shell, IDLE, no server attached |
 | `TUI-04-real-terminal-sheet.png` | All four real-terminal frames in one labeled 2×2 image |
 | `TUI-04-full-suite.png` | Full repository suite after TUI-04: **400 passed, 1 skipped** |
+| `TUI-05.png` | TUI-05 ticket tests, verbose: **38 passed, 1 skipped** (rail + shell + demo + entry) |
+| `TUI-05-real-idle-rail.png` | **Real terminal**: idle `ARCEN_TUI=new` rail — step 0/0, all phases pending, neutral placeholders |
+| `TUI-05-real-rail-mid.png` | **Real terminal**, live at TEMPER: state-driven rail step 3/4, verify row running |
+| `TUI-05-real-rail-done.png` | **Real terminal**, run finished DONE: step 4/4, full meters, tool chips |
+| `TUI-05-real-narrow.png` | **Real terminal** 80×24: rail collapsed |
+| `TUI-05-real-terminal-sheet.png` | All four real-terminal rail frames in one 2×2 image |
+| `TUI-05-full-suite.png` | Full repository suite after TUI-05: **416 passed, 1 skipped** |

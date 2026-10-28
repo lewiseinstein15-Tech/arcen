@@ -8,14 +8,14 @@ redesign ticket:
 * :class:`Footer` — the frozen key hints from :data:`keys.FOOTER_HINTS` plus
   the LIVE indicator, which stops blinking when the run settles;
 * a two-column body — the narration spine container ``#stream`` beside the
-  run-state rail host ``#rail``. Below :data:`RAIL_COLLAPSE_WIDTH` columns
-  the rail collapses automatically and the transcript takes the full width.
+  run-state :class:`~arcen.tui.views.rail.RunStateRail` mounted at ``#rail``.
+  Below :data:`RAIL_COLLAPSE_WIDTH` columns the rail collapses automatically
+  and the transcript takes the full width.
 
-The shell is render-only: it holds no server logic. Cards (TUI-07…09), the
-real rail (TUI-05), spine scroll rules (TUI-06) and the wire adapter
-(TUI-10…) mount into these containers later. The scripted demo subclasses
-:class:`ArcenApp`, so every shell change is immediately proven by a full
-narrated run.
+The shell is render-only: it holds no server logic. Cards (TUI-07…09),
+spine scroll rules (TUI-06) and the wire adapter (TUI-10…) mount into these
+containers later. The scripted demo subclasses :class:`ArcenApp`, so every
+shell change is immediately proven by a full narrated run.
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ from textual.widgets import Static
 from arcen.tui import keys
 from arcen.tui.theme import PHASE_COLORS
 from arcen.tui.theme import TOKENS as _T
+from arcen.tui.views.rail import RunStateRail
 
 # local aliases — every value traces back to a frozen theme token
 INK: str = _T["ink"]
@@ -174,25 +175,6 @@ class Footer(Static):
         )
 
 
-class ShellRail(Static):
-    """Placeholder rail host for the bare shell.
-
-    TUI-05 replaces this with the real ``views/rail.py`` run-state widget;
-    keeping the mount point and ``#rail`` id now lets layout and collapse
-    rules land independently of rail content.
-    """
-
-    def render(self) -> Panel:
-        return Panel(
-            Text("connecting…", style=MUTED),
-            box=box.ROUNDED,
-            border_style=LINE,
-            style=PANEL,
-            padding=(1, 2),
-            title=Text(" run state ", style=f"bold {MUTED}"),
-        )
-
-
 class ArcenApp(App):
     """Mission-control shell: header, two-column body, footer."""
 
@@ -229,7 +211,7 @@ class ArcenApp(App):
             with VerticalScroll(id="stream"):
                 # TUI-06 mounts the real narration spine here.
                 yield Static(id="stream-empty")
-            yield ShellRail(id="rail")
+            yield RunStateRail(id="rail")
         yield self.footer
 
     def on_mount(self) -> None:

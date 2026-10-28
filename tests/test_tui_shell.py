@@ -20,10 +20,10 @@ from arcen.tui.app import (
     ArcenApp,
     Footer,
     Header,
-    ShellRail,
     run,
 )
 from arcen.tui.theme import PHASE_COLORS, TOKENS
+from arcen.tui.views.rail import RunStateRail
 
 
 def _plain(widget) -> str:
@@ -90,7 +90,7 @@ async def test_shell_tree_wide_keeps_rail_beside_stream():
 
         assert isinstance(app.header, Header)
         assert isinstance(app.footer, Footer)
-        assert isinstance(app.query_one("#rail"), ShellRail)
+        assert isinstance(app.query_one("#rail"), RunStateRail)
         assert app.query_one("#stream-empty") is not None
 
         shell = app.query_one("#shell")
