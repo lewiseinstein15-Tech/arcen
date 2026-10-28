@@ -28,3 +28,6 @@ no server or sockets — through a complete narrated turn.
 | `TUI-01-full-suite.png` | Full repository suite after the TUI-01 restructure: **362 passed** |
 | `TUI-01-app-transcript.png` | **Real app capture** — legacy `arcen-tui` running an 18-event turn (spawn → fail → re-plan → diff → verify → answer) through the headless pilot |
 | `TUI-01-app-config-modal.png` | **Real app capture** — configuration (redacted) + sandbox status modal, degraded process backend shown honestly |
+| `TUI-02.png` | TUI-02 ticket tests, verbose: **21 passed** (14 theme token/fallback tests + 7 key-map tests) |
+| `TUI-02-palette.png` | Visual swatch sheet — all 13 tokens with hex, xterm-256 code, luminance, and the phase/status/card semantic mappings |
+| `TUI-02-full-suite.png` | Full repository suite after TUI-02: **383 passed** |

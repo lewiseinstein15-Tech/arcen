@@ -136,7 +136,7 @@ tickets. Commit prefix `TUI-NN:`.
 | Ticket | Size | Deliverable | Verification |
 |---|---|---|---|
 | **TUI-01** Branch + skeleton ✅ | S | `feat/tui-redesign`; old modules moved to `tui/_legacy/`; new `cards/`, `views/` dirs; legacy stays the default behind the `ARCEN_TUI` env flag; new shell refused cleanly pre-TUI-04 | 5 new entry tests + all 357 prior tests green (362 total); wheel contains all TUI modules; `arcen-tui --help` resolves through legacy |
-| **TUI-02** Theme + key map | M | `theme.py` (all prototype tokens, 256-color fallbacks), `keys.py` (frozen bindings incl. `^C ^G / ^R ?`) | `test_tui_theme.py`: every token resolves at truecolor and 256 |
+| **TUI-02** Theme + key map ✅ | M | `theme.py` (13 prototype tokens, computed xterm-256 fallbacks, phase/status/card semantic maps, CSS custom-property block, font stack), `keys.py` (frozen global/composer/modal bindings, scoped Textual factory, footer hints) | 21 new tests (`test_tui_theme.py` 14, `test_tui_keys.py` 7); every token resolves at truecolor and 256; palette sheet `docs/verify/TUI-02-palette.png`; full suite 383 passed |
 | **TUI-03** Headless test harness | M | pilot harness ported from `prototype/capture.py`; `--demo` wiring; CairoSVG snapshot helper under `tests/` (skipped without the extra) | headless run of demo app exits 0 in CI without a TTY |
 
 ### Phase 1 — Shell
