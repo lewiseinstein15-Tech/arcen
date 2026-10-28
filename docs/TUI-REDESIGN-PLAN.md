@@ -129,8 +129,9 @@ tickets. Commit prefix `TUI-NN:`.
 
 ### Phase 0 — Scaffolding (no user-visible change)
 
-> Progress: **TUI-01 done — verified** (362 passed; evidence
-> `docs/verify/TUI-01.png`, `docs/verify/TUI-01-full-suite.png`).
+> Progress: **TUI-01 done — verified** (362 passed; TUI subset 46 passed;
+> evidence `docs/verify/TUI-01.png`, `TUI-01-full-suite.png`, plus real-app
+> captures `TUI-01-app-transcript.png` and `TUI-01-app-config-modal.png`).
 
 | Ticket | Size | Deliverable | Verification |
 |---|---|---|---|
