@@ -143,7 +143,7 @@ tickets. Commit prefix `TUI-NN:`.
 
 | Ticket | Size | Deliverable | Verification |
 |---|---|---|---|
-| **TUI-04** App shell | M | header (session/model/quarantine/phase pill), footer (hints + LIVE), two-column layout, responsive rail collapse at <100 cols | pilot test asserts widget tree at 132×44 and 80×24 |
+| **TUI-04** App shell ✅ | M | `app.py`: `ArcenApp` shell with `Header` (wordmark/session/model/quarantine/clock/phase pill via `PHASE_COLORS`), `Footer` (frozen `FOOTER_HINTS` + LIVE blink that settles on `run.done`), `ShellRail` placeholder, two-column `#shell` with `#stream` + `#rail`, responsive collapse under 100 cols (`on_resize` + `.narrow` class); demo refactored to subclass the shell; `ARCEN_TUI=new` now boots the real shell | 10 new pilot/render tests in `test_tui_shell.py`; widget tree asserted at 132×44 (rail) and 80×24 (collapsed), incl. dynamic resize across the 99/100 boundary; entry routing test updated; frames `TUI-04-shell-{wide,narrow,empty}.png`; full suite 400 passed, 1 skipped |
 | **TUI-05** Run-state rail | M | `views/rail.py`: step counter, phase tracker, context meter, spend, tools, environment, harness ref | state-dict → rendered rail assertions |
 | **TUI-06** Narration spine + scroll rules | S | `views/stream.py`: auto-scroll only when user is at bottom; scroll-up pauses, "↓ back to live" affordance | pilot scroll test |
 

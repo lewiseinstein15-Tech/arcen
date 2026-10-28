@@ -13,6 +13,7 @@ pytest.importorskip("textual")
 
 import arcen.tui as tui_pkg
 import arcen.tui._legacy.app as legacy_app
+import arcen.tui.app as new_app
 
 
 def test_default_impl_is_legacy(monkeypatch):
@@ -30,11 +31,34 @@ def test_explicit_new_is_recognized(monkeypatch):
     assert tui_pkg._selected_impl() == "new"
 
 
-def test_new_shell_unavailable_before_tui04(monkeypatch):
-    # arcen.tui.app does not exist until the shell ticket lands.
+def test_new_shell_routes_to_redesigned_app(monkeypatch):
+    # TUI-04 onward: ARCEN_TUI=new launches arcen.tui.app with argv intact.
     monkeypatch.setenv("ARCEN_TUI", "new")
-    with pytest.raises(SystemExit, match="redesigned shell is not built"):
-        tui_pkg.main([])
+    called = {}
+
+    def fake_run(argv):
+        called["argv"] = argv
+        return 0
+
+    monkeypatch.setattr(new_app, "run", fake_run)
+    assert tui_pkg.main(["--url", "http://x:3002"]) == 0
+    assert called == {"argv": ["--url", "http://x:3002"]}
+
+
+def test_demo_flag_wins_over_impl_flag(monkeypatch):
+    # --demo routes before the legacy/new selection, regardless of ARCEN_TUI.
+    monkeypatch.setenv("ARCEN_TUI", "new")
+    called = {}
+
+    def fake_run_demo(argv):
+        called["argv"] = argv
+        return 0
+
+    import arcen.tui.demo as demo_mod
+
+    monkeypatch.setattr(demo_mod, "run_demo", fake_run_demo)
+    assert tui_pkg.main(["--demo"]) == 0
+    assert called == {"argv": []}
 
 
 def test_legacy_entry_resolves(monkeypatch):

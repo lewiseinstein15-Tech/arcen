@@ -19,6 +19,9 @@ python scripts/verify_tui.py
 
 # redesigned-shell demo frames (mission-control prototype, TUI-03+)
 python scripts/capture_demo.py <TICKET>
+
+# app-shell frames: wide rail, collapsed rail, bare shell (TUI-04+)
+python scripts/capture_shell.py <TICKET>
 ```
 
 The pytest helper replays output through Rich and writes an SVG terminal
@@ -42,3 +45,7 @@ no server or sockets — through a complete narrated turn.
 | `TUI-03-contact-sheet.png` | All three demo checkpoints in one image with labels |
 | `TUI-03-test-evidence.png` | Ticket tests + full-suite frames in one image |
 | `TUI-03-full-suite.png` | Full repository suite after TUI-03: **389 passed, 1 skipped** |
+| `TUI-04.png` | TUI-04 ticket tests, verbose: **22 passed, 1 skipped** (shell + demo + entry) |
+| `TUI-04-shell-wide.png` / `-narrow.png` / `-empty.png` | **Real headless app captures** — redesigned shell at 132×44 (rail beside spine), 80×24 (rail collapsed, full-width spine), and the bare `ARCEN_TUI=new` shell (IDLE, placeholder rail) |
+| `TUI-04-contact-sheet.png` | All three shell frames in one labeled image |
+| `TUI-04-full-suite.png` | Full repository suite after TUI-04: **400 passed, 1 skipped** |

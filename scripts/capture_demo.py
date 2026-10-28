@@ -17,7 +17,7 @@ import sys
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
-from arcen.tui.demo import DemoApp  # noqa: E402
+from arcen.tui.demo import DemoApp
 
 OUT = REPO / "docs" / "verify"
 SIZE = (132, 44)

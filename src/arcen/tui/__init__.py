@@ -13,9 +13,8 @@ Two implementations coexist during the TUI redesign
 Selection is controlled by the ``ARCEN_TUI`` environment variable:
 
 - ``ARCEN_TUI=legacy`` (default) — the frozen legacy app;
-- ``ARCEN_TUI=new`` — the redesigned shell. It only exists from the
-  shell ticket (TUI-04) onward; selecting it earlier exits with a clear
-  message instead of crashing.
+- ``ARCEN_TUI=new`` — the redesigned mission-control shell
+  (:mod:`arcen.tui.app`), built from TUI-04 onward.
 
 Both clients are thin render-only clients of the same FastAPI server and
 its frozen 17-event NDJSON contract. Textual is an optional dependency:
@@ -72,14 +71,8 @@ def main(argv: list[str] | None = None) -> int:
 
     impl = _selected_impl()
     if impl == _IMPL_NEW:
-        try:
-            from arcen.tui.app import run as run_new
-        except ImportError:
-            raise SystemExit(
-                "ARCEN_TUI=new selected but the redesigned shell is not "
-                "built yet (lands in TUI-04). Unset ARCEN_TUI to use the "
-                "default legacy client."
-            ) from None
+        from arcen.tui.app import run as run_new
+
         return run_new(argv)
 
     from arcen.tui._legacy.app import run as run_legacy

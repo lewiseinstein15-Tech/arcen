@@ -19,7 +19,6 @@ tickets (TUI-04…09) refactor its widgets into :mod:`arcen.tui.cards` and
 from __future__ import annotations
 
 import asyncio
-import datetime as dt
 import sys
 
 from rich import box
@@ -27,10 +26,11 @@ from rich.console import Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from textual.app import App, ComposeResult
+from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Static
 
+from arcen.tui.app import ArcenApp, Footer, Header
 from arcen.tui.theme import TOKENS as _T
 
 # local aliases — every value traces back to a frozen theme token
@@ -124,16 +124,6 @@ ANSWER = (
 
 
 # ── render helpers ─────────────────────────────────────────────────────────
-def phase_pill(phase: str) -> Text:
-    colors = {"DRAFT": ACCENT, "FORGE": CYAN, "TEMPER": AMBER,
-              "DONE": EMERALD, "IDLE": MUTED}
-    color = colors.get(phase, MUTED)
-    text = Text()
-    text.append("● ", style=color)
-    text.append(phase, style=f"bold {color}")
-    return text
-
-
 def card(body, title: str, accent: str, spine: str = "◉") -> Table:
     grid = Table.grid(expand=True, padding=(0, 0))
     grid.add_column(width=3, justify="center")
@@ -152,35 +142,6 @@ def card(body, title: str, accent: str, spine: str = "◉") -> Table:
 
 def spine_break() -> Text:
     return Text(" │", style=LINE)
-
-
-class Header(Static):
-    def __init__(self) -> None:
-        super().__init__()
-        self.phase = "IDLE"
-
-    def render(self):
-        grid = Table.grid(expand=True)
-        grid.add_column(justify="left")
-        grid.add_column(justify="right")
-        left = Text()
-        left.append("◆ ", style=f"bold {ACCENT}")
-        left.append("ARCEN", style="bold #FFFFFF")
-        left.append(" · console", style=MUTED)
-        left.append("    ")
-        left.append("session ", style=MUTED)
-        left.append("s_8f2a41", style=MONO)
-        left.append("   ")
-        left.append("glm-5.1 · litellm", style=f"italic {MUTED}")
-        right = Text()
-        right.append("quarantine · net off", style=EMERALD)
-        right.append("    ")
-        right.append(dt.datetime.now().strftime("%H:%M:%S"), style=MUTED)
-        right.append("    ")
-        right.append(phase_pill(self.phase))
-        grid.add_row(left, right)
-        return Panel(grid, box=box.SQUARE, border_style=LINE,
-                     style=PANEL, padding=(0, 1))
 
 
 class Narration(Static):
@@ -288,24 +249,6 @@ class Rail(Static):
                      padding=(1, 2), title=Text(" run state ", style=f"bold {MUTED}"))
 
 
-class Footer(Static):
-    def render(self):
-        grid = Table.grid(expand=True)
-        grid.add_column(justify="left")
-        grid.add_column(justify="right")
-        hints = Text()
-        for key, label in [("^C", "interrupt"), ("^G", "editor"),
-                           ("/", "commands"), ("^R", "resume"), ("?", "help")]:
-            hints.append(f" {key} ", style=f"bold {BODY} on {LINE}")
-            hints.append(f" {label}   ", style=MUTED)
-        live = Text()
-        live.append("● ", style=f"blink {EMERALD}")
-        live.append("LIVE", style=f"bold {EMERALD}")
-        grid.add_row(hints, live)
-        return Panel(grid, box=box.SQUARE, border_style=LINE, style=PANEL,
-                     padding=(0, 1))
-
-
 # ── card builders ───────────────────────────────────────────────────────────
 def goal_card() -> Table:
     return card(Text(GOAL, style=BODY), "you · goal", MUTED, spine="◆")
@@ -403,21 +346,27 @@ def answer_card() -> Table:
 
 
 # ── the app ─────────────────────────────────────────────────────────────────
-class DemoApp(App):
-    TITLE = "ARCEN console"
-    CSS = f"""
-    Screen {{ background: {INK}; }}
-    #shell {{ layout: horizontal; height: 1fr; }}
-    #stream {{ width: 1fr; height: 1fr; background: {INK}; scrollbar-size: 1 1; }}
-    Rail {{ width: 38; height: 1fr; padding: 0 0 0 1; }}
-    Header {{ height: auto; margin: 0 0 1 0; }}
-    Footer {{ height: auto; margin: 1 0 0 0; }}
-    Narration {{ width: 1fr; height: auto; padding: 0 1; }}
+class DemoApp(ArcenApp):
+    """Scripted run through the real shell chrome and responsive layout."""
+
+    # Shell CSS owns ids, chrome and collapse rules; only the demo's
+    # narration widget needs a rule of its own.
+    CSS = ArcenApp.CSS + """
+    Narration { width: 1fr; height: auto; padding: 0 1; }
     """
 
-    def __init__(self, headless_mode: bool = False) -> None:
-        super().__init__()
-        self.headless_mode = headless_mode
+    def __init__(
+        self,
+        headless_mode: bool = False,
+        exit_on_finished: bool = True,
+    ) -> None:
+        super().__init__(headless_mode=headless_mode)
+        # The demo exits at its own "finished" checkpoint, not the bare
+        # shell's one-frame headless timer. Capture harnesses pass
+        # exit_on_finished=False so they can keep driving (e.g. resize)
+        # after the scripted run completes.
+        self._auto_exit = False
+        self.exit_on_finished = exit_on_finished
         self.phase_name = "boot"
         # durable checkpoint record — transient signals (e.g. "done"
         # immediately followed by "finished") stay observable to tests.
@@ -425,9 +374,14 @@ class DemoApp(App):
         self._phase_event = asyncio.Event()
 
     def compose(self) -> ComposeResult:
-        self.header = Header()
+        self.header = Header(
+            session="s_8f2a41",
+            model="glm-5.1 · litellm",
+            quarantine="quarantine · net off",
+        )
         self.narration = Narration()
         self.rail = Rail()
+        self.rail.id = "rail"
         self.footer = Footer()
         yield self.header
         with Horizontal(id="shell"):
@@ -543,12 +497,13 @@ class DemoApp(App):
         self._signal_phase("done", "DONE")
         self.narration.push(answer_card())
         self._signal_phase("finished")
-        if self.headless_mode:
+        if self.headless_mode and self.exit_on_finished:
             # Let the final paint land, then exit cleanly with code 0.
             await asyncio.sleep(0.2)
             self.exit()
 
     def on_mount(self) -> None:
+        super().on_mount()  # clock interval + responsive collapse rule
         self._signal_phase("boot")
         self.narration.bind_scroll(self.query_one("#stream", VerticalScroll))
         asyncio.create_task(self.driver())
