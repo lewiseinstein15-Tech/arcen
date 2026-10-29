@@ -1,0 +1,4 @@
+{"seq":1,"type":"run.start","run_id":"r-offline","goal":"Build a calculator","depth":0,"ts":0.0}
+{"seq":2,"type":"think","agent":"DRAFT","text":"no model provider is configured. I can't plan a real task without one.","ts":0.0}
+{"seq":3,"type":"answer","text":"I need a model provider to plan and execute tasks. Open Settings → Provider, add a key, and try again.","ts":0.0}
+{"seq":4,"type":"run.done","status":"ok","steps":0,"duration_s":0.0005,"ts":0.0}

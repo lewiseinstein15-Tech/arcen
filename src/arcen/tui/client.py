@@ -124,9 +124,7 @@ class ArcenClient:
         The server's error detail (e.g. the T-043 docker refusal) is
         surfaced verbatim via :class:`ArcenAPIError`.
         """
-        response = await self._http.post(
-            "/api/run", json={"goal": goal, "session": session}
-        )
+        response = await self._http.post("/api/run", json={"goal": goal, "session": session})
         if response.status_code >= 400:
             raise ArcenAPIError(response.status_code, self._detail(response))
         return response.json()
@@ -149,6 +147,14 @@ class ArcenClient:
 
     async def get_config(self) -> dict:
         data = await self._get_json("/api/config")
+        return data if isinstance(data, dict) else {}
+
+    async def put_config(self, config: dict) -> dict:
+        """Update the server configuration; caller must preserve redacted secrets."""
+        response = await self._http.put("/api/config", json=config)
+        if response.status_code >= 400:
+            raise ArcenAPIError(response.status_code, self._detail(response))
+        data = response.json()
         return data if isinstance(data, dict) else {}
 
     async def sandbox_status(self) -> dict:

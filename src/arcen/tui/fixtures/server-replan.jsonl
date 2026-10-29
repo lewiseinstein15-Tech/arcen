@@ -1,0 +1,17 @@
+{"seq":1,"type":"run.start","run_id":"r-fixture","goal":"Run a failing probe and recover","depth":0,"ts":0.0}
+{"seq":2,"type":"think","agent":"DRAFT","text":"Goal: Run a failing probe and recover. Plan has 1 step(s).","ts":0.0}
+{"seq":3,"type":"plan","agent":"DRAFT","steps":[{"id":1,"title":"Run a failing probe","tool":"bash","args":{"cmd":"exit 3"}}],"ts":0.0}
+{"seq":4,"type":"command","agent":"FORGE","step":1,"tool":"bash","args":{"cmd":"exit 3"},"ts":0.0}
+{"seq":5,"type":"command.done","step":1,"ok":false,"result":{"error":"exit 3: ","detail":{"stdout":"","stderr":"","exit":3}},"duration_s":0.0021,"ts":0.0}
+{"seq":6,"type":"think","agent":"DRAFT","text":"Re-planning: step 1 (bash) failed: exit 3: ","ts":0.0}
+{"seq":7,"type":"plan.update","agent":"DRAFT","reason":"step 1 (bash) failed: exit 3: ","steps":[{"id":1,"title":"Correct the probe","tool":"bash","args":{"cmd":"echo fixed"}},{"id":2,"title":"Verify result","tool":"bash","args":{"cmd":"true"}}],"ts":0.0}
+{"seq":8,"type":"command","agent":"FORGE","step":1,"tool":"bash","args":{"cmd":"echo fixed"},"ts":0.0}
+{"seq":9,"type":"command.done","step":1,"ok":true,"result":{"stdout":"fixed\n","stderr":"","exit":0},"duration_s":0.0017,"ts":0.0}
+{"seq":10,"type":"command","agent":"FORGE","step":2,"tool":"bash","args":{"cmd":"true"},"ts":0.0}
+{"seq":11,"type":"command.done","step":2,"ok":true,"result":{"stdout":"","stderr":"","exit":0},"duration_s":0.0017,"ts":0.0}
+{"seq":12,"type":"verify.start","agent":"TEMPER","target":"Run a failing probe and recover","ts":0.0}
+{"seq":13,"type":"step.pass","step":3,"checks":["true"],"ts":0.0}
+{"seq":14,"type":"memory","op":"write","entity":"Run a failing probe and recover","fact":"turn r-fixture: 3 steps, verified=True","ts":0.0}
+{"seq":15,"type":"usage","tokens":{"input":0,"output":0},"cost_usd":0.0,"ts":0.0}
+{"seq":16,"type":"answer","text":"Done. 3 step(s) executed against: Run a failing probe and recover. Verification passed.","ts":0.0}
+{"seq":17,"type":"run.done","status":"ok","steps":3,"duration_s":0.0088,"ts":0.0}
