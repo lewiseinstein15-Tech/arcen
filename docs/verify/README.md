@@ -260,3 +260,15 @@ The final full local suite reported **606 passed, 3 skipped**; installed wheel
 loading and a private SQLite database were checked separately. The metadata refs
 are not connected to runtime harness selection or adoption; no live-Docker
 claim is made for this ticket.
+
+## H-07 inspection CLI (partial)
+
+`H-07-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the final
+installed H-07 wheel, its managed server and a local mock provider, after a
+completed direct-answer turn. Docker was unavailable and tools were blocked.
+`H-07-real-cli-tests.png` captures the focused CLI suite: **7 passed**.
+The full local suite reported **613 passed, 3 skipped**. The final installed
+`arcen` command separately initialized and inspected a temporary store without
+booting the server or plugins. Rollback and runtime selection still fail closed;
+this is not a completed adoption/rollback implementation. No live-Docker
+claim is made for H-07.

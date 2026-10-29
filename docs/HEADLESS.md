@@ -37,8 +37,8 @@ through Docker exec stdin and writes only into the container's workspace tmpfs.
 The snapshot is not an atomic filesystem snapshot: don't change the source while
 it is being read. The container is destroyed after the turn.
 
-`--harness` is parsed but **currently rejected**. The harness store and
-resolver arrive in later tickets; silently ignoring a requested ref would be
+`--harness` is parsed but **currently rejected**. The store and inspection CLI now exist, but runtime ref selection and its
+safety gates are not implemented; silently ignoring a requested ref would be
 unsafe. Use the default behavior without `--harness` until then.
 
 The real Docker integration checks are opt-in:

@@ -24,3 +24,26 @@ metadata are stored as plaintext, so use a trusted private store directory.
 Runtime selection, adoption, CLI, locking against hostile local races, git
 backing, and the full eight-component set remain future work. `--harness` continues to reject refs and
 `harnessing.enabled` remains false.
+
+## Inspection CLI
+
+```bash
+arcen harness init
+arcen harness doctor
+arcen harness diff refs/candidates/example
+```
+
+Use `arcen harness --store /trusted/path <command>` to choose another local
+store. `init` stores the current packaged baseline and creates its metadata ref;
+repeating it is safe for the same baseline. `doctor` opens the existing database
+read-only and verifies indexed manifests, components, ref history, DAG integrity
+and every object file. `diff` compares a candidate against baseline and strips
+terminal control characters. Both inspection commands fail if the store is
+missing or corrupt and do not create it. Task and trajectory metadata remain
+plaintext local data; protect the store directory.
+
+`arcen harness rollback <ref>` currently **refuses without changing anything**.
+There is no enabled adoption/approval gate or runtime ref selection yet, so
+claiming rollback works would be misleading and unsafe. `--harness` is still
+rejected. A successful `doctor` verifies local integrity, not authorship or
+security against a hostile user with access to the filesystem.

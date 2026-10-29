@@ -110,7 +110,7 @@ behavior and event output to `main`, merely loading its kit from files.
 |---|---|---|---|---|
 | **H-05** Object store + hashing (local API foundation) | M | H-04 | `harness/model.py`, `harness/store.py`: blob-addressed components, manifest hashing | hash stability test; tamper detection; no two writes of same content duplicate |
 | **H-06** Refs + lineage DAG (metadata foundation; selection pending) | L | H-05 | SQLite lineage `(ref, parent, task, trajectories, judge, decision)`; `refs/heads/adopted`, `refs/candidates/*`; `run.start` gains optional `harness_ref` (absent ⇒ adopted) | lineage traversal tests; old session jsonl without the field still replays |
-| **H-07** Harness CLI skeleton | M | H-06 | `arcen harness init\|doctor\|diff\|rollback` (read/select ops only) | CLI tests incl. rollback to a prior ref; doctor detects corrupt store |
+| **H-07** Harness CLI skeleton (inspection only; rollback pending) | M | H-06 | `arcen harness init\|doctor\|diff\|rollback` (read/select ops only) | CLI tests incl. rollback to a prior ref; doctor detects corrupt store |
 
 ### Phase P2 — Manual harnessing loop (human gate, no auto-adopt)
 

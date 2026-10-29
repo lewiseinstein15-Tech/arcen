@@ -39,7 +39,7 @@ tui = [
 ]
 
 [project.scripts]
-arcen = "arcen.server.app:main"
+arcen = "arcen.cli:main"
 arcen-tui = "arcen.tui:main"
 
 [tool.hatch.build.targets.wheel]

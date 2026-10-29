@@ -762,12 +762,16 @@ def main() -> int | None:
     import sys
 
     args = sys.argv[1:]
+    if args and args[0] == "harness":
+        from arcen.harness.cli import main as harness_main
+
+        return harness_main(args[1:])
     if args and args[0] == "run":
         from arcen.headless import main as headless_main
 
         return headless_main(args[1:])
     if args and args != ["serve"]:
-        print("usage: arcen [serve | run GOAL --json]", file=sys.stderr)
+        print("usage: arcen [serve | run GOAL --json | harness ...]", file=sys.stderr)
         return 2
     import uvicorn
 

@@ -39,14 +39,20 @@ class LineageEdge:
 class HarnessLineage:
     """SQLite lineage and refs over a separately verified object store."""
 
-    def __init__(self, store: HarnessStore):
+    def __init__(self, store: HarnessStore, *, read_only: bool = False):
         self.store = store
+        self.read_only = read_only
         self.path = store.root / "lineage.sqlite3"
-        self._prepare_file()
+        if not read_only:
+            self._prepare_file()
+        elif self.path.is_symlink() or not self.path.is_file():
+            raise HarnessError("lineage database missing or invalid")
         with self._connect() as db:
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1):
+            if version not in ((1,) if read_only else (0, 1)):
                 raise HarnessError("unsupported lineage schema")
+            if read_only:
+                return
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS nodes (
                     id TEXT PRIMARY KEY NOT NULL
@@ -97,7 +103,12 @@ class HarnessLineage:
         if self.path.is_symlink():
             raise HarnessError("lineage database cannot be a symlink")
         try:
-            db = sqlite3.connect(self.path, timeout=10)
+            if self.read_only:
+                db = sqlite3.connect(
+                    self.path.absolute().as_uri() + "?mode=ro", timeout=10, uri=True
+                )
+            else:
+                db = sqlite3.connect(self.path, timeout=10)
             db.execute("PRAGMA foreign_keys=ON")
         except sqlite3.Error as exc:
             raise HarnessError("cannot open lineage database") from exc
@@ -249,3 +260,76 @@ class HarnessLineage:
                 "SELECT old_node,new_node FROM ref_history WHERE name=? ORDER BY seq", (name,)
             ).fetchall()
         return tuple((old, new) for old, new in rows)
+
+    def audit(self) -> dict[str, int]:
+        """Verify every indexed object, ref and lineage edge without mutating it."""
+        with self._connect() as db:
+            if db.execute("PRAGMA quick_check").fetchone() != ("ok",):
+                raise HarnessError("lineage database integrity check failed")
+            if db.execute("PRAGMA foreign_key_check").fetchone():
+                raise HarnessError("lineage database has broken references")
+            nodes = [row[0] for row in db.execute("SELECT id FROM nodes ORDER BY id")]
+            refs = db.execute("SELECT name,node FROM refs ORDER BY name").fetchall()
+            edges = db.execute(
+                "SELECT child,parent,task,trajectories,judge_report,decision FROM edges"
+            ).fetchall()
+            history = db.execute(
+                "SELECT name,old_node,new_node FROM ref_history ORDER BY seq"
+            ).fetchall()
+        for node in nodes:
+            self.store.get_manifest(node)
+        for name, _node in refs:
+            if name != _ADOPTED and not _CANDIDATE.fullmatch(name):
+                raise HarnessError("invalid stored ref name")
+        if not any(name == _ADOPTED for name, _node in refs):
+            raise HarnessError("missing adopted baseline")
+        refmap = dict(refs)
+        tracked: dict[str, str] = {}
+        for name, previous, target in history:
+            if name not in refmap or previous != tracked.get(name) or target not in nodes:
+                raise HarnessError("invalid ref history")
+            if name == _ADOPTED and name in tracked:
+                raise HarnessError("adopted baseline changed")
+            tracked[name] = target
+        if tracked != refmap:
+            raise HarnessError("ref history does not match current refs")
+        graph: dict[str, list[str]] = {node: [] for node in nodes}
+        for child, parent, task, trajectories, report, decision in edges:
+            try:
+                ids = json.loads(trajectories)
+            except (ValueError, TypeError) as exc:
+                raise HarnessError("invalid lineage metadata") from exc
+            if (
+                type(task) is not str
+                or not task.strip()
+                or len(task) > 1000
+                or type(report) is not str
+                or len(report) > 512
+                or type(ids) is not list
+                or len(ids) > 64
+                or any(type(item) is not str or not item or len(item) > 256 for item in ids)
+                or decision not in _DECISIONS
+            ):
+                raise HarnessError("invalid lineage metadata")
+            graph[child].append(parent)
+        # Iterative DFS avoids Python's recursion limit on long local histories.
+        visited: set[str] = set()
+        active: set[str] = set()
+        for start in nodes:
+            if start in visited:
+                continue
+            stack: list[tuple[str, bool]] = [(start, False)]
+            while stack:
+                current, done = stack.pop()
+                if done:
+                    active.remove(current)
+                    visited.add(current)
+                elif current in active:
+                    raise HarnessError("lineage cycle")
+                elif current not in visited:
+                    active.add(current)
+                    stack.append((current, True))
+                    stack.extend(
+                        (parent, False) for parent in graph[current] if parent not in visited
+                    )
+        return {"nodes": len(nodes), "refs": len(refs), "edges": len(edges)}
