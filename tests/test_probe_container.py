@@ -111,5 +111,5 @@ def test_real_docker_probe_container_when_explicitly_enabled(tmp_path, monkeypat
                 "cmd": f'test -f src/main.py && test -z "${{{marker}:-}}" && printf changed > src/main.py'
             },
         )
-        assert result["ok"] and result["result"]["exit_code"] == 0, result
+        assert result["ok"] and result["result"]["exit"] == 0, result
     assert (repo / "src/main.py").read_text() == "print('committed')\n"
