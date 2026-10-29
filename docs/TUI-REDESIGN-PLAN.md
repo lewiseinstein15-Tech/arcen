@@ -176,7 +176,7 @@ tickets. Commit prefix `TUI-NN:`.
 | Ticket | Size | Deliverable | Verification |
 |---|---|---|---|
 | **TUI-16** Resize/terminal matrix ✅ | M | compact 80×24 header, bounded wide output, keyboard navigation and help; rail responds to resize | matrix pilot tests, real 80×24/wide-character captures and actual tmux 3.5a session, full suite 497 passed, 1 skipped |
-| **TUI-17** Docs + screenshots | S | rewrite `docs/TUI.md`, new SVG/PNG screenshots via the TUI-03 helper, README refresh | docs link-check; screenshots generated from `--demo` |
+| **TUI-17** Docs + screenshots ✅ | S | updated TUI guide and README, keys, server lifecycle, safety and screenshot provenance | local link checker; fresh real-terminal mock live, help and offline `--demo --replay` screenshots |
 
 ### Phase 6 — Cutover
 

@@ -143,3 +143,7 @@ no server or sockets — through a complete narrated turn.
 | `TUI-16-real-wide-chars.png` | **Real terminal**: wide-character input at 80×24 |
 | `TUI-16-real-tmux.png` | **Real terminal**: live TUI inside tmux 3.5a, mock HTTP backend |
 | `TUI-16-full-suite.png` | Full suite: **497 passed, 1 skipped** |
+| `TUI-17.png` | Local documentation link check |
+| `TUI-17-real-live.png` | **Real terminal**: redesigned TUI against isolated mock HTTP server |
+| `TUI-17-real-help.png` | **Real terminal**: keyboard help |
+| `TUI-17-real-demo.png` | **Real terminal**: offline recorded-event demo |

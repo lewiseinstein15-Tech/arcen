@@ -1,143 +1,120 @@
-# ARCEN — Terminal UI (TUI)
+# ARCEN terminal UI
 
-A full-screen terminal client for the ARCEN stream server — the same
-narrated DRAFT → FORGE → TEMPER experience as the web UI, rendered with
-[Textual](https://textual.textualize.io/) over the exact same HTTP/NDJSON
-contract in [BACKEND-SPEC.md](BACKEND-SPEC.md).
+ARCEN's full-screen Textual client narrates the DRAFT → FORGE → TEMPER
+stream from the same HTTP server used by the web UI. Its left spine shows
+goals, thoughts, plans, commands, verification, answers and failures; the
+right rail summarizes the current run. Below 100 columns the rail collapses
+to leave room for the transcript and composer.
 
-![ARCEN TUI transcript](tui-screenshot.svg)
+![Live TUI with a mock HTTP server](verify/TUI-17-real-live.png)
 
-## Install & launch
+The screenshot is a **real PTY/xterm.js terminal capture** against a local,
+deterministic mock HTTP server. It does not depict a model-generated run.
+The [verification index](verify/README.md) distinguishes real-terminal
+screenshots from headless test evidence.
 
-The TUI is an optional extra (Textual is not part of the core install):
+## Install and launch
 
-```bash
-pip install 'arcen[tui]'
-arcen-tui                 # that's the whole thing — one command, one terminal
-# or, without installing the script:
-python -m arcen.tui
+Install the optional extra in an isolated environment (for example, on
+PEP 668 systems):
+
+```sh
+uv tool install 'arcen[tui]'
+# or: pipx install 'arcen[tui]'
+# or, from this checkout, in an activated virtual environment:
+python -m pip install -e '.[tui]'
 ```
 
-### Managed server (the default)
+During the staged redesign, opt into the new interface explicitly:
 
-On launch the TUI probes `http://127.0.0.1:3002/api/health`:
-
-- **a server already answers** → the TUI attaches to it and never touches
-  its lifetime (a separately-run `arcen serve` keeps running after you quit);
-- **nothing answers** → the TUI spawns `uvicorn arcen.server.app:app` as a
-  child process on 127.0.0.1 (port 3002 when free, otherwise an ephemeral
-  port), waits until it is healthy, and terminates it cleanly on exit. The
-  child's output lands in `~/.arcen/tui-server.log`, never on the TUI screen.
-
-So a cold `arcen-tui` prints briefly, then takes over the terminal:
-
-```text
-ARCEN server not reachable at http://127.0.0.1:3002 — starting a local server on 127.0.0.1:3002 …
-Server ready — launching TUI (server log: /home/you/.arcen/tui-server.log)
+```sh
+ARCEN_TUI=new arcen-tui
 ```
 
-### Options
+This is one command in one terminal. The launcher attaches to a healthy
+server if one exists; otherwise it starts a local managed server, waits for
+health, and stops only that child on exit. The managed child's log is
+`~/.arcen/tui-server.log`. An already-running server is never stopped by the
+TUI. See [the launcher](../src/arcen/tui/launcher.py) for its attach/spawn
+rules.
 
-```bash
-arcen-tui --no-serve                                  # attach only; never spawn
-arcen-tui --url http://127.0.0.1:4004                 # a specific local server
-ARCEN_SERVER_URL=http://127.0.0.1:4004 arcen-tui      # same, via env var
-arcen-tui --session 3f2504e0-4f89-11d3-9a0c-0305e82c3301   # resume a session
+```sh
+ARCEN_TUI=new arcen-tui --no-serve                       # attach only
+ARCEN_TUI=new arcen-tui --url http://127.0.0.1:4004      # explicit server
+ARCEN_SERVER_URL=http://127.0.0.1:4004 ARCEN_TUI=new arcen-tui
+ARCEN_TUI=new arcen-tui --session 3f2504e0-4f89-11d3-9a0c-0305e82c3301
+arcen-tui --demo                  # scripted, no server or credentials
+arcen-tui --demo --replay         # offline recorded server-event fixture
 ```
 
-With `--no-serve` (or a remote `--url` that is unreachable) the TUI exits
-with an actionable message instead of spawning anything. A remote URL that
-is healthy is simply attached to. When the server drops mid-session the
-status bar shows `○ offline` and submitting a goal prints a banner rather
-than inventing a local run.
+A real run requires a configured provider. The demos and local test servers
+are not providers. `--no-serve` does not start a server. The interface shows
+connection failures and retries, and keeps unsent drafts on failure.
 
-## Layout
+## Compose and navigate
 
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│ ● online  http://127.0.0.1:3002  sandbox: process (degraded)  session …  │  status bar
-├──────────────┬───────────────────────────────────────────────────────────┤
-│  Sessions    │  ARCEN — live stream                                       │
-│  ● fix test  │  10:22:01 #1  ▶ RUN r-7f3a9c  "fix the failing test…"     │
-│    712eedc1… │  10:22:01 #2  ❯ DRAFT  Read the failing test first…       │
-│              │  10:22:01 #3  ≡ PLAN DRAFT                                 │
-│              │                1. read failing test  [file.read]          │
-│              │  10:22:02 #4  ↳ SPAWN TEST-READER (depth 1, parent DRAFT) │
-│              │  10:22:03 #7  ⚙ FORGE step 1 bash {"cmd":"pytest -q …"}   │
-│              │  10:22:04 #8  ✗ RESULT step 1 · 0.82s                      │
-│              │  10:22:04 #9  ⟳ RE-PLAN DRAFT — "test bug found…"         │
-│              │  10:22:05 #11 ✎ FILE DIFF  tests/test_pay.py  (+/- panel)  │
-│              │  10:22:06 #13 ⬢ TEMPER adversarial verification           │
-│              │  10:22:08 #14 ✓ PASS  step 2                               │
-│              │  ╭─ ❯❯ ANSWER ───────────────────────────────────────╮    │
-│              │  │ Fixed the assertion. Suite: 12 passed.            │    │
-│              │  ╰───────────────────────────────────────────────────╯    │
-│              │  ─────────────────────────────────────────────             │
-│              │  10:22:08 #18 ■ RUN OK · 4 step(s) · 4.52s                │
-├──────────────┴───────────────────────────────────────────────────────────┤
-│ Describe a task for ARCEN — Enter to run · Ctrl+H help · Ctrl+Q quit     │  composer
-└──────────────────────────────────────────────────────────────────────────┘
-```
-
-All 17 frozen event types render with the brand palette: DRAFT coral,
-FORGE blue, TEMPER green, sub-agents purple, failures red, replans amber.
-The config modal (`Ctrl+O`) shows the redacted provider config and the
-sandbox decision, including an honest `degraded: true` marker:
-
-![Config and sandbox modal](tui-screenshot-config.svg)
-
-## Keybindings
-
-Global shortcuts use **Ctrl** so every printable key stays available for
-typing your goal — a plain `n`/`s`/`c` would otherwise be swallowed by the
-focused composer.
-
-| Key | Action | API behind it |
-|---|---|---|
-| `Enter` | Submit the goal in the composer | `POST /api/run` |
-| `Esc` | Move focus back to the composer | — |
-| `Ctrl+N` | New chat (fresh session UUID) | client-minted UUID |
-| `Ctrl+B` | Toggle the sessions sidebar | — |
-| `Ctrl+R` | Refresh the session list | `GET /api/sessions` |
-| `Enter` (sidebar) | Open a past session and replay it | `GET /api/sessions/{id}/events` |
-| `Ctrl+O` | Config + sandbox modal (redacted) | `GET /api/config` · `/api/sandbox/status` |
-| `Ctrl+X` | Interrupt the running turn | `DELETE /api/run/{run_id}` |
-| `Ctrl+L` | Clear the transcript | — |
-| `Ctrl+H` / `F1` | This help screen | — |
-| `Ctrl+Q` | Quit | — |
-
-## Stream contract honored
-
-The TUI client (`src/arcen/tui/client.py`) is a faithful terminal port of
-the browser reader (`ui/src/stream/reader.ts`):
-
-- opens the **held** `/api/stream` before `POST /api/run`, so a session
-  that exists nowhere yet attaches within a tick instead of 404ing;
-- buffers partial NDJSON lines across TCP chunks — an event split across
-  packets is never half-rendered;
-- ignores seq-less `stream.ping` keepalives and stops cleanly on
-  `stream.done`; malformed JSON lines are skipped, never fatal;
-- resumes with `Last-Event-ID: <seq>` after a dropped connection, and
-  restarts from zero on the 409 compaction response;
-- tracks the highest rendered `seq` per session for replay-overlap guards.
-
-## Code map
-
-| Path | Role |
+| Key | Action |
 |---|---|
-| `src/arcen/tui/client.py` | Async httpx client for all eleven API routes + NDJSON framing (httpx-only, headless-testable with `MockTransport`) |
-| `src/arcen/tui/render.py` | Pure Rich renderers for the frozen 17 events, sandbox and config summaries |
-| `src/arcen/tui/widgets.py` | `EventLog`, `Composer`, `SessionSidebar`, `StatusBar`, help/config modals |
-| `src/arcen/tui/app.py` | The `ArcenTUI` Textual app, worker groups, turn loop, CLI entry (`arcen-tui`) |
-| `src/arcen/tui/launcher.py` | One-command startup: health probe, managed uvicorn child, free-port fallback, clean shutdown |
-| `tests/test_tui_client.py` | Contract tests: framing, ping/done frames, 404/409 handling, resume after drops |
-| `tests/test_tui_render.py` | Every event type draws without a screen; no Rich repr leaks |
-| `tests/test_tui_app.py` | Headless pilot tests: mount, full turn, keybindings, offline guard |
-| `tests/test_tui_launcher.py` | Attach-vs-spawn decision tree, free-port fallback, real uvicorn spawn/shutdown |
-| `scripts/verify_tui.py` | End-to-end verification + SVG screenshot regeneration |
+| `Enter` | Submit the composer goal |
+| `Ctrl+T` | Insert a newline; modified Enter may also work in terminals that report it distinctly |
+| `Tab` | Complete a unique slash-command prefix |
+| `Ctrl+G` | Edit the draft using `$VISUAL` or `$EDITOR`; nonzero exit preserves the draft |
+| `Ctrl+C` | Ask for confirmation before interrupting an active run |
+| `Ctrl+N` | New session |
+| `Ctrl+B` | Open/close the sessions drawer; select with arrows and Enter |
+| `Ctrl+R` | Resume the newest saved session |
+| `Ctrl+O` / `Ctrl+S` | Open read-only configuration / sandbox status |
+| `PageUp` / `PageDown` | Scroll narration while the composer has focus |
+| `Ctrl+End` | Return to the live edge |
+| `F1` | Open keyboard help |
+| `Ctrl+Q` | Quit |
+| `Esc` | Close a modal |
 
-Regenerate the screenshots:
+Slash commands are `/help`, `/clear`, `/new`, `/sessions`, `/config`, and
+`/sandbox`. Session switching is blocked during an active run. `/clear`
+clears the visible transcript, not the server's saved session. Configuration
+is **read-only** in the TUI, matching the legacy TUI: use the web Settings
+interface or configuration file to change it. The config view masks API keys
+and strips credentials and query parameters from displayed provider URLs.
 
-```bash
-python scripts/verify_tui.py
+![Keyboard help in the real terminal](verify/TUI-17-real-help.png)
+
+## Stream and safety details
+
+The client opens a held NDJSON stream before submitting a goal, buffers partial
+lines, ignores transport heartbeats, and resumes on disconnect using
+`Last-Event-ID`. The adapter de-duplicates replayed sequence numbers and shows
+an event-gap notice. HTTP 409 compaction triggers a replay from zero. The
+server's `run.done` or `run.error` ends the stream for that turn. The client
+also reports offline and degraded-sandbox states; the sandbox modal shows the
+selected backend and reason. A degraded process backend is not the same as a
+Docker container and should be assessed against your security requirements.
+
+Interrupt sends `DELETE /api/run/{run_id}` **only after confirmation**. The
+server cooperatively stops between steps, so an in-progress step may finish
+first. Errors are shown without pretending the run stopped. No credentials are
+needed for `--demo` or the fixture screenshots.
+
+## Code and verification
+
+| Path | Purpose |
+|---|---|
+| `src/arcen/tui/live.py` | Server-backed app, replay, reconnect and run lifecycle |
+| `src/arcen/tui/composer.py` | Multiline composer and slash completion |
+| `src/arcen/tui/adapter.py`, `state.py` | Frozen-event adapter and view state |
+| `src/arcen/tui/cards/`, `views/` | Narration cards, scroll view and run-state rail |
+| `src/arcen/tui/sessions.py`, `modals.py` | Session drawer and read-only information modals |
+| `src/arcen/tui/client.py`, `launcher.py` | HTTP/NDJSON contract and managed server lifecycle |
+| `tests/test_tui_*.py` | Client, adapter, pilot, terminal and regression tests |
+| `scripts/terminal_shot.py` | PTY → xterm.js → Chromium real-terminal capture |
+
+To reproduce the offline demo screenshot after setting up the capture tools:
+
+```sh
+bash scripts/setup_terminal_shot.sh
+python scripts/terminal_shot.py --cols 132 --rows 44 --wait 12 \
+  --out docs/verify/my-demo.png -- arcen-tui --demo --replay
 ```
+
+The capture script needs Playwright, Chromium, aiohttp, ptyprocess and the
+xterm assets; it is development tooling, not a runtime dependency of ARCEN.
