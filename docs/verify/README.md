@@ -239,3 +239,13 @@ another test subprocess; the subprocess timeout was increased, and the full
 suite passed when rerun. The manifest verifies hashes but is unsigned, the
 shipped model selection remains provider-configured, and the eight-component
 package and trust-root work remain incomplete. No live Docker claim is made.
+
+## H-05 content-addressed store foundation
+
+`H-05-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the
+installed H-05 wheel and managed server completing a direct-answer turn with a
+local mock provider. Docker was unavailable and tools were blocked.
+`H-05-real-store-tests.png` captures the focused pytest run: **6 passed**.
+The full local suite reported **599 passed, 3 skipped**; the installed wheel's
+store API was also exercised separately. This is a local API foundation, not a
+ref store, adoption mechanism, signed store or a git-backed implementation.

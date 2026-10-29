@@ -27,6 +27,8 @@ def main() -> int:
             "arcen/tool-guidance.md",
             "arcen/harness.toml",
             "arcen/harness/manifest.py",
+            "arcen/harness/model.py",
+            "arcen/harness/store.py",
             "arcen/guardrails/__init__.py",
             "arcen/guardrails/policy.py",
             "arcen/guardrails/policy.yaml",

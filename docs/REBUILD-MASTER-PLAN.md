@@ -6,7 +6,8 @@
 > H-02 and H-03 completed file-based prompts, tool guidance and validated
 > guardrails on the local `feat/harness2` branch. H-04 has an unsigned bundled
 > manifest and optional configured-model pin; signatures and full components
-> remain future work.
+> remain future work. H-05 supplies a local content-addressed object API;
+> refs, adoption and a git-backed store remain future work.
 > Original plan: 2026-10-28.
 > Umbrella document over two detailed plans:
 > - **Track A — TUI redesign:** [TUI-REDESIGN-PLAN.md](TUI-REDESIGN-PLAN.md) (tickets TUI-01…18)
@@ -107,7 +108,7 @@ behavior and event output to `main`, merely loading its kit from files.
 
 | Ticket | Size | Depends | Deliverable | Verification |
 |---|---|---|---|---|
-| **H-05** Object store + hashing | M | H-04 | `harness/model.py`, `harness/store.py`: blob-addressed components, manifest hashing | hash stability test; tamper detection; no two writes of same content duplicate |
+| **H-05** Object store + hashing (local API foundation) | M | H-04 | `harness/model.py`, `harness/store.py`: blob-addressed components, manifest hashing | hash stability test; tamper detection; no two writes of same content duplicate |
 | **H-06** Refs + lineage DAG | L | H-05 | SQLite lineage `(ref, parent, task, trajectories, judge, decision)`; `refs/heads/adopted`, `refs/candidates/*`; `run.start` gains optional `harness_ref` (absent ⇒ adopted) | lineage traversal tests; old session jsonl without the field still replays |
 | **H-07** Harness CLI skeleton | M | H-06 | `arcen harness init\|doctor\|diff\|rollback` (read/select ops only) | CLI tests incl. rollback to a prior ref; doctor detects corrupt store |
 
