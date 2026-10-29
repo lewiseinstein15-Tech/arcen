@@ -272,3 +272,14 @@ The full local suite reported **613 passed, 3 skipped**. The final installed
 booting the server or plugins. Rollback and runtime selection still fail closed;
 this is not a completed adoption/rollback implementation. No live-Docker
 claim is made for H-07.
+
+## H-08 offline editor foundation (partial)
+
+`H-08-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the final
+installed H-08 wheel, its managed server and a local mock provider completing a
+normal direct-answer turn. Docker was unavailable and tools were blocked.
+`H-08-real-editor-tests.png` captures the focused proposal-validation suite:
+**9 passed**. The full local suite reported **622 passed, 3 skipped**, and an
+installed-wheel patch-validation check passed separately. Callbacks in tests
+are mocked; the editor is not connected to a real provider, probe, campaign,
+or adoption. No live-Docker or autonomous-improvement claim is made.

@@ -116,7 +116,7 @@ behavior and event output to `main`, merely loading its kit from files.
 
 | Ticket | Size | Depends | Deliverable | Verification |
 |---|---|---|---|---|
-| **H-08** Editor (ALLOY) | L | H-06 | `harness/editor.py`: k invariant + k domain-specific proposals as unified diffs over tier-1/2 paths; multi-model panel routing via LiteLLM | mocked editor tests; diffs apply/revert cleanly; no Tier-0 path ever appears |
+| **H-08** Editor (ALLOY) (offline proposal foundation) | L | H-06 | `harness/editor.py`: k invariant + k domain-specific proposals as unified diffs over tier-1/2 paths; multi-model panel routing via LiteLLM | mocked editor tests; diffs apply/revert cleanly; no Tier-0 path ever appears |
 | **H-09** Prober (QUENCH) | L | H-01, H-08 | worktree clones + fresh quarantine per probe via `sandbox/runtime.py`; empty credential envelope; forced-on `redact_secrets`; **`spawn`/`spawn.done` go live** (closes the T-011 *wiring* gap — module exists, `run_turn` never emitted) | probe isolation tests; creds absent inside probe; spawn events appear in jsonl; depth cap retained |
 | **H-10** Contrastive Judge (TOUCHSTONE) | L | H-09 | blind shuffled, anonymized pairwise judging; candidate IDs and editor rationale hidden | blinding test (no provenance leaks into judge prompt); deterministic mocked verdicts |
 | **H-11** Campaign runner + v2 events | XL | H-10 | `harness/runner.py` 8-stage flow with resume; `stream/events_v2.py` (all additive types from architecture §8); `arcen harness run\|stop\|status\|resume`; **adoption requires human `apply`** | recorded campaign fixture; interrupt/resume test; legacy client ignores v2 types; rejection path keeps H₀ |
