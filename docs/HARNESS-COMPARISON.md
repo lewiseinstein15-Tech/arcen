@@ -27,7 +27,9 @@ change the adopted harness.
 
 These are experimental trusted-Python APIs, not an unattended campaign or CLI.
 They have no resume, full campaign-level token/USD budget, canaries, rollback,
-spawn events or approval interface. The per-trial call cap and command limits
+spawn events or adoption interface. A separate local review ledger can record
+an explicitly confirmed human opinion about successful paired evidence; it is
+unsigned and does not authorize adoption (see `HARNESS-REVIEW.md`). The per-trial call cap and command limits
 still apply, and TEMPER reruns the last command once inside each disposable
 container. Review the commit, prompts and task before provider exposure. The
 trusted Docker daemon and image are required, cleanup failure is fatal, and no

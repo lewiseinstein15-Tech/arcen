@@ -422,4 +422,25 @@ The pair captures one Git archive and uses separate trial containers, with the
 same pinned provider settings. The real-Docker pair test was skipped and has not
 been verified by the user. Review flags are caller attestations; redaction and
 blinding are best effort. There is no automatic adoption, full campaign, USD
-budget, canary, approval workflow or rollback. No improvement claim is made.
+budget, canary, authenticated approval gate or rollback. No improvement claim is made.
+
+
+## H-11 local human review record (experimental; partial)
+
+`H-11a-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+wheel, its managed server and a local mock provider answering a direct question.
+It does not depict review or a campaign; Docker was unavailable and tools were
+blocked. `H-11a-real-review-cli.png` shows the installed wheel's actual review
+show command against a locally created static candidate and its sanitized diff.
+`H-11a-real-review-tests.png` captures the focused review, CLI and comparison
+tests: **35 passed, 1 skipped**; comparison dependencies use mocked Docker and
+provider calls. The full suite reported **734 passed, 6 skipped**; the installed
+wheel had **112 entries**. The real-Docker reviewed trial and paired-comparison
+tests remain unverified locally and by the user.
+
+The ledger is unsigned, local review metadata only, not an authenticated human
+approval gate. Static reviews cannot be approved; paired records require
+successful caller-supplied comparison data. The interactive CLI shows a
+sanitized diff and requires explicit confirmation, while Python flags are caller
+attestations. No record adopts or selects a candidate or authorizes execution.
+See `docs/HARNESS-REVIEW.md` for limitations and required future checks.
