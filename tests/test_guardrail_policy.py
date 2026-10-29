@@ -128,7 +128,7 @@ def test_invalid_packaged_policy_aborts_real_server_boot(tmp_path, mode):
         env=env,
         capture_output=True,
         text=True,
-        timeout=20,
+        timeout=60,
     )
     assert result.returncode != 0
     assert "PolicyError" in result.stderr

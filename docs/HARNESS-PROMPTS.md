@@ -36,3 +36,7 @@ For compatibility, `tests/fixtures/prompts/H-02-before.json` records the actual
 model-message payloads from before externalization using a deterministic mocked
 provider. The golden test compares all 12 captured payloads, including direct,
 research, plan, strict retry, replan, executor, and verifier messages.
+
+The shipped `harness.toml` additionally verifies component hashes at server
+startup. See [HARNESS-MANIFEST.md](HARNESS-MANIFEST.md) for update requirements
+and the important limits of unsigned hashes and the default unpinned model.

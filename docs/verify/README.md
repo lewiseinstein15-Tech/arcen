@@ -226,3 +226,16 @@ installed wheel was separately checked for both guidance and policy files and
 loaded them outside the source tree. The local Docker tests remained skipped;
 no new real-Docker claim is made for H-03. Previously reported user Omarchy
 results are documented above.
+
+## H-04 bundled manifest foundation (partial)
+
+`H-04-real-live-tui.png` is a fresh PTY/xterm/Chromium screenshot of the
+installed H-04 wheel and managed server, with a local mock model provider.
+It captures a completed direct-answer turn; Docker was unavailable and tools
+were blocked. `H-04-real-manifest-tests.png` is a fresh capture of the focused
+manifest suite: **21 passed**. The final full suite reported **593 passed,
+3 skipped**. An earlier concurrently loaded test run timed out while importing
+another test subprocess; the subprocess timeout was increased, and the full
+suite passed when rerun. The manifest verifies hashes but is unsigned, the
+shipped model selection remains provider-configured, and the eight-component
+package and trust-root work remain incomplete. No live Docker claim is made.

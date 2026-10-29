@@ -1,0 +1,12 @@
+# Hashes provide integrity checks, not authentication or signatures.
+schema_version = 1
+model_pin = "provider-configured"
+
+[components]
+"guardrails/policy.yaml" = "4ea5f96a4c35dfb7b85fb2dc4b764a0013ab695037da73d167e5170920b4cde7"
+"prompts/draft.md" = "4afd77a743696015969199a822d3bea155c5d38715da07b9d59ab5443558f8ff"
+"prompts/forge.md" = "37272d80a51d0d4271efa67f769c565ae6f29b8f053dec35c087ef1e9c44a73f"
+"prompts/system.md" = "5ab734321f91e5f0d03e17dd23dd58a4cd46804b03756b87a42b79bf1fc40638"
+"prompts/temper.md" = "2cd8f2513fa545c760e644633c976089b117db9f9b4269cf76b76596d22065ba"
+"tool-guidance.md" = "6bc36e8ed6b6736ab9e2034219cd79b59a39bdad628c5968f34a316222f7a4a0"
+"tools/registry.toml" = "8417283577a78a402fc0af111c3212e360a3fb4dcb41aaa8c2f47f589fa97073"

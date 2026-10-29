@@ -41,6 +41,8 @@ from arcen.agents.forge import ForgeExecutor
 from arcen.agents.temper import TemperVerifier
 from arcen.config import ArcenConfig, default_config_path, load_config, resolve_secrets, save_config
 from arcen.guardrails import default_policy
+from arcen.harness import HarnessError
+from arcen.harness.manifest import check_model_pin, default_manifest
 from arcen.llm.bridge import build_llm_client
 from arcen.llm.client import ProviderError, classify_provider_failure, format_provider_error
 from arcen.plugins.loader import PluginLoader
@@ -79,8 +81,10 @@ class ServerState:
         # A malformed or unsafe policy is fatal at boot, before provider or
         # plugin startup. No process fallback or embedded default is substituted.
         self.guardrails = default_policy()
+        self.manifest = default_manifest()
         self.config_path = default_config_path()
         self.config = config or load_config()
+        check_model_pin(self.manifest, self.config)
         self.llm = build_llm_client(self.config)  # None → offline mode
         self.registry = load_builtin()
         self.store = SessionStore(self.config.session.dir)
@@ -609,6 +613,10 @@ def put_config(payload: dict = Body(...)) -> dict:
         provider["api_key"] = STATE.config.provider.api_key
     incoming["provider"] = provider
     updated = ArcenConfig.model_validate(incoming)
+    try:
+        check_model_pin(STATE.manifest, updated)
+    except HarnessError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     STATE.config = updated
     save_config(STATE.config_path, updated)
     STATE.llm = build_llm_client(updated)  # reload the provider bridge

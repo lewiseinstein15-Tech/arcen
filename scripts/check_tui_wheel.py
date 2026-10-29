@@ -25,6 +25,8 @@ def main() -> int:
             "arcen/prompts/forge.md",
             "arcen/prompts/temper.md",
             "arcen/tool-guidance.md",
+            "arcen/harness.toml",
+            "arcen/harness/manifest.py",
             "arcen/guardrails/__init__.py",
             "arcen/guardrails/policy.py",
             "arcen/guardrails/policy.yaml",

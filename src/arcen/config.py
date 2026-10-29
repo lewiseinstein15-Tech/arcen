@@ -87,6 +87,7 @@ DEFAULT_CONFIG: dict = {
     "stream": {"port": 3002, "content_type": "application/x-ndjson"},
     "session": {"dir": "~/.arcen/sessions"},
     "memory": {"db": "~/.arcen/memory.db", "decay_half_life_days": 14},
+    "harnessing": {"enabled": False},
 }
 
 
@@ -184,6 +185,11 @@ class MemoryConfig(BaseModel):
     decay_half_life_days: int = 14
 
 
+class HarnessingConfig(BaseModel):
+    # Future campaigns cannot be enabled until the safety gates exist.
+    enabled: Literal[False] = False
+
+
 class ArcenConfig(BaseModel):
     """The full validated config — one model per Part 4 section."""
 
@@ -197,6 +203,7 @@ class ArcenConfig(BaseModel):
     stream: StreamConfig = Field(default_factory=StreamConfig)
     session: SessionConfig = Field(default_factory=SessionConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    harnessing: HarnessingConfig = Field(default_factory=HarnessingConfig)
 
     def to_dict(self) -> dict:
         return self.model_dump()

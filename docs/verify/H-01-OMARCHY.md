@@ -21,3 +21,8 @@ The first H-01 live attempt on `8655110` failed because Docker refused
 These tests are targeted checks, not a proof against every container escape or
 all deployment configurations. Harness references remain unimplemented and
 are explicitly rejected rather than silently ignored.
+
+- H-03 branch `0d238f6`: the user reported running both live Docker tests
+  together on Omarchy: **2 passed, 23 deselected in 23.62 seconds**, Python
+  3.13.15. This covers the default-policy isolation and headless workspace
+  paths; it does not separately prove tightened policy limits on a live daemon.
