@@ -21,7 +21,13 @@ class WorkspaceError(ValueError):
     """A workspace cannot safely be imported."""
 
 
-def snapshot_workspace(path: str | Path) -> bytes:
+def snapshot_workspace(
+    path: str | Path, *, max_entries: int | None = None, max_file_bytes: int | None = None
+) -> bytes:
+    max_entries = MAX_FILES if max_entries is None else max_entries
+    max_file_bytes = MAX_BYTES if max_file_bytes is None else max_file_bytes
+    if not 0 <= max_entries <= MAX_FILES or not 0 <= max_file_bytes <= MAX_BYTES:
+        raise WorkspaceError("workspace limits exceed the immutable safety caps")
     root = Path(path).expanduser().resolve(strict=True)
     if not root.is_dir():
         raise WorkspaceError("workspace must be a directory")
@@ -40,8 +46,8 @@ def snapshot_workspace(path: str | Path) -> bytes:
             files.sort()
             for name in dirs + files:
                 count += 1
-                if count > MAX_FILES:
-                    raise WorkspaceError(f"workspace exceeds {MAX_FILES} entries")
+                if count > max_entries:
+                    raise WorkspaceError(f"workspace exceeds {max_entries} entries")
                 info = os.stat(name, dir_fd=dirfd, follow_symlinks=False)
                 relative = (Path(current).relative_to(root) / name).as_posix()
                 if stat.S_ISLNK(info.st_mode):
@@ -56,8 +62,8 @@ def snapshot_workspace(path: str | Path) -> bytes:
                     archive.addfile(entry)
                 elif stat.S_ISREG(info.st_mode):
                     size += info.st_size
-                    if size > MAX_BYTES:
-                        raise WorkspaceError("workspace exceeds 64 MiB")
+                    if size > max_file_bytes:
+                        raise WorkspaceError(f"workspace exceeds {max_file_bytes} file bytes")
                     fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dirfd)
                     with os.fdopen(fd, "rb") as source:
                         opened = os.fstat(source.fileno())

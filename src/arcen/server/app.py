@@ -40,6 +40,7 @@ from arcen.agents.draft import DraftPlanner
 from arcen.agents.forge import ForgeExecutor
 from arcen.agents.temper import TemperVerifier
 from arcen.config import ArcenConfig, default_config_path, load_config, resolve_secrets, save_config
+from arcen.guardrails import default_policy
 from arcen.llm.bridge import build_llm_client
 from arcen.llm.client import ProviderError, classify_provider_failure, format_provider_error
 from arcen.plugins.loader import PluginLoader
@@ -75,6 +76,9 @@ class ServerState:
     """Everything the server owns. One per process."""
 
     def __init__(self, config: ArcenConfig | None = None) -> None:
+        # A malformed or unsafe policy is fatal at boot, before provider or
+        # plugin startup. No process fallback or embedded default is substituted.
+        self.guardrails = default_policy()
         self.config_path = default_config_path()
         self.config = config or load_config()
         self.llm = build_llm_client(self.config)  # None → offline mode

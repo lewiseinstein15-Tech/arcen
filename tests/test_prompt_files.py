@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def copied_harness(tmp_path):
     shutil.copytree(ROOT / "src/arcen/prompts", tmp_path / "prompts")
+    shutil.copyfile(ROOT / "src/arcen/tool-guidance.md", tmp_path / "tool-guidance.md")
     return tmp_path
 
 
@@ -159,4 +160,11 @@ def test_missing_final_newline_is_rejected(tmp_path):
     path = root / "prompts/system.md"
     path.write_text(path.read_text(encoding="utf-8").rstrip("\n"), encoding="utf-8")
     with pytest.raises(HarnessError, match="LF-terminated"):
+        HarnessResolver(root).resolve()
+
+
+def test_missing_tool_guidance_is_fatal(tmp_path):
+    root = copied_harness(tmp_path)
+    (root / "tool-guidance.md").unlink()
+    with pytest.raises(HarnessError, match="cannot read prompt tool-guidance"):
         HarnessResolver(root).resolve()

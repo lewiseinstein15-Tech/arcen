@@ -22,6 +22,7 @@ class Container:
                 "Privileged": False,
                 "ReadonlyRootfs": True,
                 "NetworkMode": "none",
+                "PidsLimit": 128,
                 "Binds": [],
                 "CapDrop": ["ALL"],
                 "SecurityOpt": ["no-new-privileges:true"],

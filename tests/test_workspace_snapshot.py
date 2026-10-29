@@ -79,7 +79,7 @@ def test_size_limit_is_enforced(tmp_path, monkeypatch):
 
     monkeypatch.setattr(workspace, "MAX_BYTES", 3)
     (tmp_path / "data").write_text("1234")
-    with pytest.raises(WorkspaceError, match="64 MiB"):
+    with pytest.raises(WorkspaceError, match="exceeds 3 file bytes"):
         snapshot_workspace(tmp_path)
 
 

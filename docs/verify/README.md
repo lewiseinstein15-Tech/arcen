@@ -208,3 +208,21 @@ the pre-externalization code against a deterministic mock provider; 12 full
 provider payloads are compared byte-for-byte after the change. The final full
 suite reported **535 passed, 3 skipped**. The wheel was built and its four
 prompt files and installed-resource resolution were verified separately.
+
+
+## H-03 guardrails and tool guidance
+
+`H-03-real-live-tui.png` is a fresh capture of the final H-03 wheel's installed
+`arcen-tui` and managed server in a real PTY, rendered by xterm.js in headless
+Chromium. A local mock provider answered `hello`; the capture waits for DONE.
+Docker was unavailable, so tool execution was blocked and this run did not
+exercise container isolation. The provider and managed server were stopped.
+
+`H-03-real-policy-tests.png` is a fresh PTY/xterm capture of the actual focused
+pytest run: **54 passed**. These include invalid-policy startup failures,
+mocked Docker limit enforcement, and all 12 pre-H-02 provider-payload golden
+comparisons. The full local suite reported **572 passed, 3 skipped**. The
+installed wheel was separately checked for both guidance and policy files and
+loaded them outside the source tree. The local Docker tests remained skipped;
+no new real-Docker claim is made for H-03. Previously reported user Omarchy
+results are documented above.

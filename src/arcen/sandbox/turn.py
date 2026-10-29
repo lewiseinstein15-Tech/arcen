@@ -13,6 +13,7 @@ import posixpath
 import uuid
 from typing import Any
 
+from arcen.guardrails import default_policy
 from arcen.sandbox.workspace import WorkspaceError, import_workspace, snapshot_workspace
 from arcen.tools.bash import BashArgs
 
@@ -32,6 +33,7 @@ class DockerTurnRegistry:
         self, config, *, docker_client: Any | None = None, workspace: str | None = None
     ) -> None:
         sandbox = config.sandbox
+        self.policy = default_policy()
         if sandbox.backend == "process":
             raise IsolationUnavailable(
                 "The process backend is not an isolation boundary; tool execution is disabled. "
@@ -43,7 +45,11 @@ class DockerTurnRegistry:
         snapshot = None
         if workspace is not None:
             try:
-                snapshot = snapshot_workspace(workspace)
+                snapshot = snapshot_workspace(
+                    workspace,
+                    max_entries=self.policy.workspace.max_entries,
+                    max_file_bytes=self.policy.workspace.max_file_bytes,
+                )
             except (WorkspaceError, OSError) as exc:
                 raise IsolationUnavailable(f"Workspace snapshot rejected: {exc}") from exc
         try:
@@ -72,7 +78,7 @@ class DockerTurnRegistry:
                 cap_drop=["ALL"],
                 security_opt=["no-new-privileges:true"],
                 user="65534:65534",
-                pids_limit=128,
+                pids_limit=self.policy.execution.max_pids,
                 mem_limit=sandbox.mem_limit,
                 nano_cpus=int(sandbox.cpus * 1e9),
                 working_dir="/workspace",
@@ -91,6 +97,7 @@ class DockerTurnRegistry:
                 or not host.get("ReadonlyRootfs")
                 or host.get("NetworkMode") != "none"
                 or host.get("Binds")
+                or host.get("PidsLimit") != self.policy.execution.max_pids
                 or "ALL" not in (host.get("CapDrop") or [])
                 or not any(
                     x.startswith("no-new-privileges") for x in (host.get("SecurityOpt") or [])
@@ -117,7 +124,7 @@ class DockerTurnRegistry:
             ) from exc
 
     def dispatch(self, name: str, args: dict) -> dict:
-        if name != "bash":
+        if name not in self.policy.execution.allowed_tools:
             return {
                 "ok": False,
                 "result": None,
@@ -160,13 +167,13 @@ class DockerTurnRegistry:
                 for out_chunk, err_chunk in stream:
                     if (
                         len(stdout) + len(stderr) + len(out_chunk or b"") + len(err_chunk or b"")
-                        > 256 * 1024
+                        > self.policy.execution.max_output_bytes
                     ):
                         self._container.kill()
                         return {
                             "ok": False,
                             "result": None,
-                            "error": "sandbox output exceeded 256 KiB; container stopped",
+                            "error": f"sandbox output exceeded {self.policy.execution.max_output_bytes // 1024} KiB; container stopped",
                         }
                     stdout.extend(out_chunk or b"")
                     stderr.extend(err_chunk or b"")
@@ -205,6 +212,7 @@ def execution_status(config) -> dict:
     from arcen.sandbox.runtime import docker_status
 
     sandbox = config.sandbox
+    policy = default_policy()
     status = docker_status(sandbox.image)
     if sandbox.backend == "process":
         reason = "process backend is not isolated; tool execution is disabled"
@@ -222,7 +230,8 @@ def execution_status(config) -> dict:
             "effective": "docker",
             "reason": reason,
             "degraded": False,
-            "supported_tools": ["bash"],
+            "supported_tools": list(policy.execution.allowed_tools),
+            "policy": policy.snapshot(),
         }
     return {
         **status,
@@ -230,7 +239,8 @@ def execution_status(config) -> dict:
         "effective": "unavailable",
         "reason": reason,
         "degraded": True,
-        "supported_tools": ["bash"],
+        "supported_tools": list(policy.execution.allowed_tools),
+        "policy": policy.snapshot(),
     }
 
 

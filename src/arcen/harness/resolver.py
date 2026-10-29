@@ -20,14 +20,13 @@ SECTIONS = {
         {
             "job",
             "classify",
-            "plan",
-            "research",
             "strict",
             "direct",
             "goal-template",
             "failed-step-template",
         }
     ),
+    "tool-guidance": frozenset({"plan", "research"}),
     "forge": frozenset({"job"}),
     "temper": frozenset({"job"}),
 }
@@ -119,6 +118,14 @@ class HarnessResolver:
             if isinstance(item, Path) and item.is_symlink():
                 raise HarnessError(f"prompt {component} cannot be a symlink")
             raw[component] = _read_utf8(item, component)
+        guidance_file = (
+            resources.files("arcen").joinpath("tool-guidance.md")
+            if self.root is None
+            else self.root / "tool-guidance.md"
+        )
+        if isinstance(guidance_file, Path) and guidance_file.is_symlink():
+            raise HarnessError("tool guidance cannot be a symlink")
+        guidance = _sections(_read_utf8(guidance_file, "tool-guidance"), "tool-guidance")
         identity = raw["system"].removesuffix("\n")
         if not identity.strip():
             raise HarnessError("system prompt cannot be empty")
@@ -134,8 +141,8 @@ class HarnessResolver:
             executor_job=forge["job"],
             verifier_job=temper["job"],
             classify=draft["classify"],
-            plan=draft["plan"],
-            research=draft["research"],
+            plan=guidance["plan"],
+            research=guidance["research"],
             strict=draft["strict"],
             direct=draft["direct"],
             goal_template=draft["goal-template"],
