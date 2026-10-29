@@ -1,7 +1,8 @@
 """Transactional local harness refs and append-only lineage, not an adoption gate.
 
-This API records metadata only. No current run selects or executes a stored ref,
-and the adopted baseline cannot be moved until the future policy/approval gate.
+This API records metadata only. Headless runs can select the verified packaged
+adopted baseline, but candidates cannot run and the adopted ref cannot move
+until the future policy/approval gate.
 The store directory is trusted local state, not a security boundary against a
 hostile process that can alter SQLite files or object paths.
 """

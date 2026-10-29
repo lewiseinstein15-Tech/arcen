@@ -2,7 +2,8 @@
 
 > Status: TUI-01…18 merged; sandbox safety fix and H-01 are on local branches.
 > The user reported the H-01 live Docker workspace test passing on Omarchy.
-> H-01 remains partial: harness references are rejected until the store exists.
+> H-01 remains partial: only the verified packaged adopted baseline can be selected;
+> candidate references remain rejected until their safety gates exist.
 > H-02 and H-03 completed file-based prompts, tool guidance and validated
 > guardrails on the local `feat/harness2` branch. H-04 has an unsigned bundled
 > manifest and optional configured-model pin; signatures and full components
@@ -96,7 +97,7 @@ Service codenames from [ARCEN2-ARCHITECTURE.md](ARCEN2-ARCHITECTURE.md) §5.
 
 | Ticket | Size | Depends | Deliverable | Verification |
 |---|---|---|---|---|
-| **H-01** Headless runner (harness refs pending) | L | — | `src/arcen/headless.py`; `arcen run "goal" --json [--harness <ref>] [--workspace <path>]`; shared executor API with `server/app.run_turn`; result envelope + exit codes; no TTY required | headless pytest with mocked LLM; JSON schema test; nonzero exit on `run.error` |
+| **H-01** Headless runner (packaged baseline selectable; candidates pending) | L | — | `src/arcen/headless.py`; `arcen run "goal" --json [--harness <ref>] [--workspace <path>]`; shared executor API with `server/app.run_turn`; result envelope + exit codes; no TTY required | headless pytest with mocked LLM; JSON schema test; nonzero exit on `run.error` |
 | **H-02** Prompts as files (complete) | M | — | `prompts/system.md`, `prompts/{draft,forge,temper}.md`; `HarnessResolver`; Python-embedded prompt strings removed | fixture-golden compare of assembled prompt payloads before/after; 357-test suite stays green |
 | **H-03** Guardrails + tool guidance as files (complete locally) | M | — | `guardrails/policy.yaml`, `tool-guidance.md`; loader with validation; `registry.toml` stays data | invalid policy rejected at boot; effective policy snapshot test |
 | **H-04** Harness package + manifest (partial: unsigned foundation) | S | H-02, H-03 | `harness.toml` (component hashes, schema version, model pin); default harness shipped in-repo; `[harnessing]` config section | tampered manifest fails hash check; config round-trip test |

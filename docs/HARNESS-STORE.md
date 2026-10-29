@@ -16,14 +16,14 @@ substitute data. Object hashes do not sign provenance. H-06 adds local SQLite re
 `refs/heads/adopted` can only name the packaged baseline, candidate refs use
 transactional compare-and-set, and append-only parent edges reject cycles.
 Resolving a ref rechecks all object hashes. The optional `run.start.harness_ref`
-field round-trips without changing old event bytes, but it is not emitted yet.
-These refs do **not** select or execute a harness; the baseline ref is metadata,
-not a human approval or adoption mechanism. SQLite task, trajectory and judge
+field preserves old event bytes. A headless run explicitly selecting `adopted`
+now emits the verified packaged manifest ID in that field; candidate refs still
+cannot be selected. The baseline ref is not an approval or adoption mechanism. SQLite task, trajectory and judge
 metadata are stored as plaintext, so use a trusted private store directory.
 
-Runtime selection, adoption, CLI, locking against hostile local races, git
-backing, and the full eight-component set remain future work. `--harness` continues to reject refs and
-`harnessing.enabled` remains false.
+Candidate runtime selection, adoption, locking against hostile local races, git
+backing, and the full eight-component set remain future work. `--harness` accepts
+only the verified packaged adopted baseline and `harnessing.enabled` remains false.
 
 ## Inspection CLI
 
@@ -43,7 +43,7 @@ missing or corrupt and do not create it. Task and trajectory metadata remain
 plaintext local data; protect the store directory.
 
 `arcen harness rollback <ref>` currently **refuses without changing anything**.
-There is no enabled adoption/approval gate or runtime ref selection yet, so
-claiming rollback works would be misleading and unsafe. `--harness` is still
-rejected. A successful `doctor` verifies local integrity, not authorship or
+There is no enabled adoption/approval gate or candidate ref selection, so
+claiming rollback works would be misleading and unsafe. `--harness` accepts
+only the verified packaged baseline. A successful `doctor` verifies local integrity, not authorship or
 security against a hostile user with access to the filesystem.

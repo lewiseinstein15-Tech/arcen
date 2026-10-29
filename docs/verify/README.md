@@ -333,3 +333,58 @@ fail-closed construction and best-effort tool-result redaction. They do not
 establish that committed content is secret-free or prove real-Docker behavior.
 `run_probe` is still deliberately blocked; model execution, mandatory
 end-to-end redaction and the rest of the Harness² campaign remain incomplete.
+
+**User-reported real-Docker verification (Omarchy):** on commit `6127883`,
+`ARCEN_TEST_DOCKER_ISOLATION=1 uv run --extra dev --extra sandbox python -m pytest tests/test_turn_isolation.py tests/test_headless.py tests/test_workspace_snapshot.py tests/test_probe_workspace.py tests/test_probe_container.py -v`
+reported **60 passed in 40.75s**, with no skips. This includes the live Docker
+isolation, headless workspace, and probe-container smoke tests. It does not
+verify a model-driven probe or a complete campaign; those remain unavailable.
+
+## H-12 offline composer foundation (partial)
+
+`H-12-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+wheel, its managed server and a local mock provider completing a normal direct
+answer. Docker was unavailable and tools were blocked; it does not show a
+campaign or composition. `H-12-real-composer-tests.png` captures the focused
+composer/editor/policy suite: **21 passed**. The full local suite reported
+**676 passed, 4 skipped**. The 106-entry wheel included the composer module,
+which imported from outside the source tree.
+
+Composition is syntactic and offline: conflicts are reported, unconflicted
+changes make an unapproved immutable candidate, and no ref moves. A campaign,
+behavioral selection, conflict resolution, runtime selection and adoption are
+not implemented; this is not the completed H-12 ticket.
+
+## H-01 packaged baseline selection (partial)
+
+`H-01b-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+wheel, managed server and local mock provider answering a normal direct
+question. It does not show a selected harness or probe; Docker was unavailable
+and tools were blocked. `H-01b-real-selection-tests.png` captures the focused
+selection/headless tests: **13 passed, 1 skipped** (real Docker). The full local
+suite reported **681 passed, 4 skipped**; all 12 baseline provider-payload
+fixtures remain unchanged. The 107-entry wheel was installed and its real
+`arcen harness init` / `arcen run hello --json --harness adopted` commands were
+verified outside the source tree.
+
+Headless selection accepts only the verified packaged adopted baseline and
+emits its immutable manifest ID in `run.start`. The package is the source of
+prompts; the local store is an integrity check, not authenticated provenance.
+Candidate refs, probes, approval, adoption and rollback remain unavailable.
+No claim of full H-01 or a running campaign is made.
+
+## H-09 candidate model binding (partial)
+
+`H-09c-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+wheel, its managed server and a local mock provider answering a normal question;
+it does not depict a candidate probe. Docker was unavailable and tools were
+blocked. `H-09c-real-model-tests.png` captures the focused candidate-model and
+preflight tests: **17 passed**, using mocked provider responses. The full suite
+reported **692 passed, 4 skipped**. The 108-entry wheel included the module.
+
+Separately, the installed candidate-bound model and DRAFT planner made two real
+HTTP calls to the local mock provider and completed a direct answer; no tools
+ran and no external provider was contacted. Provider pinning is by configured
+name, filtering is best effort, and the per-client call cap is not a campaign
+budget. `run_probe` still refuses: model binding does not connect the Docker
+gateway, event redaction, approval or adoption.

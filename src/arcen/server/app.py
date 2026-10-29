@@ -236,7 +236,8 @@ def _turn_guard(goal: str, session_id: str, run_id: str, state: ServerState) -> 
 
 
 def run_turn(
-    goal: str, session_id: str, run_id: str, state: ServerState, *, workspace: str | None = None
+    goal: str, session_id: str, run_id: str, state: ServerState, *, workspace: str | None = None,
+    harness_ref: str | None = None,
 ) -> None:
     """One narrated turn. DRAFT plans from the provider; without one a
     real task refuses cleanly (T-037). A failed step triggers a DRAFT
@@ -253,7 +254,7 @@ def run_turn(
 
     isolated_registry = None
     try:
-        emit(RunStart(seq=0, run_id=run_id, goal=goal, depth=0, ts=0.0))
+        emit(RunStart(seq=0, run_id=run_id, goal=goal, depth=0, ts=0.0, harness_ref=harness_ref))
         # An explicitly requested workspace is never silently ignored, even
         # for direct-answer turns: validate and import it before planning.
         if workspace is not None:

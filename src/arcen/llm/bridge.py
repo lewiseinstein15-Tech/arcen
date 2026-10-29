@@ -21,6 +21,7 @@ from __future__ import annotations
 from typing import Any
 
 from arcen.config import VAR_PATTERN, ArcenConfig, resolve_secrets
+from arcen.harness import ResolvedPrompts
 
 # provider → LiteLLM model prefix. anthropic/openai model names are bare;
 # the rest route through their litellm provider namespace. "custom" is any
@@ -85,7 +86,9 @@ def provider_ready(config: ArcenConfig) -> tuple[bool, str]:
     return True, ""
 
 
-def build_llm_client(config: ArcenConfig) -> Any | None:
+def build_llm_client(
+    config: ArcenConfig, *, prompts: ResolvedPrompts | None = None
+) -> Any | None:
     """Build the LLM bridge from config — None when offline (no credential).
 
     Returns an arcen.llm.client.Client whose completion calls carry the
@@ -142,4 +145,5 @@ def build_llm_client(config: ArcenConfig) -> Any | None:
         completion_fn=completion,
         max_retries=config.provider.max_retries,
         retry_backoff_seconds=config.provider.retry_backoff_seconds,
+        prompts=prompts,
     )

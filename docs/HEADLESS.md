@@ -37,9 +37,29 @@ through Docker exec stdin and writes only into the container's workspace tmpfs.
 The snapshot is not an atomic filesystem snapshot: don't change the source while
 it is being read. The container is destroyed after the turn.
 
-`--harness` is parsed but **currently rejected**. The store and inspection CLI now exist, but runtime ref selection and its
-safety gates are not implemented; silently ignoring a requested ref would be
-unsafe. Use the default behavior without `--harness` until then.
+## Selecting the packaged baseline
+
+`arcen harness init` initializes a private local store with the packaged
+baseline. Headless runs can explicitly select only that verified baseline:
+
+```bash
+arcen harness init
+arcen run "hello" --json --harness adopted
+# An alternative trusted store can be supplied explicitly:
+arcen run "hello" --json --harness refs/heads/adopted --harness-store /path/to/store
+```
+
+The runner verifies the ref, all stored object hashes and equality with the
+currently packaged manifest before a turn. It uses the same packaged prompt
+snapshot as an ordinary run and records the immutable manifest identity as
+`sha256:<digest>` in `run.start.harness_ref`. With no `--harness`, legacy event
+bytes remain unchanged. The store is trusted local state; hashes do not attest
+author or prevent a hostile local user from modifying code or the package.
+
+**Candidate refs are still rejected.** This baseline-only path does not enable
+candidate execution, approval, adoption, probe campaigns or rollback. A missing,
+corrupt or non-packaged adopted ref fails rather than falling back. The default
+manifest's `provider-configured` model pin does not freeze a model's identity.
 
 The real Docker integration checks are opt-in:
 

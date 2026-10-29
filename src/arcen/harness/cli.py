@@ -100,13 +100,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "init":
             print(f"Initialized packaged baseline: {_init(args.store)}")
-            print("Metadata only; runtime harness selection and adoption remain disabled.")
+            print("Metadata only; candidate selection and adoption remain disabled.")
         elif args.command == "doctor":
             stats = _doctor(args.store)
             print(
                 "Store integrity OK: " + ", ".join(f"{key}={value}" for key, value in stats.items())
             )
-            print("Hashes do not authenticate provenance; runtime selection remains disabled.")
+            print("Hashes do not authenticate provenance; candidate selection remains disabled.")
         elif args.command == "diff":
             print(_diff(args.store, args.ref), end="")
         else:

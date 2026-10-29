@@ -25,9 +25,9 @@ rejected. Callers can pass the resulting immutable snapshot to `Client`; its
 `DraftPlanner` inherits that snapshot. This API is for trusted local inputs,
 not a policy sandbox for untrusted edits.
 
-Harness refs, an adoption store, manifests, and the `--harness` CLI option are
-**not implemented by H-03**. The CLI continues to reject requested refs rather
-than pretending to use them. See [HARNESS-GUARDRAILS.md](HARNESS-GUARDRAILS.md)
+Harness refs, an adoption store, manifests, and the `--harness` CLI option were
+**not implemented by H-03**. Later work permits selecting only the verified
+packaged baseline; candidates remain blocked rather than silently ignored. See [HARNESS-GUARDRAILS.md](HARNESS-GUARDRAILS.md)
 for guardrail validation and the important distinction between preserved tool
 guidance and tools currently supported by the isolated gateway. Editable-harness
 governance arrives in later tickets.

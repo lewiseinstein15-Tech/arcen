@@ -48,3 +48,33 @@ Review every input before exposing it to a model/provider. These APIs are not
 wired to `run_probe`, model calls, trajectory storage, spawn events, approval,
 or adoption; the runtime still fails closed. The local unit tests mock Docker;
 the opt-in real-Docker test must be run on a machine with the sandbox image.
+
+## Bound candidate model calls (not a complete probe)
+
+`bind_probe_model(store, baseline_id, candidate_id, task, config)` reruns the
+preflight against verified stored objects, requires a matching explicit fixed
+provider/model pin, resolves a private configuration snapshot, and binds the
+candidate's immutable prompt snapshot to the existing LiteLLM bridge. Binding
+itself does not contact the provider. Explicit `complete` calls **do** send
+messages to the configured provider and can incur cost; make a deliberate
+privacy decision and review all inputs first. The returned client can be used
+by the existing DRAFT planner, but is **not connected to `run_probe` or the
+Docker gateway** and does not execute tools.
+
+The binding rejects detected secret patterns and the resolved provider key in
+prompt and message inputs, redacts those patterns from model output, suppresses
+provider error text, disables retries and enforces a thread-safe per-client cap
+of 1–8 calls. Each request asks the provider for at most 1,024 output tokens and
+a 30-second timeout; enforcement of those two request parameters depends on the
+provider/SDK. Inputs and returned output are size-limited. This is not a USD,
+token, total wall-clock or campaign budget, and the response may already have
+been buffered by a provider SDK before its output-size check.
+
+Filtering is best effort: encoded, split, previously unknown, short or other
+secrets can evade it. A checked model name does not authenticate model weights;
+model output is untrusted. The object-store and local Python caller are trusted;
+this API is not a security boundary against an arbitrary local process. Do not
+send confidential tasks, prompts or repository data unless sharing them with the
+configured provider is acceptable. No real provider was called in unit tests.
+`run_probe` remains blocked pending end-to-end isolation, event handling and
+other safety gates; this binding does not constitute a successful probe.

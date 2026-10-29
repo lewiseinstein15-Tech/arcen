@@ -20,5 +20,6 @@ untrusted.
 The callback interface is not yet wired to LiteLLM or to a CLI/campaign. Model
 budgets, isolated probes, judging, full tier policy, human approval and all
 adoption remain unimplemented. The API alone does not test or apply proposals;
-`--harness` still rejects refs. Real provider calls, quarantined execution and
+`--harness` rejects candidate refs (only the verified packaged baseline is selectable).
+Real provider calls, quarantined execution and
 end-to-end recursive improvement must not be claimed until those gates exist.
