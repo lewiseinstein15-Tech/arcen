@@ -283,3 +283,14 @@ normal direct-answer turn. Docker was unavailable and tools were blocked.
 installed-wheel patch-validation check passed separately. Callbacks in tests
 are mocked; the editor is not connected to a real provider, probe, campaign,
 or adoption. No live-Docker or autonomous-improvement claim is made.
+
+## H-09 probe preflight (incomplete; execution blocked)
+
+`H-09-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+H-09 wheel with the managed server and local mock provider completing a normal
+direct-answer turn. Docker was unavailable and tools were blocked. It does not
+show a probe. `H-09-real-preflight-tests.png` captures the focused preflight
+suite: **6 passed**. The full local suite reported **628 passed, 3 skipped**;
+the wheel contained and loaded the preflight module. Candidate probe execution,
+worktree quarantine, forced redaction and live Docker isolation remain
+unimplemented; `run_probe` refuses rather than running on the host.

@@ -29,6 +29,7 @@ def main() -> int:
             "arcen/harness/manifest.py",
             "arcen/harness/cli.py",
             "arcen/harness/editor.py",
+            "arcen/harness/probe.py",
             "arcen/cli.py",
             "arcen/harness/model.py",
             "arcen/harness/lineage.py",
