@@ -110,4 +110,5 @@ Inputs and outputs can contain secrets that filtering does not recognize;
 review does not prove otherwise. The model provider may receive task and prompt
 content and can incur cost. The sandbox image, Docker daemon, Git repository,
 package and local Python caller must be trusted. The assistant environment has
-no Docker; an opt-in real-Docker test exists but is **not yet verified there**.
+no Docker. The user reported the opt-in real-Docker test passed on Omarchy at
+`f34ea27` with a mocked model provider (see `docs/verify/README.md`).

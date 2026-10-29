@@ -33,5 +33,6 @@ unsigned and does not authorize adoption (see `HARNESS-REVIEW.md`). The per-tria
 still apply, and TEMPER reruns the last command once inside each disposable
 container. Review the commit, prompts and task before provider exposure. The
 trusted Docker daemon and image are required, cleanup failure is fatal, and no
-host fallback exists. Unit tests use a mocked Docker boundary; the opt-in
-real-Docker paired test has not yet been run by the user.
+host fallback exists. Most unit tests mock Docker. The user reported the opt-in
+real-Docker paired test passed on Omarchy at `f34ea27`, with a mocked model
+provider and judge (see `docs/verify/README.md`).

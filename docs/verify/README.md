@@ -419,8 +419,8 @@ modules. The installed paired path was separately exercised using real HTTP to a
 local mock provider, a mocked Docker boundary and a callback judge.
 
 The pair captures one Git archive and uses separate trial containers, with the
-same pinned provider settings. The real-Docker pair test was skipped and has not
-been verified by the user. Review flags are caller attestations; redaction and
+same pinned provider settings. The real-Docker pair test was skipped locally;
+the user later reported it passing on Omarchy, as recorded below. Review flags are caller attestations; redaction and
 blinding are best effort. There is no automatic adoption, full campaign, USD
 budget, canary, authenticated approval gate or rollback. No improvement claim is made.
 
@@ -436,7 +436,7 @@ show command against a locally created static candidate and its sanitized diff.
 tests: **35 passed, 1 skipped**; comparison dependencies use mocked Docker and
 provider calls. The full suite reported **734 passed, 6 skipped**; the installed
 wheel had **112 entries**. The real-Docker reviewed trial and paired-comparison
-tests remain unverified locally and by the user.
+tests were skipped locally; the user later reported them passing as noted below.
 
 The ledger is unsigned, local review metadata only, not an authenticated human
 approval gate. Static reviews cannot be approved; paired records require
@@ -444,3 +444,20 @@ successful caller-supplied comparison data. The interactive CLI shows a
 sanitized diff and requires explicit confirmation, while Python flags are caller
 attestations. No record adopts or selects a candidate or authorizes execution.
 See `docs/HARNESS-REVIEW.md` for limitations and required future checks.
+
+
+### User-reported real-Docker verification on Omarchy
+
+On commit `f34ea27`, the user ran:
+
+```sh
+ARCEN_TEST_DOCKER_ISOLATION=1 uv run --extra dev --extra sandbox \
+  python -m pytest tests/test_probe_execution.py tests/test_harness_comparison.py \
+  -k real_docker -v
+```
+
+The supplied terminal output reported **2 passed, 14 deselected in 16.09s**,
+with no skips. This covers the reviewed trial and paired comparison against real
+Docker. Their model responses and judge are mocked; the result does not verify
+an external model provider, unattended campaign, adoption or authentication.
+This is user-reported terminal output, not a captured screenshot.

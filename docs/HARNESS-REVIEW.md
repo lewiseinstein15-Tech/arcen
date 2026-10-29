@@ -69,8 +69,9 @@ compare-and-set semantics; wall-clock rollback is handled by clamping the
 recorded decision time to its creation time.
 
 Paired execution is available as a trusted Python API, not a campaign CLI.
-Real-Docker testing of the newer model-driven trial and paired comparison is
-still outstanding. Before any future adoption mechanism is enabled, it must
+The user reported the opt-in trial and paired-comparison real-Docker tests passed
+on Omarchy at `f34ea27`, with mocked provider responses and a callback judge.
+Before any future adoption mechanism is enabled, it must
 independently revalidate the active baseline, actual evidence and authorized
 human, immutable policy, canaries, budgets and rollback. This ledger alone does
 none of those things; stale-baseline reviews are possible and are flagged in the
