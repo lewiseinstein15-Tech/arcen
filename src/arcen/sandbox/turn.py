@@ -27,7 +27,9 @@ class DockerTurnRegistry:
 
     supports_host_diff = False
 
-    def __init__(self, config, *, docker_client: Any | None = None) -> None:
+    def __init__(
+        self, config, *, docker_client: Any | None = None, workspace: str | None = None
+    ) -> None:
         sandbox = config.sandbox
         if sandbox.backend == "process":
             raise IsolationUnavailable(
@@ -37,6 +39,14 @@ class DockerTurnRegistry:
         if sandbox.network != "none":
             raise IsolationUnavailable("Tool execution requires sandbox.network=none.")
         self._container = None
+        snapshot = None
+        if workspace is not None:
+            from arcen.sandbox.workspace import WorkspaceError, snapshot_workspace
+
+            try:
+                snapshot = snapshot_workspace(workspace)
+            except (WorkspaceError, OSError) as exc:
+                raise IsolationUnavailable(f"Workspace snapshot rejected: {exc}") from exc
         try:
             if docker_client is None:
                 import docker
@@ -90,6 +100,8 @@ class DockerTurnRegistry:
                 or any(m.get("Type") != "tmpfs" for m in attrs.get("Mounts", []))
             ):
                 raise RuntimeError("Docker did not enforce the required container policy")
+            if snapshot is not None and not self._container.put_archive("/workspace", snapshot):
+                raise RuntimeError("Docker refused the workspace snapshot")
         except Exception as exc:
             if self._container is not None:
                 self.close()
@@ -216,5 +228,5 @@ def execution_status(config) -> dict:
     }
 
 
-def create_turn_registry(config) -> DockerTurnRegistry:
-    return DockerTurnRegistry(config)
+def create_turn_registry(config, *, workspace: str | None = None) -> DockerTurnRegistry:
+    return DockerTurnRegistry(config, workspace=workspace)

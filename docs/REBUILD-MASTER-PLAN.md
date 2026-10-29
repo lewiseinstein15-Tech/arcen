@@ -1,6 +1,8 @@
 # ARCEN Rebuild — Master Plan
 
-> Status: **plan, no production code changed.** Date: 2026-10-28.
+> Status: TUI-01…18 merged; sandbox safety fix and H-01 are on local branches.
+> H-01 headless workspace Docker integration still requires a live-daemon test;
+> harness references are rejected until the store exists. Original plan: 2026-10-28.
 > Umbrella document over two detailed plans:
 > - **Track A — TUI redesign:** [TUI-REDESIGN-PLAN.md](TUI-REDESIGN-PLAN.md) (tickets TUI-01…18)
 > - **Track B — ARCEN² recursive harnessing:** design in
@@ -88,7 +90,7 @@ Service codenames from [ARCEN2-ARCHITECTURE.md](ARCEN2-ARCHITECTURE.md) §5.
 
 | Ticket | Size | Depends | Deliverable | Verification |
 |---|---|---|---|---|
-| **H-01** Headless runner | L | — | `src/arcen/headless.py`; `arcen run "goal" --json [--harness <ref>] [--workspace <path>]`; shared executor API with `server/app.run_turn`; result envelope + exit codes; no TTY required | headless pytest with mocked LLM; JSON schema test; nonzero exit on `run.error` |
+| **H-01** Headless runner (live workspace verification pending) | L | — | `src/arcen/headless.py`; `arcen run "goal" --json [--harness <ref>] [--workspace <path>]`; shared executor API with `server/app.run_turn`; result envelope + exit codes; no TTY required | headless pytest with mocked LLM; JSON schema test; nonzero exit on `run.error` |
 | **H-02** Prompts as files | M | — | `prompts/system.md`, `prompts/{draft,forge,temper}.md`; `HarnessResolver`; Python-embedded prompt strings removed | fixture-golden compare of assembled prompt payloads before/after; 357-test suite stays green |
 | **H-03** Guardrails + tool guidance as files | M | — | `guardrails/policy.yaml`, `tool-guidance.md`; loader with validation; `registry.toml` stays data | invalid policy rejected at boot; effective policy snapshot test |
 | **H-04** Harness package + manifest | S | H-02, H-03 | `harness.toml` (component hashes, schema version, model pin); default harness shipped in-repo; `[harnessing]` config section | tampered manifest fails hash check; config round-trip test |

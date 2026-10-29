@@ -169,3 +169,14 @@ environment.
 capture, using a local mock model provider but the real managed server and its
 Docker-unavailable execution gate. It shows a planned bash step refused before
 FORGE or TEMPER execute. Neither screenshot demonstrates a live Docker run.
+
+## H-01 headless runner
+
+`H-01-real-headless-success.png` and `H-01-real-headless-blocked.png` are
+fresh captures of the installed `arcen` command in a real PTY rendered by
+xterm.js/Chromium; JSON is formatted with `python -m json.tool`. The first
+shows a no-tool response and exit 0; the second shows a workspace request
+refused with `SANDBOX_UNAVAILABLE` and exit 1 in this Docker-less environment.
+`H-01-real-headless-tests.png` records the real focused pytest run in the same
+PTY capture harness. The real-Docker workspace test is opt-in and was skipped
+in this environment; these images are not proof of live workspace import.

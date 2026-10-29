@@ -102,6 +102,12 @@ The sandbox is a defense-in-depth boundary, not a guarantee against Docker or ke
 
 Live Docker isolation must be verified on a machine with a daemon and the image installed: `ARCEN_TEST_DOCKER_ISOLATION=1 pytest tests/test_turn_isolation.py -k real_docker`. Mocked tests alone do not prove real container isolation.
 
+## Headless runs
+
+Run one task without a terminal UI using `arcen run "goal" --json`. See the
+[headless guide](docs/HEADLESS.md) for the result schema, exit codes, workspace
+snapshot limits, and the not-yet-available harness references.
+
 ## Features
 
 - **Narrated execution** — every thought, command, and result is one NDJSON event on the stream

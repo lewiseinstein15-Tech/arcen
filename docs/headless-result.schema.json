@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arcen.example/schemas/headless-result-v1.json",
+  "title": "ARCEN headless result envelope, version 1",
+  "type": "object",
+  "required": ["schema_version", "run_id", "session_id", "status", "answer", "error", "events", "workspace_mode"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": ["string", "null"]},
+    "session_id": {"type": ["string", "null"]},
+    "status": {"enum": ["ok", "failed", "error", "interrupted"]},
+    "answer": {"type": ["string", "null"]},
+    "error": {"oneOf": [{"type": "null"}, {"type": "object", "required": ["code", "message"], "additionalProperties": false, "properties": {"code": {"type": ["string", "null"]}, "message": {"type": ["string", "null"]}}}]},
+    "events": {"type": "array", "items": {"type": "object"}},
+    "workspace_mode": {"enum": ["empty", "snapshot_requested"]}
+  }
+}

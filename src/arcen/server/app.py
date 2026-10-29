@@ -227,7 +227,9 @@ def _turn_guard(goal: str, session_id: str, run_id: str, state: ServerState) -> 
         state.turn_finished(session_id)
 
 
-def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> None:
+def run_turn(
+    goal: str, session_id: str, run_id: str, state: ServerState, *, workspace: str | None = None
+) -> None:
     """One narrated turn. DRAFT plans from the provider; without one a
     real task refuses cleanly (T-037). A failed step triggers a DRAFT
     replan and the loop CONTINUES with the corrected steps, bounded to
@@ -244,6 +246,10 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
     isolated_registry = None
     try:
         emit(RunStart(seq=0, run_id=run_id, goal=goal, depth=0, ts=0.0))
+        # An explicitly requested workspace is never silently ignored, even
+        # for direct-answer turns: validate and import it before planning.
+        if workspace is not None:
+            isolated_registry = create_turn_registry(state.config, workspace=workspace)
 
         # DRAFT opens the turn — plan from the provider, or an honest
         # refusal when none is configured (never a fake bash plan, T-037)
@@ -279,7 +285,8 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
                 json.dumps(step.get("args") or {}, sort_keys=True, default=str),
             )
 
-        isolated_registry = create_turn_registry(state.config)
+        if isolated_registry is None:
+            isolated_registry = create_turn_registry(state.config)
         run_registry = isolated_registry
         if state.plugin_loader.active("after_tool") or state.plugin_loader.active("before_tool"):
             run_registry = HookedRegistry(isolated_registry, state.plugin_loader)
@@ -739,11 +746,22 @@ def session_detail(session_id: str) -> dict:
     }
 
 
-def main() -> None:
+def main() -> int | None:
+    import sys
+
+    args = sys.argv[1:]
+    if args and args[0] == "run":
+        from arcen.headless import main as headless_main
+
+        return headless_main(args[1:])
+    if args and args != ["serve"]:
+        print("usage: arcen [serve | run GOAL --json]", file=sys.stderr)
+        return 2
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=STATE.config.stream.port)
+    return None
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
