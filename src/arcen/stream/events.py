@@ -37,6 +37,7 @@ class RunStart:
     goal: str
     depth: int = 0
     ts: float = 0.0
+    harness_ref: str | None = None
     TYPE: ClassVar[str] = "run.start"
 
 
@@ -299,6 +300,9 @@ def to_dict(event: Event) -> dict[str, Any]:
     Key order: seq, type, payload..., ts (BACKEND-SPEC Part 9).
     """
     data = asdict(event)
+    # Absence preserves byte-identical legacy run.start events and replay.
+    if isinstance(event, RunStart) and data["harness_ref"] is None:
+        del data["harness_ref"]
     seq = data.pop("seq")
     ts = data.pop("ts")
     out: dict[str, Any] = {"seq": seq, "type": event.TYPE}
@@ -329,7 +333,12 @@ def from_dict(data: dict[str, Any]) -> Event:
     dropped = {k for k in data if k != "type" and k not in field_names}
     if dropped:
         raise EventError(f"{etype}: unknown fields {sorted(dropped)}")
-    missing = {n for n in field_names if n not in payload and n != "ts"}
+    optional = {"ts"}
+    if cls is RunStart:
+        optional.add("harness_ref")
+        if "harness_ref" in payload and (type(payload["harness_ref"]) is not str or not payload["harness_ref"]):
+            raise EventError("run.start: harness_ref must be a nonempty string")
+    missing = {n for n in field_names if n not in payload and n not in optional}
     if missing:
         raise EventError(f"{etype}: missing required fields {sorted(missing)}")
     return cls(**payload)  # type: ignore[return-value]

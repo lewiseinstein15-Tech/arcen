@@ -249,3 +249,14 @@ local mock provider. Docker was unavailable and tools were blocked.
 The full local suite reported **599 passed, 3 skipped**; the installed wheel's
 store API was also exercised separately. This is a local API foundation, not a
 ref store, adoption mechanism, signed store or a git-backed implementation.
+
+## H-06 refs and lineage metadata foundation
+
+`H-06-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the final
+installed H-06 wheel, its managed server and a local mock provider, after a
+completed direct-answer turn. Docker was unavailable and tools were blocked.
+`H-06-real-lineage-tests.png` captures the focused pytest run: **7 passed**.
+The final full local suite reported **606 passed, 3 skipped**; installed wheel
+loading and a private SQLite database were checked separately. The metadata refs
+are not connected to runtime harness selection or adoption; no live-Docker
+claim is made for this ticket.
