@@ -89,3 +89,10 @@ no server or sockets — through a complete narrated turn.
 | `TUI-06-real-narrow-paused.png` | **Real terminal** 80×24: paused with rail collapsed |
 | `TUI-06-real-terminal-sheet.png` | All four scroll-rule frames in one 2×2 image |
 | `TUI-06-full-suite.png` | Full repository suite after TUI-06: **424 passed, 1 skipped** |
+| `TUI-07.png` | TUI-07 ticket and prior TUI tests: **68 passed, 1 skipped** |
+| `TUI-07-real-thought-streaming.png` | **Real terminal**: shared goal and thought card, streaming cursor |
+| `TUI-07-real-paused.png` | **Real terminal**: completed goal and thought while paused |
+| `TUI-07-real-narrow.png` | **Real terminal**: streaming thought at 80×24 |
+| `TUI-07-real-live.png` | **Real terminal**: completed demo |
+| `TUI-07-real-terminal-sheet.png` | Four fresh real-terminal captures |
+| `TUI-07-full-suite.png` | Full repository suite after TUI-07: **446 passed, 1 skipped** |

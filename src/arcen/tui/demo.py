@@ -21,14 +21,15 @@ from __future__ import annotations
 import asyncio
 import sys
 
-from rich import box
-from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 
 from arcen.tui.app import ArcenApp, Footer, Header
+from arcen.tui.cards.base import WordBatcher, spine_break, spine_card
+from arcen.tui.cards.goal import goal_card as shared_goal_card
+from arcen.tui.cards.thought import thought_card as shared_thought_card
 from arcen.tui.theme import TOKENS as _T
 from arcen.tui.views.rail import RunStateRail
 from arcen.tui.views.stream import BackToLive, Narration, StreamView
@@ -123,40 +124,25 @@ ANSWER = (
 )
 
 
-# ── render helpers ─────────────────────────────────────────────────────────
-def card(body, title: str, accent: str, spine: str = "◉") -> Table:
-    grid = Table.grid(expand=True, padding=(0, 0))
-    grid.add_column(width=3, justify="center")
-    grid.add_column(ratio=1)
-    panel = Panel(
-        body,
-        box=box.ROUNDED,
-        border_style=LINE,
-        title=Text(f" {title} ", style=f"bold {accent}"),
-        title_align="left",
-        padding=(0, 1),
-    )
-    grid.add_row(Text(spine, style=f"bold {accent}"), panel)
-    return grid
+# ── render helpers (TUI-07: shared spine chrome) ────────────────────────────
+# Local ``card()`` helper removed — all card builders now use the shared
+# ``spine_card()`` from :mod:`arcen.tui.cards.base` so there is one panel
+# shape for the whole spine. ``spine_break`` is also shared. The two
+# extracted cards below (goal, thought) are thin wrappers around the same
+# shared chrome and are re-exported here for the legacy demo tests.
 
-
-def spine_break() -> Text:
-    return Text(" │", style=LINE)
-
+# Keep the old names for test compat — they now delegate to the shared lib.
+card = spine_card
 
 
 # ── card builders ───────────────────────────────────────────────────────────
-def goal_card() -> Table:
-    return card(Text(GOAL, style=BODY), "you · goal", MUTED, spine="◆")
+def goal_card(text: str | None = None) -> Table:
+    return shared_goal_card(text if text is not None else GOAL)
 
 
-def thought_card(text: str, streaming: bool,
-                 label: str = "DRAFT · thinking") -> Table:
-    body = Text()
-    body.append(text, style=f"italic {THOUGHT}")
-    if streaming:
-        body.append("▍", style=f"blink {ACCENT}")
-    return card(body, label, ACCENT)
+def thought_card(text: str, streaming: bool = False,
+                 label: str = "draft · thinking") -> Table:
+    return shared_thought_card(text, streaming=streaming, label=label)
 
 
 def plan_card(statuses: list[str]) -> Table:
@@ -323,12 +309,18 @@ class DemoApp(ArcenApp):
 
     async def stream_text(self, full: str, label: str) -> None:
         self.narration.push(thought_card("", True, label))
-        words = full.split(" ")
-        for i in range(len(words)):
-            shown = " ".join(words[: i + 1])
-            self.narration.replace_last(thought_card(shown, True, label))
-            await asyncio.sleep(0.025)
-        self.narration.replace_last(thought_card(full, False, label))
+        batcher = WordBatcher(
+            lambda text, streaming: self.narration.replace_last(
+                thought_card(text, streaming, label)
+            )
+        )
+        try:
+            for index, word in enumerate(full.split(" ")):
+                batcher.feed((" " if index else "") + word)
+                await asyncio.sleep(0.025)
+            batcher.finish()
+        finally:
+            batcher.cancel()
 
     async def stream_output(self, cmd: str, lines: list[str],
                             footer: str, tool: str) -> None:

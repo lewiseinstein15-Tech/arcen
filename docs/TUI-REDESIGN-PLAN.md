@@ -151,7 +151,7 @@ tickets. Commit prefix `TUI-NN:`.
 
 | Ticket | Size | Deliverable | Verification |
 |---|---|---|---|
-| **TUI-07** Base + goal/thought cards | M | `cards/base.py`, streaming word-batch cursor (no per-token repaint storm) | render tests; cursor present/absent states |
+| **TUI-07** Base + goal/thought cards ✅ | M | Shared Rich spine chrome, goal and thought cards; `WordBatcher` coalesces input fragments over 50 ms and flushes exactly on finish; demo uses the shared cards and batcher (adapter wiring remains TUI-10) | 22 render/batching tests; fresh real-terminal streaming/paused/narrow/completed frames `TUI-07-real-*.png`; full suite 446 passed, 1 skipped |
 | **TUI-08** Plan + command + diff cards | L | checklist mutation, streaming stdout with output cap ("… N more lines"), exit footer, diff coloring | fixture-driven render tests incl. non-zero exit |
 | **TUI-09** Verify + answer + system cards | M | pass/fail rows, error card, memory chip, run markers | all 17 events have at least one render test |
 
