@@ -1,4 +1,4 @@
-# ARCEN sandbox image — one container per session (BACKEND-SPEC Part 2 row 11).
+# ARCEN sandbox image — one container per server turn (BACKEND-SPEC Part 2 row 11).
 #
 # Pinned reference: ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0
 # Built and pushed by .github/workflows/sandbox-image.yml on every push to main.
@@ -6,10 +6,8 @@
 # Local build:
 #   docker build -t ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0 docker/sandbox
 #
-# The runtime (src/arcen/sandbox/runtime.py) uses the docker backend only
-# when this image is present locally; otherwise it degrades to the
-# quarantined process backend (degraded=true). Nothing is auto-pulled from
-# Docker Hub — the image lives in this repo's GHCR namespace only.
+# Server turns use the Docker-only boundary in src/arcen/sandbox/turn.py.
+# If the daemon or image is unavailable, tool execution fails closed.
 
 FROM python:3.12-slim
 

@@ -43,6 +43,7 @@ from arcen.config import ArcenConfig, default_config_path, load_config, resolve_
 from arcen.llm.bridge import build_llm_client
 from arcen.llm.client import ProviderError, classify_provider_failure, format_provider_error
 from arcen.plugins.loader import PluginLoader
+from arcen.sandbox.turn import IsolationUnavailable, create_turn_registry, execution_status
 from arcen.session.store import SessionStore
 from arcen.stream.emitter import StreamEmitter
 from arcen.stream.events import (
@@ -93,20 +94,18 @@ class ServerState:
         """Boot log: the detected sandbox state, verbatim for support (T-043).
 
         Four lines, always: daemon / image / backend selected / reason —
-        the same decision SandboxRuntime makes, surfaced before any task.
+        the server's Docker-only execution policy, surfaced before any task.
         A pinned docker backend that cannot serve additionally warns
         loudly: it will REFUSE runs at /api/run, not degrade silently.
         """
-        from arcen.sandbox.runtime import sandbox_state
-
-        st = sandbox_state(self.config.sandbox.backend, self.config.sandbox.image)
+        st = execution_status(self.config)
         log.info(
-            "[sandbox] docker daemon: %s", "present" if st["docker_available"] else "absent"
+            "[sandbox] docker daemon: %s", "reachable" if st["docker_available"] else "not reachable"
         )
         log.info(
             "[sandbox] image %s: %s",
             st["image"],
-            "present" if st["image_present"] else "absent",
+            "present" if st["image_present"] else ("absent" if st["docker_available"] else "not checked"),
         )
         log.info("[sandbox] backend selected: %s", st["effective"])
         log.info("[sandbox] reason: %s", st["reason"])
@@ -114,9 +113,7 @@ class ServerState:
             log.warning(
                 "config sandbox.backend='docker' but no docker daemon is "
                 "available — sandboxed tasks will be REFUSED at /api/run "
-                "with a clear error until docker is running (set "
-                "sandbox.backend=auto|process in Settings → Sandbox to "
-                "allow the quarantined process backend)"
+                "with a clear error until Docker is running and the image is installed"
             )
 
     def emitter_for(self, session_id: str) -> StreamEmitter:
@@ -244,6 +241,7 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
         state.note_event(session_id, wire)
         state.store.append(session_id, wire)
 
+    isolated_registry = None
     try:
         emit(RunStart(seq=0, run_id=run_id, goal=goal, depth=0, ts=0.0))
 
@@ -281,7 +279,11 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
                 json.dumps(step.get("args") or {}, sort_keys=True, default=str),
             )
 
-        forge = ForgeExecutor(state.registry, emit=emit)
+        isolated_registry = create_turn_registry(state.config)
+        run_registry = isolated_registry
+        if state.plugin_loader.active("after_tool") or state.plugin_loader.active("before_tool"):
+            run_registry = HookedRegistry(isolated_registry, state.plugin_loader)
+        forge = ForgeExecutor(run_registry, emit=emit)
         executed = 0
         last_cmd: tuple[str, dict] | None = None
         last_ok = True
@@ -343,7 +345,7 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
         if failure is None and last_cmd is not None and last_ok:
             tool, cmd_args = last_cmd
             check = cmd_args.get("cmd", "true") if tool == "bash" else "true"
-            temper = TemperVerifier(state.registry, emit=emit, adversarial=True, reruns=1)
+            temper = TemperVerifier(run_registry, emit=emit, adversarial=True, reruns=1)
             verdict = temper.verify(step=executed, target=goal[:64], checks=[check])
             verified = verdict[-1].TYPE == "step.pass"
 
@@ -362,6 +364,8 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
         else:
             emit(Answer(seq=0, text=f"Turn failed: verification did not pass after {executed} step(s).", ts=0.0))
             emit(RunDone(seq=0, status="failed", steps=executed, duration_s=duration, ts=0.0))
+    except IsolationUnavailable as exc:
+        emit(RunError(seq=0, code="SANDBOX_UNAVAILABLE", message=str(exc), ts=0.0))
     except ProviderError as exc:
         # v0.1.6 BUG 2: the provider's cause lands on the stream in the
         # spec wire format ("provider error: 401 unauthorized — check
@@ -370,6 +374,9 @@ def run_turn(goal: str, session_id: str, run_id: str, state: ServerState) -> Non
         emit(RunError(seq=0, code="PROVIDER_ERROR", message=str(exc), ts=0.0))
     except Exception as exc:  # noqa: BLE001 — a turn never crashes the server
         emit(RunError(seq=0, code="TURN_FAILED", message=str(exc), ts=0.0))
+    finally:
+        if isolated_registry is not None:
+            isolated_registry.close()
 
 
 # ---------------------------------------------------------------------------
@@ -396,8 +403,7 @@ def post_run(payload: dict = Body(...)) -> dict:
                 status_code=409,
                 detail=(
                     "Sandbox backend is set to docker, but no docker daemon is "
-                    "reachable. Either start docker or change the backend in "
-                    "Settings → Sandbox."
+                    "reachable. Start Docker and install the configured sandbox image."
                 ),
             )
     session_id = payload.get("session") or f"s-{uuid.uuid4().hex[:8]}"
@@ -690,9 +696,7 @@ def sandbox_status() -> dict:
     backend, the backend actually selected, and the reason (T-043) —
     the same four lines the boot log prints.
     """
-    from arcen.sandbox.runtime import sandbox_state
-
-    return sandbox_state(STATE.config.sandbox.backend, STATE.config.sandbox.image)
+    return execution_status(STATE.config)
 
 
 def _require_uuid(session_id: str) -> None:

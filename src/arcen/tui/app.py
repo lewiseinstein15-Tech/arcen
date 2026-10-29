@@ -125,7 +125,7 @@ class Header(Static):
         right = Text()
         status = self.quarantine.lower()
         status_color = (_T["rose"] if "offline" in status else
-                        _T["amber"] if "degraded" in status else
+                        _T["amber"] if "degraded" in status or "blocked" in status else
                         MUTED if "unknown" in status or "connecting" in status else EMERALD)
         status_label = Text(self.quarantine, style=status_color)
         if narrow:

@@ -154,3 +154,18 @@ no server or sockets — through a complete narrated turn.
 | `TUI-18-wheel.png` | Wheel contents: replay fixture present; legacy TUI absent |
 | `TUI-11-18-real-terminal-sheet.png` | Labeled overview assembled from one real PTY capture per ticket; originals remain available at full resolution |
 | `TUI-18-full-suite.png` | Full suite after removing legacy-only tests: **482 passed, 1 skipped** |
+
+## Sandbox execution safety work
+
+`SANDBOX-fail-closed-real-terminal.png` is a fresh capture of the installed
+`arcen-tui` wheel and its own managed server in a real PTY, rendered by xterm.js
+in headless Chromium. It shows the live `/api/sandbox/status` response with
+Docker unavailable; it is not evidence of working container isolation.
+The Docker-specific unit tests use fakes. The opt-in real-Docker isolation test
+is in `tests/test_turn_isolation.py` and was skipped in the Docker-less capture
+environment.
+
+`SANDBOX-refused-run-real-terminal.png` is another fresh installed-command PTY
+capture, using a local mock model provider but the real managed server and its
+Docker-unavailable execution gate. It shows a planned bash step refused before
+FORGE or TEMPER execute. Neither screenshot demonstrates a live Docker run.

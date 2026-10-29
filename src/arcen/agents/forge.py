@@ -93,12 +93,14 @@ class ForgeExecutor:
 
     # -- file.diff support (spec row 9) -------------------------------------
     def _capture_before(self, tool: str, args: dict) -> str | None:
+        if not getattr(self.registry, "supports_host_diff", True):
+            return None
         if tool in DIFF_TOOLS and isinstance(args.get("path"), str):
             return _read(args["path"])
         return None
 
     def _diff_after(self, tool: str, args: dict, before: str | None) -> FileDiff | None:
-        if tool not in DIFF_TOOLS:
+        if tool not in DIFF_TOOLS or not getattr(self.registry, "supports_host_diff", True):
             return None
         path = args.get("path")
         if not isinstance(path, str):

@@ -58,6 +58,7 @@ KEY_SEQUENCES: dict[str, bytes] = {
     "down": b"\x1b[B",
     "enter": b"\r",
     "ctrl+c": b"\x03",
+    "ctrl+s": b"\x13",
 }
 
 

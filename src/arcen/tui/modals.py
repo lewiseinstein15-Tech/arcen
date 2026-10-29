@@ -77,7 +77,7 @@ def sandbox_view(status: dict) -> Table:
     degraded = bool(status.get("degraded"))
     effective = str(status.get("effective") or "unknown")
     marker = Text(
-        "DEGRADED" if degraded else "READY",
+        "BLOCKED" if effective == "unavailable" else ("DEGRADED" if degraded else "AVAILABLE"),
         style=f"bold {TOKENS['amber' if degraded else 'emerald']}",
     )
     return _table(
@@ -85,10 +85,11 @@ def sandbox_view(status: dict) -> Table:
             ("status", marker),
             ("configured", status.get("backend") or "auto"),
             ("selected", effective),
-            ("docker daemon", "present" if status.get("docker_available") else "absent"),
-            ("sandbox image", "present" if status.get("image_present") else "absent"),
+            ("docker daemon", "reachable" if status.get("docker_available") else "not reachable"),
+            ("sandbox image", "present" if status.get("image_present") else ("absent" if status.get("docker_available") else "not checked")),
             ("image", status.get("image") or "—"),
             ("reason", status.get("reason") or "—"),
+            ("isolated tools", ", ".join(status.get("supported_tools") or []) or "—"),
         ]
     )
 
@@ -200,7 +201,7 @@ class ConfigEditScreen(ModalScreen[bool]):
             yield Input(self.display_url, id="edit-url")
             yield Static("New API key (leave blank to keep current)")
             yield Input(password=True, id="edit-key")
-            yield Static("Sandbox backend: auto / docker / process")
+            yield Static("Sandbox backend: auto / docker / process (process blocks tools)")
             yield Input(str(sandbox.get("backend") or "auto"), id="edit-sandbox")
             yield Static("Enter or Save to apply; Esc cancels.", id="edit-status")
             yield Button("Save configuration", id="edit-save", variant="primary")

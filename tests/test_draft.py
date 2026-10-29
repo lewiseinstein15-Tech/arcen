@@ -587,7 +587,10 @@ def _run_turn(goal: str, llm) -> list[dict]:
     session = f"s-replan-{_time.time_ns() % 1_000_000}"
     run_id = f"r-{uuid4().hex[:6]}"
     server_app.STATE.run_flags[run_id] = threading.Event()
-    run_turn(goal, session, run_id, server_app.STATE)
+    from fake_turn_registry import FakeTurnRegistry
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(server_app, "create_turn_registry", lambda config: FakeTurnRegistry())
+        run_turn(goal, session, run_id, server_app.STATE)
     return server_app.STATE.emitters[session].replay(0)
 
 

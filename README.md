@@ -82,25 +82,25 @@ arcen-tui --demo --replay      # offline recorded-event demo; no credentials
 See [the TUI guide](docs/TUI.md) for shortcuts, sessions, server lifecycle,
 real-terminal screenshots and sandbox details.
 
-## The Sandbox: Docker or Honest Fallback
+## Sandbox execution
 
-ARCEN executes FORGE's commands inside a sandbox — one per session, zero host binds, network off, resources capped. Two backends, selected automatically at session start:
+**Security notice:** Earlier versions could run planned tools on the host even when the UI reported a sandbox. Upgrade before running untrusted tasks.
 
-- **docker** — used when a docker daemon is reachable **and** the pinned sandbox image is present locally:
+The server execution path now fails closed: FORGE and TEMPER use a per-turn Docker container, never the host tool registry. Docker must be running, the configured image must already exist locally, and `sandbox.network` must be `none`. Container creation or policy checks failing, an unavailable daemon/image, and `sandbox.backend=process` all disable tool execution; there is **no process fallback or automatic image pull**. Conversational turns that do not use tools can still run.
 
-  ```bash
-  docker pull ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0   # required for the docker backend
-  ```
-
-- **process** (degraded fallback) — when there is no daemon, or the image is absent. Commands run in a per-session quarantine root (`/tmp/arcen-s-<id>`), file-tool paths are resolved against that root, escapes are refused, the environment is scrubbed. Honest about the limit: this is confinement, not isolation — the runtime reports `degraded: true` and the UI never overclaims.
-
-The image is built and pushed to GHCR by `.github/workflows/sandbox-image.yml` on every push to `main`. To build it locally instead:
+Install the Docker SDK extra (`arcen[sandbox]`; combine with `arcen[tui,sandbox]` for the TUI), then prepare the image:
 
 ```bash
+docker pull ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0
+# Or build the image locally:
 docker build -t ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0 docker/sandbox
 ```
 
-Only known-good references (ARCEN's own pinned GHCR repo, or an explicit `ARCEN_SANDBOX_IMAGE=<ref>` override) are ever auto-pulled, at most once per boot; anything else falls back to the process backend with zero network attempts. A container-create failure mid-session degrades the session to the process backend instead of crashing it.
+**Current limitations:** only `bash` is implemented in the isolated turn executor. Other planned tools are denied, not run on the host. Each turn has a new temporary `/workspace`; its files are discarded at the end, so no host repository is mounted and changes do not persist between turns. Docker presence in Settings is only a readiness check: the actual container policy is checked at turn start. Host process environment variables are not passed into it. Command output is limited to 256 KiB; excessive output stops the container.
+
+The sandbox is a defense-in-depth boundary, not a guarantee against Docker or kernel vulnerabilities. The Docker daemon, selected image and host plugins must be trusted; plugins run in the server process, outside the tool sandbox. Network-disabled commands can still expose any data visible inside the container through their output to the application and its model provider. Sessions, configuration and logs remain host-side. Standalone tool/agent modules and the older `SandboxRuntime` are not the server execution boundary and must not be used to run untrusted input.
+
+Live Docker isolation must be verified on a machine with a daemon and the image installed: `ARCEN_TEST_DOCKER_ISOLATION=1 pytest tests/test_turn_isolation.py -k real_docker`. Mocked tests alone do not prove real container isolation.
 
 ## Features
 
@@ -108,10 +108,10 @@ Only known-good references (ARCEN's own pinned GHCR repo, or an explicit `ARCEN_
 - **3 core agents** — DRAFT plans, FORGE executes, TEMPER verifies; nothing else decides
 - **500+ sub-agents** — spawned on demand, named for their task, depth-capped
 - **10,000+ skills** — SKILL.md folders loaded progressively, indexed at boot
-- **1,000+ tools** — bash, file, search, browse, code; schema-generated, sandboxed
+- **Tool registry** — bash, file, search, browse and code schemas; only bash is currently enabled in isolated server turns
 - **300+ MCPs** — Model Context Protocol servers, connected lazily
 - **100+ plugins** — hooks at every point in the loop: `before_tool`, `after_tool`, `on_spawn`, `on_error`
-- **Sandboxed execution** — one Docker container per session when the sandbox image is present; otherwise a quarantined process backend that reports `degraded: true`. The host is never touched
+- **Fail-closed server execution** — per-turn Docker container for supported tools; no unsafe process fallback
 - **Persistent memory** — entity graph in a single SQLite file with decay and consolidation
 - **Multi-provider** — one LiteLLM bridge: Anthropic, OpenAI, Groq, local models
 - **NDJSON streaming** — 17 frozen event types; resume with `Last-Event-ID`
@@ -209,7 +209,7 @@ docker run --rm -it \
   ghcr.io/lewiseinstein15-tech/arcen:0.1.0 "run pytest and fix failures"
 ```
 
-The Docker socket is mounted so ARCEN can create per-session sandboxes. Omit it to run without sandboxing. The sandbox itself needs the pinned image: `docker pull ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0` (see [The Sandbox](#the-sandbox-docker-or-honest-fallback)) — without it, ARCEN degrades to the quarantined process backend.
+The Docker socket lets ARCEN create per-turn sandboxes; access to that socket grants powerful control over the host Docker daemon. Without a reachable daemon and the installed sandbox image, tool execution is blocked, not run on the host. See [Sandbox execution](#sandbox-execution).
 
 </details>
 

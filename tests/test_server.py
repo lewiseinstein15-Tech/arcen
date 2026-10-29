@@ -23,6 +23,7 @@ import arcen.server.app as server_app
 from arcen.config import ArcenConfig, default_config_path
 from arcen.llm.client import LLMResponse, ProviderError
 from arcen.server.app import ServerState, app
+from fake_turn_registry import FakeTurnRegistry
 
 PORT = 3179
 BASE = f"http://127.0.0.1:{PORT}"
@@ -89,7 +90,9 @@ class _Server:
 
 
 @pytest.fixture()
-def server(tmp_path):
+def server(tmp_path, monkeypatch):
+    # Exercise the server protocol with a fake that never runs host commands.
+    monkeypatch.setattr(server_app, "create_turn_registry", lambda config: FakeTurnRegistry())
     with _Server(tmp_path / "config.yaml") as s:
         yield s
 
@@ -370,8 +373,8 @@ def test_sandbox_status_endpoint(client, monkeypatch) -> None:
     assert {"docker_available", "image_present", "image"} <= set(status)
     assert {"backend", "effective", "reason", "degraded"} <= set(status)
     assert status["docker_available"] is False
-    assert status["effective"] == "process"  # auto default, daemon absent
-    assert "no docker daemon" in status["reason"]
+    assert status["effective"] == "unavailable"  # no unsafe process fallback
+    assert "daemon unreachable" in status["reason"]
 
 
 # -- T-043: the docker-less machine is explicit and honest --------------------
@@ -388,10 +391,10 @@ def test_boot_logs_sandbox_state_lines(caplog, monkeypatch) -> None:
     with caplog.at_level(logging.INFO, logger="arcen.server"):
         ServerState(config=cfg)
     messages = [r.message for r in caplog.records]
-    assert any("[sandbox] docker daemon: absent" in m for m in messages)
-    assert any("[sandbox] image " in m and ": absent" in m for m in messages)
-    assert any("[sandbox] backend selected: process" in m for m in messages)
-    assert any("[sandbox] reason: no docker daemon" in m for m in messages)
+    assert any("[sandbox] docker daemon: not reachable" in m for m in messages)
+    assert any("[sandbox] image " in m and ": not checked" in m for m in messages)
+    assert any("[sandbox] backend selected: unavailable" in m for m in messages)
+    assert any("[sandbox] reason: Docker SDK missing or daemon unreachable" in m for m in messages)
 
 
 def test_run_refuses_when_docker_pinned_but_daemon_absent(client, monkeypatch) -> None:
@@ -410,7 +413,7 @@ def test_run_refuses_when_docker_pinned_but_daemon_absent(client, monkeypatch) -
     detail = resp.json()["detail"]
     assert detail == (
         "Sandbox backend is set to docker, but no docker daemon is reachable. "
-        "Either start docker or change the backend in Settings → Sandbox."
+        "Start Docker and install the configured sandbox image."
     )
     # nothing was planned: the refusal session stays an empty truth (T-052)
     events = client.get(f"/api/sessions/{session}/events")
@@ -418,16 +421,18 @@ def test_run_refuses_when_docker_pinned_but_daemon_absent(client, monkeypatch) -
     assert events.json() == [], "no session was created for a refused run"
 
 
-def test_run_allows_auto_when_daemon_absent(client, monkeypatch) -> None:
-    """backend=auto + no daemon → the run is accepted and the turn
-    executes in the quarantined process backend (the amber path)."""
-    from arcen.sandbox import runtime as runtime_mod
+def test_run_auto_fails_closed_when_daemon_absent(client, monkeypatch) -> None:
+    """Auto accepts the request, but an unavailable boundary runs no tools."""
+    from arcen.sandbox.turn import IsolationUnavailable
 
-    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: None)
-    assert server_app.STATE.config.sandbox.backend == "auto"
-    resp = client.post("/api/run", json={"goal": "true", "session": "s-auto-process"})
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["run_id"]
+    def unavailable(config):
+        raise IsolationUnavailable("no Docker; tool execution disabled")
+
+    monkeypatch.setattr(server_app, "create_turn_registry", unavailable)
+    session = _new_session(client, "true")
+    events = _stream_until(client, session, want="run.error")
+    assert events[-1]["code"] == "SANDBOX_UNAVAILABLE"
+    assert not any(e["type"] == "command" for e in events)
 
 
 def test_boot_warns_when_docker_pinned_but_unavailable(caplog) -> None:

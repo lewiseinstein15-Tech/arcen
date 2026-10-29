@@ -389,7 +389,10 @@ class LiveApp(ArcenApp):
             else:
                 effective = str(sandbox.get("effective") or "unknown")
                 self.rail.apply_state({"environment": {"sandbox": effective}})
-                if sandbox.get("degraded"):
+                if effective == "unavailable":
+                    self.header.update_meta(quarantine="tools blocked")
+                    self._notice(f"sandbox unavailable: {sandbox.get('reason') or effective}")
+                elif sandbox.get("degraded"):
                     self.header.update_meta(quarantine=f"{effective} · degraded")
                     self._notice(f"sandbox degraded: {sandbox.get('reason') or effective}")
                 else:

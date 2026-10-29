@@ -120,3 +120,11 @@ python scripts/terminal_shot.py --cols 132 --rows 44 --wait 12 \
 
 The capture script needs Playwright, Chromium, aiohttp, ptyprocess and the
 xterm assets; it is development tooling, not a runtime dependency of ARCEN.
+
+### Sandbox status
+
+The sandbox modal reports **BLOCKED** when isolated tool execution is unavailable.
+Docker and the configured local image are required; `process` is not an isolation
+backend. Only bash is currently supported, in a disposable per-turn workspace.
+A Docker availability indication is a preflight, not proof that a container has
+started. See [Sandbox execution](../README.md#sandbox-execution).
