@@ -192,3 +192,19 @@ real Docker-daemon test. The read-only rootfs is retained. The user subsequently
 reported the live Docker workspace test passing on Omarchy at `d6f805d`; see
 [H-01-OMARCHY.md](H-01-OMARCHY.md) for the transcript summary. H-01 still
 has an unresolved harness-reference requirement.
+
+## H-02 file-based prompts
+
+`H-02-real-live-tui.png` is a fresh capture of the final wheel's installed
+`arcen-tui` and its managed server in a real PTY, rendered by xterm.js in
+headless Chromium. A local mock provider classified and answered the `hello`
+turn using the newly packaged prompts; the capture waits for the DONE state.
+Docker was unavailable and tools were blocked; this direct-answer run did not
+exercise Docker. The mock provider and managed server were stopped afterward.
+
+`H-02-real-prompt-tests.png` captures the real focused pytest run in a PTY.
+The golden fixture `tests/fixtures/prompts/H-02-before.json` was recorded from
+the pre-externalization code against a deterministic mock provider; 12 full
+provider payloads are compared byte-for-byte after the change. The final full
+suite reported **535 passed, 3 skipped**. The wheel was built and its four
+prompt files and installed-resource resolution were verified separately.

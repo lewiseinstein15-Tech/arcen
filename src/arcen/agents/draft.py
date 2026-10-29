@@ -43,40 +43,17 @@ import re
 import sys
 from collections.abc import Callable
 
+from arcen.harness import ResolvedPrompts, default_prompts
 from arcen.llm.client import Client, ProviderError
 from arcen.stream.events import Answer, Event, Plan, PlanUpdate, Think, to_line
 
-SYSTEM_HINT = """Return ONLY a JSON array of 1-6 steps for this goal, shaped:
-[{"title": "imperative step", "tool": "bash|file.read|file.edit|file.write|search.text|...", "args": {}}]
-"args" carries the tool's arguments and is REQUIRED on every step:
-- bash → {"cmd": "the exact shell command"}
-- file.read / file.write / file.edit → {"path": "..."} (file.write adds "content")
-- search.text → {"query": "..."};  http.get → {"url": "..."}
-- only tools that truly take no arguments (e.g. file.list) get {}
-No prose, no markdown fences."""
-
-RESEARCH_HINT = """Return ONLY a JSON array of 1-4 steps to RESEARCH this goal, shaped:
-[{"title": "imperative step", "tool": "search.text|http.get|http.post|file.read|file.write", "args": {}}]
-Prefer search.text ({"query": "..."}) for queries and http.get ({"url": "..."})
-for specific URLs. Every step carries its args. No prose, no markdown fences."""
-
-# the strict retry prompt (T-037): one second chance, then refuse
-STRICT_PLAN_HINT = (
-    "Your previous reply was not a valid plan. Respond with ONLY the JSON "
-    "array — no prose, no markdown fences, no commentary. Every step MUST "
-    "carry its tool args (e.g. bash → {\"cmd\": \"...\"})."
-)
-
-CLASSIFY_HINT = """Classify this user message into one of:
-DIRECT    — answerable by you directly, no tools needed
-            (greetings, math, definitions, facts, opinions,
-            questions about yourself)
-RESEARCH  — needs web search or reading a URL
-CODE      — needs to read/write files, run commands, execute code
-Return ONLY the word: DIRECT, RESEARCH, or CODE."""
-
-# the DIRECT answer persona (T-031): the model speaks as ARCEN itself
-DIRECT_IDENTITY = "You are ARCEN. Answer concisely and directly."
+# Compatibility names, resolved from the packaged prompt files once per process.
+_DEFAULT_PROMPTS = default_prompts()
+SYSTEM_HINT = _DEFAULT_PROMPTS.plan
+RESEARCH_HINT = _DEFAULT_PROMPTS.research
+STRICT_PLAN_HINT = _DEFAULT_PROMPTS.strict
+CLASSIFY_HINT = _DEFAULT_PROMPTS.classify
+DIRECT_IDENTITY = _DEFAULT_PROMPTS.direct
 
 KNOWN_TOOLS = {
     "bash",
@@ -182,7 +159,9 @@ NO_PLAN_ANSWER = (
 )
 
 
-def classify_intent(text: str, llm: Client | None = None) -> str:
+def classify_intent(
+    text: str, llm: Client | None = None, *, prompts: ResolvedPrompts | None = None
+) -> str:
     """Classify a user message → DIRECT | RESEARCH | CODE | UNKNOWN.
 
     LLM-first (the whole point of T-031: a word list cannot read intent).
@@ -198,6 +177,8 @@ def classify_intent(text: str, llm: Client | None = None) -> str:
     with its real cause on the stream (run.error), not masquerade as a
     classification result.
     """
+    inherited = getattr(llm, "prompts", None)
+    resolved = prompts if prompts is not None else (inherited or _DEFAULT_PROMPTS)
     stripped = text.strip()
     if not stripped:
         return DIRECT  # an empty ping is conversational, never a bash plan
@@ -206,7 +187,7 @@ def classify_intent(text: str, llm: Client | None = None) -> str:
         try:
             resp = llm.complete(
                 "planner",
-                [{"role": "user", "content": f"{stripped}\n\n{CLASSIFY_HINT}"}],
+                [{"role": "user", "content": f"{stripped}\n\n{resolved.classify}"}],
                 temperature=0.0,
             )
             word = _parse_intent_word(resp.text)
@@ -269,8 +250,13 @@ class DraftPlanner:
         llm: Client | None = None,
         emit: Callable[[Event], None] | None = None,
         max_steps: int = 40,
+        prompts: ResolvedPrompts | None = None,
     ) -> None:
         self.llm = llm
+        inherited = getattr(llm, "prompts", None)
+        if prompts is not None and isinstance(inherited, ResolvedPrompts) and prompts != inherited:
+            raise ValueError("planner and client must use the same prompt snapshot")
+        self.prompts = prompts if prompts is not None else (inherited or _DEFAULT_PROMPTS)
         self.emit = emit
         self.max_steps = max_steps
 
@@ -291,7 +277,7 @@ class DraftPlanner:
         RESEARCH/CODE → ``think`` + ``plan`` (web tools / file+bash tools).
         UNKNOWN → treated as CODE (the pre-T-031 default).
         """
-        intent = classify_intent(goal, self.llm)
+        intent = classify_intent(goal, self.llm, prompts=self.prompts)
         if intent == DIRECT:
             return self._direct_reply(goal)
         if not self._has_provider():
@@ -329,7 +315,7 @@ class DraftPlanner:
                 resp = self.llm.complete(
                     "planner",
                     [{"role": "user", "content": goal}],
-                    identity=DIRECT_IDENTITY,
+                    identity=self.prompts.direct,
                 )
                 reply = resp.text.strip() or reply
             except ProviderError:
@@ -341,7 +327,7 @@ class DraftPlanner:
 
     # -- RESEARCH: plan with web tools --------------------------------------
     def _research_turn(self, goal: str, depth: int) -> list[Event]:
-        decomposed = self._decompose(goal, depth, hint=RESEARCH_HINT)
+        decomposed = self._decompose(goal, depth, hint=self.prompts.research)
         if decomposed is None:
             return self._refusal(NO_PLAN_THINK, NO_PLAN_ANSWER)
         think_text, steps = decomposed
@@ -381,7 +367,7 @@ class DraftPlanner:
         goal: str,
         depth: int,
         failed_step: dict | None = None,
-        hint: str = SYSTEM_HINT,
+        hint: str | None = None,
     ) -> tuple[str, list[dict]] | None:
         """LLM decomposition only — the honest path (T-037).
 
@@ -397,6 +383,7 @@ class DraftPlanner:
         """
         if not self._has_provider():
             return None
+        hint = self.prompts.plan if hint is None else hint
         try:
             return self._decompose_llm(goal, depth, failed_step, hint)
         except ProviderError:
@@ -404,7 +391,7 @@ class DraftPlanner:
         except Exception:  # noqa: BLE001 — malformed/down → one strict retry
             pass
         try:
-            return self._decompose_llm(goal, depth, failed_step, f"{hint}\n\n{STRICT_PLAN_HINT}")
+            return self._decompose_llm(goal, depth, failed_step, f"{hint}\n\n{self.prompts.strict}")
         except ProviderError:
             raise
         except Exception:  # noqa: BLE001 — second failure → honest refusal
@@ -418,9 +405,9 @@ class DraftPlanner:
         hint: str,
     ) -> tuple[str, list[dict]]:
         assert self.llm is not None
-        user = f"Goal: {goal}"
+        user = self.prompts.goal_template.format(goal=goal)
         if failed_step:
-            user += f"\nThe step {json.dumps(failed_step)} failed. Plan around it."
+            user += "\n" + self.prompts.failed_step_template.format(step=json.dumps(failed_step))
         resp = self.llm.complete(
             "planner",
             [{"role": "user", "content": user + "\n" + hint}],

@@ -21,6 +21,8 @@ from typing import Any, Callable
 
 import litellm
 
+from arcen.harness import ResolvedPrompts, default_prompts
+
 litellm.suppress_debug_info = True
 
 # -- v0.1.6: the fail-fast provider error contract ---------------------------
@@ -161,37 +163,24 @@ ROLE_AGENTS: dict[str, str] = {
     "verifier": "TEMPER",
 }
 
-IDENTITY = """You are {agent}, one of three core agents inside ARCEN (Agentic reasoning + Code + Engineer).
-
-ARCEN is an agentic engineer that plans, builds, and verifies — with every action narrated on a live NDJSON stream. It does not invent: it pulls from the best open-source agent projects, edits only what is needed, wires it, and tests it.
-
-Your job as {agent}: {job}
-
-Narrate your reasoning — it streams to the user verbatim. Be precise, be brief, and never claim work you have not done."""
-
+# Compatibility exports backed by the immutable, file-resolved default.
+_DEFAULT_PROMPTS = default_prompts()
+IDENTITY = _DEFAULT_PROMPTS.identity_template
 ROLE_JOBS: dict[str, str] = {
-    "planner": (
-        "you open every turn. Break the goal into concrete steps, decide which "
-        "tools fit each step, spawn sub-agents for parallel work, and re-plan "
-        "when a step fails. You never execute tools yourself."
-    ),
-    "executor": (
-        "you execute exactly one tool step at a time and return the raw "
-        "observation. No planning ahead, no batching, no skipping."
-    ),
-    "verifier": (
-        "you verify adversarially — try to break the work. Run the checks, "
-        "probe edge cases, and report a binary pass/fail with reasons."
-    ),
+    "planner": _DEFAULT_PROMPTS.planner_job,
+    "executor": _DEFAULT_PROMPTS.executor_job,
+    "verifier": _DEFAULT_PROMPTS.verifier_job,
 }
 
-
-def identity_block(role: str) -> str:
+def identity_block(role: str, *, prompts: ResolvedPrompts | None = None) -> str:
     """The system identity block for a role — present in every call."""
     if role not in ROLE_AGENTS:
         raise ValueError(f"unknown role {role!r}; expected one of {sorted(ROLE_AGENTS)}")
     agent = ROLE_AGENTS[role]
-    return IDENTITY.format(agent=agent, job=ROLE_JOBS[role])
+    resolved = prompts if prompts is not None else _DEFAULT_PROMPTS
+    jobs = {"planner": resolved.planner_job, "executor": resolved.executor_job,
+            "verifier": resolved.verifier_job}
+    return resolved.identity_template.format(agent=agent, job=jobs[role])
 
 
 @dataclass
@@ -219,9 +208,11 @@ class Client:
         max_retries: int = 2,
         retry_backoff_seconds: float = 1.0,
         completion_fn: Callable[..., Any] | None = None,
+        prompts: ResolvedPrompts | None = None,
     ) -> None:
         # fixed per-role mapping — callers cannot pass arbitrary models per call
         self.models = dict(models or {})
+        self.prompts = prompts if prompts is not None else _DEFAULT_PROMPTS
         self.max_retries = max_retries
         self.retry_backoff_seconds = retry_backoff_seconds
         self._completion = completion_fn or litellm.completion
@@ -259,8 +250,7 @@ class Client:
 
         ``identity`` overrides the role's default identity block — used by
         the DIRECT conversational path so answers speak as ARCEN itself
-        ("You are ARCEN. Answer concisely and directly.") instead of the
-        planning persona. Meters tokens and cost from the provider
+        instead of the planning persona. Meters tokens and cost from the provider
         response. Never mutates the caller's list.
 
         v0.1.6 retry policy (ARCEN owns retries — the bridge disables
@@ -278,7 +268,7 @@ class Client:
         """
         model = self.model_for(role)
         prepped = [
-            {"role": "system", "content": identity if identity is not None else identity_block(role)},
+            {"role": "system", "content": identity if identity is not None else identity_block(role, prompts=self.prompts)},
             *messages,
         ]
         kwargs.setdefault("timeout", 60)  # spec D: the per-call budget

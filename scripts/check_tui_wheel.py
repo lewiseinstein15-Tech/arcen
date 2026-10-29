@@ -20,13 +20,17 @@ def main() -> int:
             "arcen/tui/sessions.py",
             "arcen/tui/modals.py",
             "arcen/tui/fixtures/server-replan.jsonl",
+            "arcen/prompts/system.md",
+            "arcen/prompts/draft.md",
+            "arcen/prompts/forge.md",
+            "arcen/prompts/temper.md",
         }
         missing = required - names
         legacy = [name for name in names if name.startswith("arcen/tui/_legacy/")]
         if missing or legacy:
             raise SystemExit(f"wheel invalid: missing={sorted(missing)}, legacy={legacy}")
     print(f"Wheel {path.name}: {len(names)} entries")
-    print("Single TUI and recorded replay fixture present; legacy TUI absent.")
+    print("Single TUI, replay fixture and prompt files present; legacy TUI absent.")
     return 0
 
 

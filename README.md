@@ -106,7 +106,8 @@ Live Docker isolation must be verified on a machine with a daemon and the image 
 
 Run one task without a terminal UI using `arcen run "goal" --json`. See the
 [headless guide](docs/HEADLESS.md) for the result schema, exit codes, workspace
-snapshot limits, and the not-yet-available harness references.
+snapshot limits, and the not-yet-available harness references. The default
+model prompts are [file-based](docs/HARNESS-PROMPTS.md).
 
 ## Features
 
