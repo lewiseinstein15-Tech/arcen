@@ -294,3 +294,14 @@ suite: **6 passed**. The full local suite reported **628 passed, 3 skipped**;
 the wheel contained and loaded the preflight module. Candidate probe execution,
 worktree quarantine, forced redaction and live Docker isolation remain
 unimplemented; `run_probe` refuses rather than running on the host.
+
+## H-10 offline judge foundation (partial)
+
+`H-10-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+H-10 wheel, its managed server and a local mock provider completing a normal
+answer. Docker was unavailable and tools were blocked; it does not show a
+probe or judge. `H-10-real-judge-tests.png` records the focused mocked judge
+suite: **15 passed**. The full local suite reported **643 passed, 3 skipped**;
+an installed-wheel mock-judge check passed separately. The judge has no live
+probe inputs or provider/campaign integration; redaction and blinding are
+best effort and no adoption is enabled.
