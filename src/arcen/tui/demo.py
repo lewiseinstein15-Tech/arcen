@@ -27,12 +27,15 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 
 from arcen.tui.app import ArcenApp, Footer, Header
-from arcen.tui.cards.base import WordBatcher, spine_break, spine_card
+from arcen.tui.cards.answer import answer_card as shared_answer_card
+from arcen.tui.cards.base import WordBatcher, spine_break
 from arcen.tui.cards.command import CommandCard
 from arcen.tui.cards.diff import diff_card
 from arcen.tui.cards.goal import goal_card as shared_goal_card
 from arcen.tui.cards.plan import PlanCard, PlanStep
+from arcen.tui.cards.system import run_marker
 from arcen.tui.cards.thought import thought_card as shared_thought_card
+from arcen.tui.cards.verify import Check, VerifyCard
 from arcen.tui.theme import TOKENS as _T
 from arcen.tui.views.rail import RunStateRail
 from arcen.tui.views.stream import BackToLive, Narration, StreamView
@@ -128,17 +131,6 @@ ANSWER = (
 )
 
 
-# ── render helpers (TUI-07: shared spine chrome) ────────────────────────────
-# Local ``card()`` helper removed — all card builders now use the shared
-# ``spine_card()`` from :mod:`arcen.tui.cards.base` so there is one panel
-# shape for the whole spine. ``spine_break`` is also shared. The two
-# extracted cards below (goal, thought) are thin wrappers around the same
-# shared chrome and are re-exported here for the legacy demo tests.
-
-# Keep the old names for test compat — they now delegate to the shared lib.
-card = spine_card
-
-
 # ── card builders ───────────────────────────────────────────────────────────
 def goal_card(text: str | None = None) -> Table:
     return shared_goal_card(text if text is not None else GOAL)
@@ -149,32 +141,9 @@ def thought_card(text: str, streaming: bool = False,
     return shared_thought_card(text, streaming=streaming, label=label)
 
 
-def verify_card(rows: list[tuple[str, str, bool]] | None = None,
-                active: str | None = None) -> Table:
-    body = Table.grid(expand=True, padding=(0, 1))
-    body.add_column(width=3)
-    body.add_column(ratio=1)
-    body.add_column(justify="right")
-    rows = rows or []
-    done_names = {row[0] for row in rows}
-    for name, detail, _ok in rows:
-        body.add_row(Text("✓", style=f"bold {EMERALD}"),
-                     Text(name, style=BODY),
-                     Text(detail, style=f"italic {MUTED}"))
-    if active:
-        body.add_row(Text("◐", style=f"bold {AMBER}"),
-                     Text(active, style=AMBER),
-                     Text("running…", style=f"italic {MUTED}"))
-    for name, detail, _ok in VERIFY:
-        if name not in done_names and name != active:
-            body.add_row(Text("○", style=LINE),
-                         Text(name, style=MUTED),
-                         Text(detail, style=f"italic {MUTED}"))
-    return card(body, "temper · verification", AMBER)
-
-
 def answer_card() -> Table:
-    return card(Text.from_markup(ANSWER), "answer", EMERALD, spine="◆")
+    # The demo's trusted, pre-styled text is explicit; model text stays literal.
+    return shared_answer_card(Text.from_markup(ANSWER))
 
 
 # ── the app ─────────────────────────────────────────────────────────────────
@@ -294,6 +263,7 @@ class DemoApp(ArcenApp):
 
     async def driver(self) -> None:
         await asyncio.sleep(0.4)
+        self.narration.push(run_marker("r_demo"))
         self.narration.push(goal_card())
         self.narration.push(spine_break())
         await asyncio.sleep(0.5)
@@ -333,15 +303,15 @@ class DemoApp(ArcenApp):
         self.narration.push(spine_break())
 
         self._signal_phase("temper", "TEMPER")
-        self.narration.push(verify_card(active=VERIFY[0][0]))
-        await asyncio.sleep(0.9)
-        partial = [VERIFY[0]]
-        self.narration.replace_last(verify_card(partial, active=VERIFY[1][0]))
-        await asyncio.sleep(0.9)
-        partial = VERIFY[:2]
-        self.narration.replace_last(verify_card(partial, active=VERIFY[2][0]))
-        await asyncio.sleep(1.1)
-        self.narration.replace_last(verify_card(VERIFY))
+        self.verification = VerifyCard([Check(name, name, detail) for name, detail, _ in VERIFY])
+        self.verification.set_status(VERIFY[0][0], "active")
+        self.narration.push(self.verification.render())
+        for index, (name, _, ok) in enumerate(VERIFY):
+            await asyncio.sleep(1.1 if index == 2 else 0.9)
+            self.verification.set_status(name, "pass" if ok else "fail")
+            if index + 1 < len(VERIFY):
+                self.verification.set_status(VERIFY[index + 1][0], "active")
+            self.narration.replace_last(self.verification.render())
         self.rail.steps_done = 4
         self.rail.tokens, self.rail.cost = 12384, 0.0412
         self.rail.refresh()

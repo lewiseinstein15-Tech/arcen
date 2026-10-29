@@ -153,7 +153,7 @@ tickets. Commit prefix `TUI-NN:`.
 |---|---|---|---|
 | **TUI-07** Base + goal/thought cards ✅ | M | Shared Rich spine chrome, goal and thought cards; `WordBatcher` coalesces input fragments over 50 ms and flushes exactly on finish; demo uses the shared cards and batcher (adapter wiring remains TUI-10) | 22 render/batching tests; fresh real-terminal streaming/paused/narrow/completed frames `TUI-07-real-*.png`; full suite 446 passed, 1 skipped |
 | **TUI-08** Plan + command + diff cards ✅ | L | Shared `PlanCard`, `CommandCard` and unified `diff_card`; mutable step status/replan, streaming command text with display line cap and exit footer, semantic add/delete colors; demo uses these cards | 11 focused render/state tests, including non-zero exit; real-terminal captures `TUI-08-real-*.png`; full suite 457 passed, 1 skipped |
-| **TUI-09** Verify + answer + system cards | M | pass/fail rows, error card, memory chip, run markers | all 17 events have at least one render test |
+| **TUI-09** Verify + answer + system cards ✅ | M | Mutable verification checklist, Markdown answer, error card, memory/run markers and subagent notices; demo uses shared verify/answer cards. Fixed TUI-06 scroll watcher repaint regression via `super().watch_scroll_y` | Visual cases for all 17 event types (not adapter wiring); verification and answer proven via fresh real-terminal frames; full suite 465 passed, 1 skipped |
 
 ### Phase 3 — Wire it to the real server
 

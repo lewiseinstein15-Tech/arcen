@@ -114,6 +114,8 @@ class StreamView(VerticalScroll):
         return self.parent
 
     def watch_scroll_y(self, old: float, new: float) -> None:
+        # Preserve Textual's repaint, scrollbar and anchoring behavior.
+        super().watch_scroll_y(old, new)
         at_bottom = new >= self.max_scroll_y
         self._following = at_bottom
         # Only offer the pill when there is actually content to return to.

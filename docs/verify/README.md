@@ -102,3 +102,10 @@ no server or sockets — through a complete narrated turn.
 | `TUI-08-real-narrow.png` | **Real terminal**: 80×24 narrow view |
 | `TUI-08-real-terminal-sheet.png` | Fresh real-terminal capture sheet |
 | `TUI-08-full-suite.png` | Full repository suite: **457 passed, 1 skipped** |
+| `TUI-09.png` | Ticket and prior TUI tests: **87 passed, 1 skipped** |
+| `TUI-09-real-verifying.png` | **Real terminal**: verification in progress |
+| `TUI-09-real-answer.png` | **Real terminal**: completed answer at live edge; xterm buffer inspected |
+| `TUI-09-real-narrow.png` | **Real terminal**: 80×24 completed demo |
+| `TUI-09-real-run-marker.png` | **Real terminal**: run marker and paused history |
+| `TUI-09-real-terminal-sheet.png` | Four fresh real-terminal captures |
+| `TUI-09-full-suite.png` | Full repository suite: **465 passed, 1 skipped** |

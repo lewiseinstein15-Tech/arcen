@@ -182,3 +182,23 @@ async def test_replace_last_keeps_following_and_mutates_stack():
         assert app.narration.items[-1].plain == "replaced final card"
         assert stream.following is True
         assert stream.scroll_y == stream.max_scroll_y
+
+
+async def test_scroll_watcher_preserves_textual_repaint_and_scrollbar():
+    """A changed scroll offset must repaint, not merely update follow state."""
+    from unittest.mock import patch
+
+    app = StreamHarness(rows=40)
+    async with app.run_test(headless=True, size=(80, 16)) as pilot:
+        await pilot.pause()
+        stream = app.query_one(StreamView)
+        with patch.object(stream, "_refresh_scroll", wraps=stream._refresh_scroll) as refresh:
+            stream.scroll_to(y=0, animate=False)
+            await pilot.pause()
+            assert refresh.call_count > 0
+        assert stream.vertical_scrollbar.position == 0
+        with patch.object(stream, "_refresh_scroll", wraps=stream._refresh_scroll) as refresh:
+            stream.scroll_end(animate=False)
+            await pilot.pause()
+            assert refresh.call_count > 0
+        assert stream.vertical_scrollbar.position == stream.scroll_y == stream.max_scroll_y
