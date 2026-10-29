@@ -239,3 +239,15 @@ def test_real_docker_isolation_when_explicitly_enabled(monkeypatch, tmp_path):
         assert not network["ok"], network
     finally:
         reg.close()
+
+
+def test_strict_probe_cleanup_failure_is_generic(caplog):
+    docker = FakeDocker()
+    reg = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    def fail(*args, **kwargs):
+        raise RuntimeError("sensitive-daemon-error")
+    docker.container.remove = fail
+    with pytest.raises(IsolationUnavailable, match="cleanup failed") as error:
+        reg.close(strict=True)
+    assert "sensitive-daemon-error" not in str(error.value)
+    assert "sensitive-daemon-error" not in caplog.text

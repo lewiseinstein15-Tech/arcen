@@ -18,6 +18,32 @@ from arcen.sandbox.turn import DockerTurnRegistry
 from .probe_workspace import GitSnapshot, materialize_git_snapshot
 
 
+def redact_probe_value(value: Any, secret_values: tuple[str, ...], depth: int = 0) -> Any:
+    """Best-effort recursive redaction for tool and trajectory envelopes."""
+    if depth > 16:
+        return "[REDACTED: nesting limit]"
+    if isinstance(value, str):
+        text = redact_text(value)
+        for secret in secret_values:
+            text = text.replace(secret, "[REDACTED]")
+        return text
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            if type(key) is not str:
+                return "[REDACTED: unsupported keys]"
+            safe_key = redact_probe_value(key, secret_values, depth + 1)
+            if safe_key in result:
+                return "[REDACTED: key collision]"
+            result[safe_key] = redact_probe_value(item, secret_values, depth + 1)
+        return result
+    if isinstance(value, (list, tuple)):
+        return [redact_probe_value(item, secret_values, depth + 1) for item in value]
+    if value is None or type(value) in (bool, int, float):
+        return value
+    return "[REDACTED: unsupported value]"
+
+
 class RedactingProbeRegistry:
     """Apply mandatory, best-effort recursive redaction to tool responses."""
 
@@ -27,33 +53,9 @@ class RedactingProbeRegistry:
         self._inner = inner
         self._secret_values = secret_values
 
-    def _redact(self, value: Any, depth: int = 0) -> Any:
-        if depth > 16:
-            return "[REDACTED: nesting limit]"
-        if isinstance(value, str):
-            text = redact_text(value)
-            for secret in self._secret_values:
-                text = text.replace(secret, "[REDACTED]")
-            return text
-        if isinstance(value, dict):
-            result = {}
-            for key, item in value.items():
-                if type(key) is not str:
-                    return "[REDACTED: unsupported keys]"
-                safe_key = self._redact(key, depth + 1)
-                if safe_key in result:
-                    return "[REDACTED: key collision]"
-                result[safe_key] = self._redact(item, depth + 1)
-            return result
-        if isinstance(value, (list, tuple)):
-            return [self._redact(item, depth + 1) for item in value]
-        if value is None or type(value) in (bool, int, float):
-            return value
-        return "[REDACTED: unsupported value]"
-
     def dispatch(self, name: str, args: dict) -> dict:
         """Only the underlying Docker gateway dispatches; no host fallback."""
-        return self._redact(self._inner.dispatch(name, args))
+        return redact_probe_value(self._inner.dispatch(name, args), self._secret_values)
 
 
 def _provider_secret(config: ArcenConfig) -> tuple[str, ...]:
@@ -77,4 +79,4 @@ def open_probe_container(snapshot: GitSnapshot, config: ArcenConfig):
         try:
             yield RedactingProbeRegistry(registry, _provider_secret(config))
         finally:
-            registry.close()
+            registry.close(strict=True)

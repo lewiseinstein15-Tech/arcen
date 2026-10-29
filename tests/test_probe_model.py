@@ -203,3 +203,11 @@ def test_mutated_invalid_config_is_revalidated_before_provider_binding(tmp_path)
     config.provider.max_retries = "not-a-number"
     with pytest.raises(HarnessError, match="invalid probe provider configuration"):
         bind_probe_model(store, baseline, candidate, "task", config)
+
+
+def test_empty_model_output_is_an_error_not_a_fallback_answer(tmp_path, monkeypatch):
+    store, baseline, candidate, config = configured(tmp_path)
+    monkeypatch.setattr(litellm, "completion", lambda **_: response("  "))
+    model = bind_probe_model(store, baseline, candidate, "task", config)
+    with pytest.raises(ProbeModelError, match="no output"):
+        model.complete("planner", [{"role": "user", "content": "task"}])

@@ -84,8 +84,8 @@ def prepare_probe(
 
 
 def run_probe(plan: ProbePlan) -> None:
-    """Always refuse until quarantine and credential isolation are implemented."""
+    """The standard campaign probe remains unavailable; no fallback is used."""
     raise ProbeUnavailable(
-        "Probe execution is not available: isolated workspace, credential envelope, "
-        "mandatory redaction and selected-harness execution are not implemented."
+        "Probe execution is not available: the complete campaign executor, "
+        "approval and end-to-end safety gates are not implemented."
     )

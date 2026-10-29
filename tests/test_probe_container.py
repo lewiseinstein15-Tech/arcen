@@ -39,7 +39,8 @@ class FakeBoundary:
             "error": "test-token-123",
         }
 
-    def close(self):
+    def close(self, *, strict=False):
+        assert strict is True
         self.closed = True
 
 

@@ -388,3 +388,21 @@ ran and no external provider was contacted. Provider pinning is by configured
 name, filtering is best effort, and the per-client call cap is not a campaign
 budget. `run_probe` still refuses: model binding does not connect the Docker
 gateway, event redaction, approval or adoption.
+
+## H-09 reviewed trial integration (experimental; partial)
+
+`H-09d-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+wheel, its managed server and a local mock provider answering a normal question;
+it does not depict a candidate trial. Docker was unavailable and tools were
+blocked. `H-09d-real-trial-tests.png` captures the reviewed-trial, gateway and
+model tests: **24 passed, 2 skipped**, using mocked Docker and provider calls;
+the skipped tests require real Docker. The full local suite reported **703
+passed, 5 skipped**. The 109-entry installed wheel included the trial module.
+
+Separately, the installed trial used real HTTP to a local mock provider and a
+mocked Docker boundary: two model calls, two fake dispatches, and cleanup
+passed. This does not establish real-Docker trial behavior. The experimental
+Python-only API requires an explicit input-review attestation, never moves refs
+or adopts a candidate, and returns only after strict cleanup. Redaction remains
+best effort and cannot establish that reviewed inputs or outputs are secret-free.
+The standard campaign `run_probe` remains blocked; no campaign is running.

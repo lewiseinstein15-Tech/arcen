@@ -196,14 +196,18 @@ class DockerTurnRegistry:
         except Exception as exc:  # noqa: BLE001 — tool failures are values
             return {"ok": False, "result": None, "error": str(exc)}
 
-    def close(self) -> None:
-        """Remove the container; do not leave generated workloads behind."""
+    def close(self, *, strict: bool = False) -> None:
+        """Remove the container; strict callers fail if cleanup cannot be confirmed."""
         container, self._container = self._container, None
         if container is None:
             return
         try:
             container.remove(force=True)
         except Exception:
+            if strict:
+                # Do not expose an untrusted daemon exception in probe logs.
+                log.error("Failed to remove isolated turn container")
+                raise IsolationUnavailable("isolated container cleanup failed") from None
             log.exception("Failed to remove isolated turn container")
 
 

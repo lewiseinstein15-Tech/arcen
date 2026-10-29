@@ -129,7 +129,9 @@ class BoundProbeModel:
                 timeout=CALL_TIMEOUT,
                 max_tokens=MAX_OUTPUT_TOKENS,
             )
-            if type(result.text) is not str or len(result.text.encode("utf-8")) > MAX_OUTPUT_BYTES:
+            if type(result.text) is not str or not result.text.strip():
+                raise ProbeModelError("probe model returned no output")
+            if len(result.text.encode("utf-8")) > MAX_OUTPUT_BYTES:
                 raise ProbeModelError("probe model output exceeds limit")
             return replace(
                 result,

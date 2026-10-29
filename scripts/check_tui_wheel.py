@@ -36,6 +36,7 @@ def main() -> int:
             "arcen/harness/probe_workspace.py",
             "arcen/harness/probe_container.py",
             "arcen/harness/probe_model.py",
+            "arcen/harness/probe_execution.py",
             "arcen/harness/selection.py",
             "arcen/cli.py",
             "arcen/harness/model.py",

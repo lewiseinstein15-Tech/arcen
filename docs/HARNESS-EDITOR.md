@@ -17,9 +17,8 @@ approval, safety judgment, proof of task improvement, or prompt-injection
 filter. Candidate bytes and user-supplied task text should be treated as
 untrusted.
 
-The callback interface is not yet wired to LiteLLM or to a CLI/campaign. Model
-budgets, isolated probes, judging, full tier policy, human approval and all
-adoption remain unimplemented. The API alone does not test or apply proposals;
+The callback interface is not yet wired to LiteLLM or to a CLI/campaign. Campaign-level budgets, full probe campaigns, judging integration, full tier
+policy, human approval and all adoption remain unimplemented. The API alone does not test or apply proposals;
 `--harness` rejects candidate refs (only the verified packaged baseline is selectable).
 Real provider calls, quarantined execution and
 end-to-end recursive improvement must not be claimed until those gates exist.
