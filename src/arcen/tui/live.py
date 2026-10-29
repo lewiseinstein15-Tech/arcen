@@ -36,6 +36,7 @@ from arcen.tui.client import (
 )
 from arcen.tui.composer import COMMANDS, Composer
 from arcen.tui.interrupt import InterruptScreen
+from arcen.tui.modals import InfoScreen
 from arcen.tui.sessions import SessionsScreen
 from arcen.tui.theme import TOKENS
 from arcen.tui.views.rail import RunStateRail
@@ -54,6 +55,8 @@ class LiveApp(ArcenApp):
         Binding("ctrl+b", "sessions", "Sessions", priority=True),
         Binding("ctrl+r", "resume", "Resume", priority=True),
         Binding("ctrl+n", "new_chat", "New session", priority=True),
+        Binding("ctrl+o", "show_config", "Configuration", priority=True),
+        Binding("ctrl+s", "show_sandbox", "Sandbox", priority=True),
     ]
 
     def __init__(self, *, base_url: str = DEFAULT_BASE_URL, session_id: str | None = None,
@@ -156,6 +159,10 @@ class LiveApp(ArcenApp):
             self.action_sessions()
         elif command == "/new":
             self.action_new_chat()
+        elif command == "/config":
+            self.action_show_config()
+        elif command == "/sandbox":
+            self.action_show_sandbox()
         elif command in COMMANDS:
             self._notice(f"{command} is not available yet")
             return
@@ -163,6 +170,14 @@ class LiveApp(ArcenApp):
             self._notice(f"unknown command {command}; use /help")
             return
         self.query_one(Composer).load_text("")
+
+    def action_show_config(self) -> None:
+        if not isinstance(self.screen, InfoScreen):
+            self.push_screen(InfoScreen(self.client))
+
+    def action_show_sandbox(self) -> None:
+        if not isinstance(self.screen, InfoScreen):
+            self.push_screen(InfoScreen(self.client, sandbox_only=True))
 
     def _session_operation_allowed(self) -> bool:
         if self.busy or self.adapter.state.status == "running":

@@ -134,3 +134,7 @@ no server or sockets — through a complete narrated turn.
 | `TUI-14-real-drawer.png` | **Real terminal**: isolated fixture session picker |
 | `TUI-14-real-replay.png` | **Real terminal**: selected recorded session replay |
 | `TUI-14-full-suite.png` | Full suite before final drawer styling: **492 passed, 1 skipped** |
+| `TUI-15.png` | Modal and regression tests: **16 passed** |
+| `TUI-15-real-config.png` | **Real terminal**: redacted read-only configuration and sandbox |
+| `TUI-15-real-sandbox.png` | **Real terminal**: degraded sandbox detail |
+| `TUI-15-full-suite.png` | Full suite: **495 passed, 1 skipped** |
