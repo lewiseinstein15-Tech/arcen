@@ -17,7 +17,8 @@ content-addressed blobs and a successor manifest; it never changes a ref or
 records a lineage decision. A storage failure can leave unreferenced blobs.
 
 This is a **syntactic** merge, not an assessment of prompt compatibility,
-correctness, safety or improvement. Candidates are unapproved. No composition
-runs a model, probe, judge, canary or approval; runtime harness selection and
-adoption still fail closed. H-12 remains incomplete until campaign integration,
+correctness, safety or improvement. Candidates are unapproved. The standalone
+composer does not run a model, probe, judge, canary or approval. The separate
+reviewed proposal-comparison API can compose and then run experimental paired
+trials; candidate runtime selection and adoption still fail closed. H-12 remains incomplete until campaign integration,
 evidence-based selection and conflict resolution are implemented.

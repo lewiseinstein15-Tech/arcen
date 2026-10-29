@@ -104,7 +104,8 @@ copied back. A direct answer is also run with a container opened and closed.
 
 This is not the ordinary shared server turn or the complete H-09 campaign
 prober. The standard `run_probe` remains unavailable, there is no CLI, no
-persisted trajectory, and no comparison, approval, ref movement or adoption.
+persisted trajectory, approval, ref movement or adoption. An explicitly
+reviewed paired-comparison API is described in `HARNESS-COMPARISON.md`.
 Inputs and outputs can contain secrets that filtering does not recognize;
 review does not prove otherwise. The model provider may receive task and prompt
 content and can incur cost. The sandbox image, Docker daemon, Git repository,

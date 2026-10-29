@@ -29,8 +29,8 @@ from arcen.stream.events import Answer, RunDone, RunError, RunStart, to_dict
 
 from .probe import ProbeUnavailable
 from .probe_container import open_probe_container, redact_probe_value
-from .probe_model import bind_probe_model
-from .probe_workspace import snapshot_git_commit
+from .probe_model import BoundProbeModel, bind_probe_model
+from .probe_workspace import GitSnapshot, snapshot_git_commit
 from .resolver import HarnessError
 from .store import HarnessStore
 
@@ -95,24 +95,8 @@ class _BoundedGateway:
         return self._inner.dispatch("bash", bounded)
 
 
-def run_reviewed_probe(
-    store: HarnessStore,
-    baseline_id: str,
-    candidate_id: str,
-    task: str,
-    config: ArcenConfig,
-    *,
-    repo: str | Path,
-    commit: str,
-    reviewed_inputs: bool = False,
-    max_model_calls: int = 4,
-) -> ReviewedProbeResult:
-    """Run one manually reviewed trial using a disposable Docker workspace.
-
-    The caller explicitly attests they reviewed the commit, prompts and task for
-    provider exposure. This does not prove the data secret-free. Input review is
-    required before any Git, Docker or provider call; no adoption is performed.
-    """
+def _reviewed_config(config: ArcenConfig, reviewed_inputs: bool) -> ArcenConfig:
+    """Validate and freeze provider secrets and endpoint once for a trial."""
     if reviewed_inputs is not True:
         raise HarnessError("explicit review of workspace, prompts and task is required")
     if type(config) is not ArcenConfig:
@@ -128,8 +112,41 @@ def run_reviewed_probe(
         raise HarnessError("probe provider configuration has unresolved environment references")
     cfg.provider.api_key = str(resolved.get("api_key") or "").strip()
     cfg.provider.base_url = str(resolved.get("base_url") or "").strip()
+    return cfg
+
+
+def run_reviewed_probe(
+    store: HarnessStore,
+    baseline_id: str,
+    candidate_id: str,
+    task: str,
+    config: ArcenConfig,
+    *,
+    repo: str | Path,
+    commit: str,
+    reviewed_inputs: bool = False,
+    max_model_calls: int = 4,
+) -> ReviewedProbeResult:
+    """Run one explicitly reviewed trial in a disposable Docker workspace.
+
+    The caller attests they reviewed the commit, prompts and task for provider
+    exposure. This does not prove the data secret-free. No adoption is performed.
+    """
+    cfg = _reviewed_config(config, reviewed_inputs)
     model = bind_probe_model(store, baseline_id, candidate_id, task, cfg, max_calls=max_model_calls)
     snapshot = snapshot_git_commit(repo, commit)
+    return _run_bound_probe(snapshot, cfg, model)
+
+
+def _run_bound_probe(
+    snapshot: GitSnapshot, cfg: ArcenConfig, model: BoundProbeModel
+) -> ReviewedProbeResult:
+    """Run already-validated model and snapshot; never accept either from a CLI."""
+    baseline_id, candidate_id, task = (
+        model.plan.baseline_id,
+        model.plan.candidate_id,
+        model.plan.task,
+    )
     secrets = (cfg.provider.api_key,) if cfg.provider.api_key else ()
     collector = _Collector(secrets)
     start = time.monotonic()

@@ -406,3 +406,20 @@ Python-only API requires an explicit input-review attestation, never moves refs
 or adopts a candidate, and returns only after strict cleanup. Redaction remains
 best effort and cannot establish that reviewed inputs or outputs are secret-free.
 The standard campaign `run_probe` remains blocked; no campaign is running.
+
+## H-10 paired reviewed comparison (experimental; partial)
+
+`H-10b-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+wheel, its managed server and a local mock provider answering a normal question.
+It does not depict the experimental comparison; Docker was unavailable and tools
+were blocked. `H-10b-real-comparison-tests.png` captures the focused paired,
+proposal and trial tests: **17 passed, 2 skipped**. The full development suite
+reported **711 passed, 6 skipped**; the 111-entry wheel included both comparison
+modules. The installed paired path was separately exercised using real HTTP to a
+local mock provider, a mocked Docker boundary and a callback judge.
+
+The pair captures one Git archive and uses separate trial containers, with the
+same pinned provider settings. The real-Docker pair test was skipped and has not
+been verified by the user. Review flags are caller attestations; redaction and
+blinding are best effort. There is no automatic adoption, full campaign, USD
+budget, canary, approval workflow or rollback. No improvement claim is made.

@@ -16,6 +16,8 @@ An answer or task may itself reveal provenance, include unknown secrets or
 contain adversarial instructions. Pattern redaction is incomplete. The
 caller must decide whether its evidence may be shared with a model provider.
 The judge's result is not a verifier, policy decision, approval, or proof of
-improvement. There are no live H-09 probes yet; this module is not wired to a
-provider, campaign, fusion, canaries or adoption. H-10 remains partial until
-those dependencies and actual probe trajectories exist.
+improvement. The experimental manually reviewed comparison API can pass it
+reduced evidence from two trial trajectories and a caller-supplied callback.
+There is still no built-in judge provider, campaign, fusion, canaries or
+adoption. Real-Docker verification of the new paired path is pending. H-10
+remains partial until those dependencies and production safety gates exist.
