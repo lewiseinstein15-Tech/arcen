@@ -134,3 +134,32 @@ class InfoScreen(ModalScreen[None]):
 
     def action_close(self) -> None:
         self.dismiss(None)
+
+
+class HelpScreen(ModalScreen[None]):
+    CSS = """
+    HelpScreen { align: center middle; background: #0B0E14 75%; }
+    #help-modal { width: 68; max-width: 96%; height: auto; max-height: 90%;
+        border: round #A78BFA; background: #10141D; padding: 1 2; }
+    """
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape,q,enter,f1", "close", "Close", priority=True)
+    ]
+
+    def compose(self) -> ComposeResult:
+        body = Text("ARCEN  /  KEYBOARD\n\n", style=f"bold {TOKENS['accent']}")
+        body.append("Enter  submit goal        Ctrl+T  new line\n")
+        body.append("Ctrl+G  external editor  Tab  complete slash command\n")
+        body.append("Ctrl+C  interrupt        Ctrl+N  new session\n")
+        body.append("Ctrl+B  sessions         Ctrl+R  resume latest\n")
+        body.append("Ctrl+O  configuration    Ctrl+S  sandbox\n")
+        body.append("PageUp / PageDown  scroll    Ctrl+End  back to live\n")
+        body.append("F1  help                 Ctrl+Q  quit\n\n")
+        body.append(
+            "Slash: /help /clear /new /sessions /config /sandbox\n\n", style=TOKENS["muted"]
+        )
+        body.append("Esc / Enter  close", style=TOKENS["muted"])
+        yield VerticalScroll(Static(body), id="help-modal")
+
+    def action_close(self) -> None:
+        self.dismiss(None)

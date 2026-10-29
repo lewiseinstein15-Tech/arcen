@@ -36,7 +36,7 @@ from arcen.tui.client import (
 )
 from arcen.tui.composer import COMMANDS, Composer
 from arcen.tui.interrupt import InterruptScreen
-from arcen.tui.modals import InfoScreen
+from arcen.tui.modals import HelpScreen, InfoScreen
 from arcen.tui.sessions import SessionsScreen
 from arcen.tui.theme import TOKENS
 from arcen.tui.views.rail import RunStateRail
@@ -57,6 +57,10 @@ class LiveApp(ArcenApp):
         Binding("ctrl+n", "new_chat", "New session", priority=True),
         Binding("ctrl+o", "show_config", "Configuration", priority=True),
         Binding("ctrl+s", "show_sandbox", "Sandbox", priority=True),
+        Binding("f1", "show_help", "Help", priority=True),
+        Binding("pageup", "scroll_narration_up", "Scroll up", priority=True),
+        Binding("pagedown", "scroll_narration_down", "Scroll down", priority=True),
+        Binding("ctrl+end", "narration_live", "Back to live", priority=True),
     ]
 
     def __init__(self, *, base_url: str = DEFAULT_BASE_URL, session_id: str | None = None,
@@ -170,6 +174,24 @@ class LiveApp(ArcenApp):
             self._notice(f"unknown command {command}; use /help")
             return
         self.query_one(Composer).load_text("")
+
+    def action_show_help(self) -> None:
+        if isinstance(self.screen, HelpScreen):
+            self.screen.dismiss(None)
+        elif len(self.screen_stack) == 1:
+            self.push_screen(HelpScreen())
+
+    def action_scroll_narration_up(self) -> None:
+        if len(self.screen_stack) == 1:
+            self.query_one(StreamView).scroll_page_up(animate=False)
+
+    def action_scroll_narration_down(self) -> None:
+        if len(self.screen_stack) == 1:
+            self.query_one(StreamView).scroll_page_down(animate=False)
+
+    def action_narration_live(self) -> None:
+        if len(self.screen_stack) == 1:
+            self.query_one(StreamView).scroll_end(animate=False)
 
     def action_show_config(self) -> None:
         if not isinstance(self.screen, InfoScreen):

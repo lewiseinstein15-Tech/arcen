@@ -112,22 +112,29 @@ class Header(Static):
         left = Text()
         left.append("◆ ", style=f"bold {ACCENT}")
         left.append("ARCEN", style="bold #FFFFFF")
-        left.append(" · console", style=MUTED)
+        narrow = 0 < self.size.width < RAIL_COLLAPSE_WIDTH
+        if not narrow:
+            left.append(" · console", style=MUTED)
         left.append("    ")
         left.append("session ", style=MUTED)
         left.append(self.session, style=MONO)
-        left.append("   ")
-        left.append(self.model, style=f"italic {MUTED}")
+        if not narrow:
+            left.append("   ")
+            left.append(self.model, style=f"italic {MUTED}")
 
         right = Text()
         status = self.quarantine.lower()
         status_color = (_T["rose"] if "offline" in status else
                         _T["amber"] if "degraded" in status else
                         MUTED if "unknown" in status or "connecting" in status else EMERALD)
-        right.append(self.quarantine, style=status_color)
-        right.append("    ")
-        right.append(self.now.strftime("%H:%M:%S"), style=MUTED)
-        right.append("    ")
+        status_label = Text(self.quarantine, style=status_color)
+        if narrow:
+            status_label.truncate(23, overflow="ellipsis")
+        right.append(status_label)
+        if not narrow:
+            right.append("    ")
+            right.append(self.now.strftime("%H:%M:%S"), style=MUTED)
+        right.append("  " if narrow else "    ")
         right.append(_phase_pill(self.phase))
 
         grid.add_row(left, right)

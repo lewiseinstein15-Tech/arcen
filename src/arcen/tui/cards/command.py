@@ -8,6 +8,8 @@ from arcen.tui.cards.base import CURSOR, spine_card
 from arcen.tui.theme import TOKENS
 
 DEFAULT_OUTPUT_LIMIT = 20
+# Prevent a single unbroken line from consuming an unbounded terminal height.
+MAX_LINE_CELLS = 240
 
 
 class CommandCard:
@@ -45,7 +47,9 @@ class CommandCard:
         body.add_row(Text(""))
         lines = "".join(self._chunks).splitlines()
         for line in lines[:self.output_limit]:
-            body.add_row(Text("  " + line, style=TOKENS["muted"]))
+            row = Text("  " + line, style=TOKENS["muted"])
+            row.truncate(MAX_LINE_CELLS, overflow="ellipsis")
+            body.add_row(row)
         hidden = max(0, len(lines) - self.output_limit)
         if hidden:
             body.add_row(Text(f"  … {hidden} more lines", style=TOKENS["muted"]))

@@ -96,5 +96,5 @@ FOOTER_HINTS: tuple[tuple[str, str], ...] = (
     ("^G", "editor"),
     ("/", "commands"),
     ("^R", "resume"),
-    ("?", "help"),
+    ("F1", "help"),
 )

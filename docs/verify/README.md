@@ -138,3 +138,8 @@ no server or sockets — through a complete narrated turn.
 | `TUI-15-real-config.png` | **Real terminal**: redacted read-only configuration and sandbox |
 | `TUI-15-real-sandbox.png` | **Real terminal**: degraded sandbox detail |
 | `TUI-15-full-suite.png` | Full suite: **495 passed, 1 skipped** |
+| `TUI-16.png` | Terminal matrix and regression tests: **41 passed** |
+| `TUI-16-real-80x24.png` | **Real terminal**: submitted run at 80×24 |
+| `TUI-16-real-wide-chars.png` | **Real terminal**: wide-character input at 80×24 |
+| `TUI-16-real-tmux.png` | **Real terminal**: live TUI inside tmux 3.5a, mock HTTP backend |
+| `TUI-16-full-suite.png` | Full suite: **497 passed, 1 skipped** |
