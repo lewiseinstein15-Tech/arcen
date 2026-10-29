@@ -189,6 +189,7 @@ class ArcenApp(App):
     Screen {{ background: {INK}; }}
     #shell {{ layout: horizontal; height: 1fr; }}
     #stream-column {{ width: 1fr; height: 1fr; }}
+    #composer-hint {{ height: 1; color: #7D8699; padding: 0 1; }}
     #rail {{ width: {RAIL_WIDTH}; height: 1fr; padding: 0 0 0 1; }}
     Header {{ height: auto; margin: 0 0 1 0; }}
     Footer {{ height: auto; margin: 1 0 0 0; }}

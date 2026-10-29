@@ -125,3 +125,8 @@ no server or sockets — through a complete narrated turn.
 | `TUI-12-real-confirm.png` | **Real terminal**: interrupt confirmation against local mock server |
 | `TUI-12-real-interrupted.png` | **Real terminal**: server-confirmed interrupted run |
 | `TUI-12-full-suite.png` | Full suite: **486 passed, 1 skipped** |
+| `TUI-13.png` | Composer and regression tests: **31 passed** |
+| `TUI-13-real-slash.png` | **Real terminal**: slash-command suggestions |
+| `TUI-13-real-compose.png` | **Real terminal**: multiline goal before submission |
+| `TUI-13-real-submit.png` | **Real terminal**: posted goal and mock-server answer |
+| `TUI-13-full-suite.png` | Full suite: **490 passed, 1 skipped** |

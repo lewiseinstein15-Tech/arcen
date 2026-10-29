@@ -9,8 +9,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import shlex
+import subprocess
+import tempfile
 import uuid
 from functools import partial
+from pathlib import Path
 from typing import ClassVar
 
 import httpx
@@ -18,6 +22,7 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.widgets import Static, TextArea
 
 from arcen.tui.adapter import EventAdapter
 from arcen.tui.app import ArcenApp, Footer, Header
@@ -29,6 +34,7 @@ from arcen.tui.client import (
     ArcenClient,
     new_session_id,
 )
+from arcen.tui.composer import COMMANDS, Composer
 from arcen.tui.interrupt import InterruptScreen
 from arcen.tui.theme import TOKENS
 from arcen.tui.views.rail import RunStateRail
@@ -40,7 +46,11 @@ RETRY_SECONDS = 1.0
 class LiveApp(ArcenApp):
     """Server-backed shell; input and other parity features arrive later."""
 
-    BINDINGS: ClassVar[list[Binding]] = [Binding("ctrl+c", "interrupt", "Interrupt", priority=True)]
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("ctrl+c", "interrupt", "Interrupt", priority=True),
+        Binding("ctrl+g", "external_editor", "Editor", priority=True),
+        Binding("ctrl+q", "quit", "Quit", priority=True),
+    ]
 
     def __init__(self, *, base_url: str = DEFAULT_BASE_URL, session_id: str | None = None,
                  client: ArcenClient | None = None, retry_seconds: float = RETRY_SECONDS):
@@ -56,6 +66,8 @@ class LiveApp(ArcenApp):
         self.busy = False
         self.run_id: str | None = None
         self._reader_task: asyncio.Task | None = None
+        self._submit_task: asyncio.Task | None = None
+        self._stream_started = asyncio.Event()
         self._closing = False
         self._connection_message = ""
 
@@ -70,6 +82,8 @@ class LiveApp(ArcenApp):
                 with StreamView(id="stream"):
                     yield self.narration
                 yield BackToLive(" ↓ back to live ", id="back-to-live")
+                yield Static("Enter submit  ·  Ctrl+T new line  ·  Tab complete", id="composer-hint")
+                yield Composer(id="composer")
             yield self.rail
         yield self.footer
 
@@ -77,10 +91,14 @@ class LiveApp(ArcenApp):
         super().on_mount()
         self.narration.bind_stream(self.query_one(StreamView))
         self.adapter = EventAdapter(self.narration, self.rail, self.header, self.footer)
+        self.query_one(Composer).focus()
         self._reader_task = asyncio.create_task(self._boot_and_stream())
 
     async def on_unmount(self) -> None:
         self._closing = True
+        if self._submit_task:
+            self._submit_task.cancel()
+            await asyncio.gather(self._submit_task, return_exceptions=True)
         if self._reader_task:
             self._reader_task.cancel()
             try:
@@ -89,6 +107,89 @@ class LiveApp(ArcenApp):
                 pass
         if self._owns_client:
             await self.client.aclose()
+
+    def on_text_area_changed(self, event: TextArea.Changed) -> None:
+        if not isinstance(event.text_area, Composer):
+            return
+        text = event.text_area.text.strip()
+        matches = [f"{cmd}  {desc}" for cmd, desc in COMMANDS.items() if cmd.startswith(text)] if text.startswith("/") else []
+        hint = "  ·  ".join(matches) if matches else "Enter submit  ·  Ctrl+T new line  ·  Tab complete"
+        self.query_one("#composer-hint", Static).update(hint)
+
+    def on_composer_submitted(self, event: Composer.Submitted) -> None:
+        value = event.value.strip()
+        if not value:
+            return
+        if value.startswith("/"):
+            self._slash(value)
+            return
+        if self.busy or self.adapter.state.status == "running":
+            self._notice("a turn is already running; draft preserved")
+            return
+        if not self.online:
+            self._notice("server offline; draft preserved")
+            return
+        self.busy = True
+        self._submit_task = asyncio.create_task(self._submit_goal(value))
+
+    def _slash(self, value: str) -> None:
+        command = value.split()[0].lower()
+        if command == "/help":
+            self._notice("Commands: " + ", ".join(COMMANDS) + " · Enter submit · Ctrl+T newline", warning=False)
+        elif command == "/clear":
+            self.narration.items.clear()
+            self.narration._sync()
+            # Keep adapter card indexes valid; cleared entries must not be mutated.
+            self.adapter.state.cards.clear()
+            self.adapter.state.plan = self.adapter.state.verification = None
+            self.adapter.state.commands.clear()
+        elif command in COMMANDS:
+            self._notice(f"{command} is not available yet")
+            return
+        else:
+            self._notice(f"unknown command {command}; use /help")
+            return
+        self.query_one(Composer).load_text("")
+
+    async def _submit_goal(self, goal: str) -> None:
+        try:
+            if self._reader_task is None or self._reader_task.done():
+                self._stream_started.clear()
+                self._reader_task = asyncio.create_task(self._stream_loop())
+            await self._stream_started.wait()
+            await asyncio.sleep(0)  # allow the held stream request to start first
+            run = await self.client.submit_run(goal, self.session_id)
+            self.run_id = str(run.get("run_id", ""))
+            composer = self.query_one(Composer)
+            if composer.text.strip() == goal:
+                composer.load_text("")
+        except (ArcenAPIError, httpx.HTTPError, OSError) as exc:
+            self.busy = False
+            self.narration.push(error_card("SUBMIT", str(exc), "Your draft was preserved."))
+
+    def action_external_editor(self) -> None:
+        editor = os.environ.get("VISUAL") or os.environ.get("EDITOR")
+        if not editor:
+            self._notice("set $VISUAL or $EDITOR to use an external editor")
+            return
+        composer = self.query_one(Composer)
+        path = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".txt", delete=False) as f:
+                path = Path(f.name)
+                f.write(composer.text)
+            with self.suspend():
+                result = subprocess.run([*shlex.split(editor), str(path)], check=False)
+            if result.returncode == 0:
+                composer.load_text(path.read_text(encoding="utf-8"))
+            else:
+                self._notice(f"editor exited {result.returncode}; draft preserved")
+        except (OSError, ValueError) as exc:
+            self._notice(f"editor unavailable: {exc}; draft preserved")
+        finally:
+            if path is not None:
+                path.unlink(missing_ok=True)
+            composer.focus()
 
     def action_interrupt(self) -> None:
         if isinstance(self.screen, InterruptScreen):
@@ -133,7 +234,10 @@ class LiveApp(ArcenApp):
         last = self.adapter.state.last_seq
         if isinstance(seq, int) and not isinstance(seq, bool) and seq > last + 1:
             self._notice(f"event gap: expected {last + 1}, received {seq}")
-        return self.adapter.apply(event)
+        applied = self.adapter.apply(event)
+        if applied and event.get("type") in TERMINAL_EVENTS:
+            self.busy = False
+        return applied
 
     async def _stream_loop(self) -> None:
         """Reconnect after an abnormal EOF; terminal events end this pump."""
@@ -165,6 +269,7 @@ class LiveApp(ArcenApp):
                 after = self.adapter.state.last_seq or None
                 # Disable client's internal retry loop so reconnections are
                 # visible here; its framing and 409 behavior remain unchanged.
+                self._stream_started.set()
                 async for event in self.client.stream(self.session_id, after, max_hold_retries=0):
                     if self._apply_event(event) and event.get("type") in TERMINAL_EVENTS:
                         terminal = True
