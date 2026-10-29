@@ -188,5 +188,7 @@ The first real Docker workspace test on Omarchy failed because Docker refuses
 `H-01-real-import-fix-tests.png` is a fresh PTY/xterm capture of the revised
 focused tests. They include the real Docker SDK speaking over TCP and Unix
 sockets to a **fake** engine, and a local extraction process; they are not a
-real Docker-daemon test. The read-only rootfs is retained and the actual Docker
-workspace integration must be rerun on Omarchy before H-01 is considered verified.
+real Docker-daemon test. The read-only rootfs is retained. The user subsequently
+reported the live Docker workspace test passing on Omarchy at `d6f805d`; see
+[H-01-OMARCHY.md](H-01-OMARCHY.md) for the transcript summary. H-01 still
+has an unresolved harness-reference requirement.
