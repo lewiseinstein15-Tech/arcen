@@ -315,3 +315,21 @@ captures the focused static-review tests: **5 passed**. The full local suite
 reported **648 passed, 3 skipped**, and the installed wheel refused the
 adoption call separately. This is not an operational policy/adoption engine;
 human approval, canaries, rollback and runtime enforcement remain unimplemented.
+
+## H-09 Git workspace and Docker gateway foundations (partial)
+
+`H-09b-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the
+installed wheel, its managed server and a local mock provider answering a
+normal direct question. Docker was unavailable and tools were blocked; this
+is **not** a probe run. `H-09b-real-workspace-tests.png` is a fresh terminal
+capture of the focused tests: **27 passed, 1 skipped**. The skipped opt-in test
+requires real Docker and the sandbox image. The full development suite reported
+**669 passed, 4 skipped**. The built wheel contained 105 entries and its new
+modules imported from outside the source tree.
+
+The workspace and gateway tests use real local Git archives but mock Docker.
+They establish bounded input processing, no working-tree writeback, teardown,
+fail-closed construction and best-effort tool-result redaction. They do not
+establish that committed content is secret-free or prove real-Docker behavior.
+`run_probe` is still deliberately blocked; model execution, mandatory
+end-to-end redaction and the rest of the Harness² campaign remain incomplete.
