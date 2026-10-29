@@ -186,5 +186,6 @@ def test_real_docker_headless_workspace_when_enabled(tmp_path):
     result = execute(
         "edit the file", state=make_state(tmp_path, WorkspacePlanner()), workspace=str(workspace)
     )
-    assert result["status"] == "ok", result
+    if result["status"] != "ok":
+        pytest.fail("Headless execution failed:\n" + json.dumps(result, indent=2), pytrace=False)
     assert source.read_text() == "host-original"

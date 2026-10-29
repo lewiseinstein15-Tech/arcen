@@ -32,7 +32,9 @@ selected directory is included, including hidden files and possible secrets;
 select only data you are willing to expose in tool output and to the model
 provider. Symbolic links and special files are rejected rather than followed;
 the snapshot is limited to 10,000 entries and 64 MiB of file content. The
-snapshot is not an atomic filesystem snapshot: don't change the source while
+read-only container root is retained: a non-root importer receives the snapshot
+through Docker exec stdin and writes only into the container's workspace tmpfs.
+The snapshot is not an atomic filesystem snapshot: don't change the source while
 it is being read. The container is destroyed after the turn.
 
 `--harness` is parsed but **currently rejected**. The harness store and

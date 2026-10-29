@@ -13,6 +13,7 @@ import posixpath
 import uuid
 from typing import Any
 
+from arcen.sandbox.workspace import WorkspaceError, import_workspace, snapshot_workspace
 from arcen.tools.bash import BashArgs
 
 log = logging.getLogger(__name__)
@@ -41,8 +42,6 @@ class DockerTurnRegistry:
         self._container = None
         snapshot = None
         if workspace is not None:
-            from arcen.sandbox.workspace import WorkspaceError, snapshot_workspace
-
             try:
                 snapshot = snapshot_workspace(workspace)
             except (WorkspaceError, OSError) as exc:
@@ -100,11 +99,18 @@ class DockerTurnRegistry:
                 or any(m.get("Type") != "tmpfs" for m in attrs.get("Mounts", []))
             ):
                 raise RuntimeError("Docker did not enforce the required container policy")
-            if snapshot is not None and not self._container.put_archive("/workspace", snapshot):
-                raise RuntimeError("Docker refused the workspace snapshot")
+            if snapshot is not None:
+                try:
+                    import_workspace(self._client, self._container, snapshot)
+                except Exception as exc:
+                    raise WorkspaceError("isolated workspace import failed") from exc
         except Exception as exc:
             if self._container is not None:
                 self.close()
+            if isinstance(exc, WorkspaceError):
+                raise IsolationUnavailable(
+                    "Workspace import failed inside the isolated container; tool execution is disabled."
+                ) from exc
             raise IsolationUnavailable(
                 "Docker isolation unavailable; tool execution is disabled. "
                 "Ensure the Docker daemon is running and the configured sandbox image is installed."

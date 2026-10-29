@@ -180,3 +180,13 @@ refused with `SANDBOX_UNAVAILABLE` and exit 1 in this Docker-less environment.
 `H-01-real-headless-tests.png` records the real focused pytest run in the same
 PTY capture harness. The real-Docker workspace test is opt-in and was skipped
 in this environment; these images are not proof of live workspace import.
+
+### H-01 workspace import follow-up
+
+The first real Docker workspace test on Omarchy failed because Docker refuses
+`put_archive` on a read-only container rootfs, even for a tmpfs destination.
+`H-01-real-import-fix-tests.png` is a fresh PTY/xterm capture of the revised
+focused tests. They include the real Docker SDK speaking over TCP and Unix
+sockets to a **fake** engine, and a local extraction process; they are not a
+real Docker-daemon test. The read-only rootfs is retained and the actual Docker
+workspace integration must be rerun on Omarchy before H-01 is considered verified.
