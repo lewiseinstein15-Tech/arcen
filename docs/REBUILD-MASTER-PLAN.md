@@ -136,7 +136,7 @@ blind, and the winning diff applied only after explicit human approval.
 
 | Ticket | Size | Depends | Deliverable | Verification |
 |---|---|---|---|---|
-| **H-15** Policy engine + immutable core | L | H-08 | `harness/policy.py`: Tier 0 path locks (C2 guardrails, C8 plugins, sandbox/network posture), Tier 1 gated, Tier 2 auto-eligible; forbidden-edit linter; adoption gate | red-team tests: every crafted Tier-0 proposal rejected at two layers; tier matrix test |
+| **H-15** Policy engine + immutable core (static review foundation) | L | H-08 | `harness/policy.py`: Tier 0 path locks (C2 guardrails, C8 plugins, sandbox/network posture), Tier 1 gated, Tier 2 auto-eligible; forbidden-edit linter; adoption gate | red-team tests: every crafted Tier-0 proposal rejected at two layers; tier matrix test |
 | **H-16** Canary bank + auto-rollback | L | H-15, H-14 | graded task bank under `harness/canaries/`; adoption blocked on any regression; live adopted ref auto-rolls-back when canary monitoring fails | seeded regression fixture blocks adoption; rollback restores prior ref |
 | **H-17** Governor (GAUGE) | L | H-14 | `--budget-usd/--max-tokens/--k`/wall-clock caps; concurrency limit; early elimination; convergence stop (Δ < ε for 2 rounds); shared prefix caching; kill switch; `budget.usage` events | budget breach aborts campaign; convergence emits no-change outcome; elimination frees probe slots |
 | **H-18** Hybrid judge fusion | M | H-16, H-10 | verifier channel (TEMPER verdicts, pytest/type/lint/exit codes) > human > contrastive; confidence threshold τ; Tier-2 auto-adopt path opens only here | each channel's precedence tested; low-confidence result falls back to human/keep-H₀ |

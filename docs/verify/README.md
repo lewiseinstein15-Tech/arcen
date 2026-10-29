@@ -305,3 +305,13 @@ suite: **15 passed**. The full local suite reported **643 passed, 3 skipped**;
 an installed-wheel mock-judge check passed separately. The judge has no live
 probe inputs or provider/campaign integration; redaction and blinding are
 best effort and no adoption is enabled.
+
+## H-15 static policy-review foundation (partial)
+
+`H-15-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+H-15 wheel, managed server and local mock provider completing a normal direct
+answer. Docker was unavailable and tools were blocked. `H-15-real-policy-tests.png`
+captures the focused static-review tests: **5 passed**. The full local suite
+reported **648 passed, 3 skipped**, and the installed wheel refused the
+adoption call separately. This is not an operational policy/adoption engine;
+human approval, canaries, rollback and runtime enforcement remain unimplemented.
