@@ -28,7 +28,10 @@ from textual.containers import Horizontal, Vertical
 
 from arcen.tui.app import ArcenApp, Footer, Header
 from arcen.tui.cards.base import WordBatcher, spine_break, spine_card
+from arcen.tui.cards.command import CommandCard
+from arcen.tui.cards.diff import diff_card
 from arcen.tui.cards.goal import goal_card as shared_goal_card
+from arcen.tui.cards.plan import PlanCard, PlanStep
 from arcen.tui.cards.thought import thought_card as shared_thought_card
 from arcen.tui.theme import TOKENS as _T
 from arcen.tui.views.rail import RunStateRail
@@ -97,6 +100,7 @@ DIFF = (
     [
         ("+", '@app.get("/api/health")'),
         ("+", "def health() -> dict:"),
+        ("-", '    return {"status": "unknown"}'),
         ("+", '    return {"status": "ok", "session_count": len(state.sessions)}'),
     ],
     "tests/test_health.py",
@@ -143,60 +147,6 @@ def goal_card(text: str | None = None) -> Table:
 def thought_card(text: str, streaming: bool = False,
                  label: str = "draft · thinking") -> Table:
     return shared_thought_card(text, streaming=streaming, label=label)
-
-
-def plan_card(statuses: list[str]) -> Table:
-    body = Table.grid(expand=True, padding=(0, 1))
-    body.add_column(width=3)
-    body.add_column(ratio=1)
-    body.add_column(justify="right")
-    icons = {
-        "pending": ("○", LINE, MUTED),
-        "active": ("◐", f"bold {AMBER}", AMBER),
-        "done": ("●", EMERALD, EMERALD),
-        "fail": ("✕", ROSE, ROSE),
-    }
-    for (_, title, meta), status in zip(PLAN, statuses):
-        icon, icon_style, _title_style = icons[status]
-        body.add_row(
-            Text(icon, style=icon_style),
-            Text(title, style=BODY if status != "pending" else MUTED),
-            Text(meta, style=f"italic {MUTED}"),
-        )
-    return card(body, "plan · 4 steps", ACCENT)
-
-
-def command_card(cmd: str, output: list[str], footer: str | None,
-                 streaming: bool) -> Table:
-    body = Table.grid(expand=True)
-    body.add_column()
-    head = Text()
-    head.append("$ ", style=f"bold {CYAN}")
-    head.append(cmd, style=f"bold {MONO}")
-    body.add_row(head)
-    body.add_row(Text(""))
-    for line in output:
-        body.add_row(Text("  " + line, style=MUTED))
-    if streaming:
-        body.add_row(Text("  ▍", style=f"blink {CYAN}"))
-    if footer:
-        body.add_row(Text(""))
-        body.add_row(Text(footer, style=f"italic {EMERALD}"))
-    return card(body, "forge · bash", CYAN)
-
-
-def diff_card(data) -> Table:
-    left_path, left_lines, right_path, right_lines = data
-    body = Table.grid(expand=True)
-    body.add_column()
-    body.add_row(Text(left_path, style=f"bold {MONO}"))
-    for sign, line in left_lines:
-        body.add_row(Text(f" {sign} {line}", style=EMERALD))
-    body.add_row(Text(""))
-    body.add_row(Text(right_path, style=f"bold {MONO}"))
-    for sign, line in right_lines:
-        body.add_row(Text(f" {sign} {line}", style=EMERALD))
-    return card(body, "file.diff", CYAN)
 
 
 def verify_card(rows: list[tuple[str, str, bool]] | None = None,
@@ -325,16 +275,21 @@ class DemoApp(ArcenApp):
     async def stream_output(self, cmd: str, lines: list[str],
                             footer: str, tool: str) -> None:
         self.rail.tools.append(tool)
-        shown: list[str] = []
-        self.narration.push(command_card(cmd, shown, None, True))
+        command = CommandCard(cmd, tool=tool)
+        self.narration.push(command.render())
         for line in lines:
-            shown.append(line)
-            self.narration.replace_last(command_card(cmd, shown, None, True))
+            command.append_output(line + "\n")
+            self.narration.replace_last(command.render())
             await asyncio.sleep(0.18)
-        self.narration.replace_last(command_card(cmd, shown, footer, False))
+        # Demo data carries a known exit status and elapsed time.
+        elapsed = float(footer.rsplit(" ", 1)[-1].removesuffix("s"))
+        command.finish(exit_code=0, duration_s=elapsed)
+        self.narration.replace_last(command.render())
 
     def update_plan(self, statuses: list[str]) -> None:
-        self.narration.items[self.plan_index] = plan_card(statuses)
+        for step, status in zip(self.plan.steps, statuses, strict=True):
+            self.plan.set_status(step.id, status)
+        self.narration.items[self.plan_index] = self.plan.render()
         self.narration._sync()
 
     async def driver(self) -> None:
@@ -346,7 +301,9 @@ class DemoApp(ArcenApp):
         self._signal_phase("draft", "DRAFT")
         await self.stream_text(THOUGHT_1, "draft · thinking")
         self.narration.push(spine_break())
-        self.narration.push(plan_card(["active", "pending", "pending", "pending"]))
+        self.plan = PlanCard([PlanStep(key, title, detail) for key, title, detail in PLAN])
+        self.plan.set_status("inspect", "active")
+        self.narration.push(self.plan.render())
         self.plan_index = len(self.narration.items) - 1
         await asyncio.sleep(0.8)
         self.rail.steps_done = 1
@@ -369,7 +326,10 @@ class DemoApp(ArcenApp):
         self.rail.steps_done = 3
         self.rail.tokens, self.rail.cost = 7410, 0.0198
         self.rail.refresh()
-        self.narration.push(diff_card(DIFF))
+        first_path, first_lines, second_path, second_lines = DIFF
+        for path, lines in ((first_path, first_lines), (second_path, second_lines)):
+            patch = "\n".join(sign + line for sign, line in lines)
+            self.narration.push(diff_card(path, patch))
         self.narration.push(spine_break())
 
         self._signal_phase("temper", "TEMPER")

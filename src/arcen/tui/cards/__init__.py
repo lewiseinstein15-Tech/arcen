@@ -17,7 +17,10 @@ from arcen.tui.cards.base import (
     spine_card,
     streaming_text,
 )
+from arcen.tui.cards.command import CommandCard
+from arcen.tui.cards.diff import diff_card
 from arcen.tui.cards.goal import goal_card
+from arcen.tui.cards.plan import PlanCard, PlanStep
 from arcen.tui.cards.thought import thought_card
 
 __all__ = [
@@ -25,9 +28,13 @@ __all__ = [
     "GOAL_GLYPH",
     "SPINE_BREAK",
     "SPINE_GLYPH",
+    "CommandCard",
+    "PlanCard",
+    "PlanStep",
     "SpineCard",
     "WordBatcher",
     "append_cursor",
+    "diff_card",
     "goal_card",
     "spine_break",
     "spine_card",

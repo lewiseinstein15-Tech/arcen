@@ -96,3 +96,9 @@ no server or sockets — through a complete narrated turn.
 | `TUI-07-real-live.png` | **Real terminal**: completed demo |
 | `TUI-07-real-terminal-sheet.png` | Four fresh real-terminal captures |
 | `TUI-07-full-suite.png` | Full repository suite after TUI-07: **446 passed, 1 skipped** |
+| `TUI-08.png` | Ticket and prior TUI tests: **79 passed, 1 skipped** |
+| `TUI-08-real-plan-command.png` | **Real terminal**: plan checklist and command output |
+| `TUI-08-real-diff.png` | **Real terminal**: file diffs and verification |
+| `TUI-08-real-narrow.png` | **Real terminal**: 80×24 narrow view |
+| `TUI-08-real-terminal-sheet.png` | Fresh real-terminal capture sheet |
+| `TUI-08-full-suite.png` | Full repository suite: **457 passed, 1 skipped** |
