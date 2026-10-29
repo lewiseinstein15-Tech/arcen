@@ -120,7 +120,11 @@ class Header(Static):
         left.append(self.model, style=f"italic {MUTED}")
 
         right = Text()
-        right.append(self.quarantine, style=EMERALD)
+        status = self.quarantine.lower()
+        status_color = (_T["rose"] if "offline" in status else
+                        _T["amber"] if "degraded" in status else
+                        MUTED if "unknown" in status or "connecting" in status else EMERALD)
+        right.append(self.quarantine, style=status_color)
         right.append("    ")
         right.append(self.now.strftime("%H:%M:%S"), style=MUTED)
         right.append("    ")
@@ -242,6 +246,10 @@ def run(
     Auto-detects a missing TTY so CI/headless runs paint one frame and exit
     0 instead of hanging on an event loop with no server attached.
     """
+    if argv is not None:
+        from arcen.tui.live import run as run_live
+
+        return run_live(argv)
     if headless is None:
         headless = not sys.stdout.isatty()
     app = ArcenApp(headless_mode=headless)

@@ -160,7 +160,7 @@ tickets. Commit prefix `TUI-NN:`.
 | Ticket | Size | Deliverable | Verification |
 |---|---|---|---|
 | **TUI-10** View model + adapter ✅ | L | `ViewState`, extensible card factory and 17-event adapter drive `Narration.replace_at`, `RunStateRail.apply_state`, header and footer; amber re-plan state; offline `--demo --replay` uses a bundled real-server recording. NDJSON transport/reconnect remains TUI-11 | 14 adapter tests incl. two isolated real-server recordings, exact card order, mutation, replay dedupe, errors and extension events; real-terminal PTY captures `TUI-10-real-*.png`; full suite 479 passed, 1 skipped |
-| **TUI-11** Live integration | L | real `client.py` stream drives the adapter; reconnect with `Last-Event-ID`, gap banner, offline/degraded states | pilot test against a mock NDJSON server; recorded-fixture replay end to end |
+| **TUI-11** Live integration ✅ | L | `LiveApp` feeds real `ArcenClient` NDJSON to the adapter, restores sessions, resumes unexpected EOF with `Last-Event-ID`, shows gap/reconnect/offline/degraded notices; managed launcher reused | 5 mock-transport pilot tests; fresh real-terminal screenshots against HTTP NDJSON mock with a forced disconnect; full suite 484 passed, 1 skipped |
 | **TUI-12** Interrupt + error paths | M | `^C` confirm card → `DELETE /api/run/{id}`; `run.error` rose card; non-zero command styling | adapter + pilot tests for each failure path |
 
 ### Phase 4 — Input and chrome parity

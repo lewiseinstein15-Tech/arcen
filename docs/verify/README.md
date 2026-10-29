@@ -116,3 +116,8 @@ no server or sockets — through a complete narrated turn.
 | `TUI-10-real-narrow.png` | **Real terminal**: 80×24 recorded replay |
 | `TUI-10-real-terminal-sheet.png` | Four fresh PTY/xterm captures from `arcen-tui --demo --replay` |
 | `TUI-10-full-suite.png` | Full repository suite: **479 passed, 1 skipped** |
+| `TUI-11.png` | Live integration and regression tests: **66 passed** |
+| `TUI-11-real-reconnect.png` | **Real terminal** against mock NDJSON server: reconnect and degraded sandbox |
+| `TUI-11-real-done.png` | **Real terminal** against mock NDJSON server: resumed through answer |
+| `TUI-11-real-narrow.png` | **Real terminal**: live mock NDJSON at 80×24 |
+| `TUI-11-full-suite.png` | Full suite: **484 passed, 1 skipped** |
