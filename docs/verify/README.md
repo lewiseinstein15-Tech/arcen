@@ -130,3 +130,7 @@ no server or sockets — through a complete narrated turn.
 | `TUI-13-real-compose.png` | **Real terminal**: multiline goal before submission |
 | `TUI-13-real-submit.png` | **Real terminal**: posted goal and mock-server answer |
 | `TUI-13-full-suite.png` | Full suite: **490 passed, 1 skipped** |
+| `TUI-14.png` | Sessions and regression tests: **27 passed** |
+| `TUI-14-real-drawer.png` | **Real terminal**: isolated fixture session picker |
+| `TUI-14-real-replay.png` | **Real terminal**: selected recorded session replay |
+| `TUI-14-full-suite.png` | Full suite before final drawer styling: **492 passed, 1 skipped** |

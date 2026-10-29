@@ -168,7 +168,7 @@ tickets. Commit prefix `TUI-NN:`.
 | Ticket | Size | Deliverable | Verification |
 |---|---|---|---|
 | **TUI-13** Composer ✅ | L | multiline with `^T`, slash autocomplete, `^G` external editor, submit → `POST /api/run`; preserves drafts on errors | pilot typing, two consecutive turns, ordering, offline/rejection and editor; fresh PTY screenshots against mock HTTP server; full suite 490 passed, 1 skipped |
-| **TUI-14** Sessions drawer | M | list/replay from session store, `^R` resume | fixture sessions render and switch |
+| **TUI-14** Sessions drawer ✅ | M | list/replay from session store, `^R` resume, `^N` new; guarded during active runs | fixture session picker/replay/new/resume pilots; real terminal captures against isolated HTTP fixture; full suite 492 passed, 1 skipped |
 | **TUI-15** Modals | M | config + sandbox modals restyled to tokens; same API calls as legacy | pilot open/close/submit tests |
 
 ### Phase 5 — Hardening

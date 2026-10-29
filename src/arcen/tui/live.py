@@ -36,6 +36,7 @@ from arcen.tui.client import (
 )
 from arcen.tui.composer import COMMANDS, Composer
 from arcen.tui.interrupt import InterruptScreen
+from arcen.tui.sessions import SessionsScreen
 from arcen.tui.theme import TOKENS
 from arcen.tui.views.rail import RunStateRail
 from arcen.tui.views.stream import BackToLive, Narration, StreamView
@@ -50,6 +51,9 @@ class LiveApp(ArcenApp):
         Binding("ctrl+c", "interrupt", "Interrupt", priority=True),
         Binding("ctrl+g", "external_editor", "Editor", priority=True),
         Binding("ctrl+q", "quit", "Quit", priority=True),
+        Binding("ctrl+b", "sessions", "Sessions", priority=True),
+        Binding("ctrl+r", "resume", "Resume", priority=True),
+        Binding("ctrl+n", "new_chat", "New session", priority=True),
     ]
 
     def __init__(self, *, base_url: str = DEFAULT_BASE_URL, session_id: str | None = None,
@@ -67,6 +71,8 @@ class LiveApp(ArcenApp):
         self.run_id: str | None = None
         self._reader_task: asyncio.Task | None = None
         self._submit_task: asyncio.Task | None = None
+        self._session_task: asyncio.Task | None = None
+        self._session_lock = asyncio.Lock()
         self._stream_started = asyncio.Event()
         self._closing = False
         self._connection_message = ""
@@ -96,6 +102,9 @@ class LiveApp(ArcenApp):
 
     async def on_unmount(self) -> None:
         self._closing = True
+        if self._session_task:
+            self._session_task.cancel()
+            await asyncio.gather(self._session_task, return_exceptions=True)
         if self._submit_task:
             self._submit_task.cancel()
             await asyncio.gather(self._submit_task, return_exceptions=True)
@@ -143,6 +152,10 @@ class LiveApp(ArcenApp):
             self.adapter.state.cards.clear()
             self.adapter.state.plan = self.adapter.state.verification = None
             self.adapter.state.commands.clear()
+        elif command == "/sessions":
+            self.action_sessions()
+        elif command == "/new":
+            self.action_new_chat()
         elif command in COMMANDS:
             self._notice(f"{command} is not available yet")
             return
@@ -150,6 +163,87 @@ class LiveApp(ArcenApp):
             self._notice(f"unknown command {command}; use /help")
             return
         self.query_one(Composer).load_text("")
+
+    def _session_operation_allowed(self) -> bool:
+        if self.busy or self.adapter.state.status == "running":
+            self._notice("finish or interrupt the current run before switching sessions")
+            return False
+        return True
+
+    def _start_session_task(self, coro) -> None:
+        if self._session_task is not None and not self._session_task.done():
+            coro.close()
+            return
+        self._session_task = asyncio.create_task(coro)
+
+    def action_sessions(self) -> None:
+        if isinstance(self.screen, SessionsScreen):
+            self.screen.dismiss(None)
+            return
+        if self._session_operation_allowed():
+            self._start_session_task(self._show_sessions())
+
+    async def _show_sessions(self) -> None:
+        try:
+            sessions = await self.client.list_sessions()
+        except (ArcenAPIError, httpx.HTTPError, OSError) as exc:
+            self._notice(f"sessions unavailable: {exc}")
+            return
+        if self._session_operation_allowed():
+            self.push_screen(SessionsScreen(sessions, self.session_id), self._session_selected)
+
+    def _session_selected(self, session_id: str | None) -> None:
+        if session_id and self._session_operation_allowed():
+            self._start_session_task(self._open_session(session_id))
+
+    def action_resume(self) -> None:
+        if self._session_operation_allowed():
+            self._start_session_task(self._resume_latest())
+
+    async def _resume_latest(self) -> None:
+        try:
+            sessions = await self.client.list_sessions()
+        except (ArcenAPIError, httpx.HTTPError, OSError) as exc:
+            self._notice(f"sessions unavailable: {exc}")
+            return
+        if not sessions or not sessions[0].get("id"):
+            self._notice("no saved sessions to resume")
+            return
+        await self._open_session(str(sessions[0]["id"]))
+
+    def action_new_chat(self) -> None:
+        if self._session_operation_allowed():
+            self._start_session_task(self._replace_session(new_session_id(), []))
+
+    async def _open_session(self, session_id: str) -> None:
+        try:
+            events = await self.client.session_events(session_id)
+        except (ArcenAPIError, httpx.HTTPError, OSError) as exc:
+            self._notice(f"session replay unavailable: {exc}")
+            return
+        await self._replace_session(session_id, events)
+
+    async def _replace_session(self, session_id: str, events: list[dict]) -> None:
+        async with self._session_lock:
+            if not self._session_operation_allowed():
+                return
+            if self._reader_task:
+                self._reader_task.cancel()
+                await asyncio.gather(self._reader_task, return_exceptions=True)
+            self.session_id = session_id
+            self.run_id = None
+            self.header.update_meta(session=session_id[:8])
+            self.header.set_phase("IDLE")
+            self.footer.set_live(False)
+            self.rail.apply_state({"steps_done": 0, "steps_total": 0, "phase_idx": 0,
+                                   "tokens": 0, "cost_usd": 0.0, "tools": [], "replanning": False})
+            self.narration.items.clear()
+            self.narration._sync()
+            self.adapter = EventAdapter(self.narration, self.rail, self.header, self.footer)
+            for event in events:
+                self._apply_event(event)
+            self._stream_started.clear()
+            self._reader_task = asyncio.create_task(self._stream_loop())
 
     async def _submit_goal(self, goal: str) -> None:
         try:
