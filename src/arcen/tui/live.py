@@ -10,14 +10,18 @@ import argparse
 import asyncio
 import os
 import uuid
+from functools import partial
+from typing import ClassVar
 
 import httpx
 from rich.text import Text
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 
 from arcen.tui.adapter import EventAdapter
 from arcen.tui.app import ArcenApp, Footer, Header
+from arcen.tui.cards.system import error_card
 from arcen.tui.client import (
     DEFAULT_BASE_URL,
     TERMINAL_EVENTS,
@@ -25,6 +29,7 @@ from arcen.tui.client import (
     ArcenClient,
     new_session_id,
 )
+from arcen.tui.interrupt import InterruptScreen
 from arcen.tui.theme import TOKENS
 from arcen.tui.views.rail import RunStateRail
 from arcen.tui.views.stream import BackToLive, Narration, StreamView
@@ -34,6 +39,8 @@ RETRY_SECONDS = 1.0
 
 class LiveApp(ArcenApp):
     """Server-backed shell; input and other parity features arrive later."""
+
+    BINDINGS: ClassVar[list[Binding]] = [Binding("ctrl+c", "interrupt", "Interrupt", priority=True)]
 
     def __init__(self, *, base_url: str = DEFAULT_BASE_URL, session_id: str | None = None,
                  client: ArcenClient | None = None, retry_seconds: float = RETRY_SECONDS):
@@ -82,6 +89,29 @@ class LiveApp(ArcenApp):
                 pass
         if self._owns_client:
             await self.client.aclose()
+
+    def action_interrupt(self) -> None:
+        if isinstance(self.screen, InterruptScreen):
+            self.screen.dismiss(False)
+            return
+        run_id = self.adapter.state.run_id
+        if not run_id or self.adapter.state.status != "running":
+            self._notice("no active run to interrupt")
+            return
+        self.push_screen(InterruptScreen(run_id), partial(self._interrupt_confirmed, run_id))
+
+    async def _interrupt_confirmed(self, run_id: str, confirmed: bool | None) -> None:
+        if not confirmed:
+            return
+        if self.adapter.state.run_id != run_id or self.adapter.state.status != "running":
+            self._notice("run already finished; no interrupt sent")
+            return
+        try:
+            await self.client.interrupt(run_id)
+        except (ArcenAPIError, httpx.HTTPError, OSError) as exc:
+            self.narration.push(error_card("INTERRUPT", str(exc), "The run may still be active."))
+        else:
+            self._notice("interrupt requested; waiting for the current step to stop")
 
     def _notice(self, message: str, *, warning: bool = True) -> None:
         if message == self._connection_message:

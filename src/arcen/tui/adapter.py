@@ -11,10 +11,13 @@ import logging
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from rich.text import Text
+
 from arcen.tui.cards import CardRegistry, spine_break
 from arcen.tui.cards.plan import PlanStep
 from arcen.tui.cards.verify import Check
 from arcen.tui.state import CardEntry, ViewState
+from arcen.tui.theme import TOKENS
 
 log = logging.getLogger(__name__)
 
@@ -241,6 +244,10 @@ class EventAdapter:
     def _run_done(self, e):
         status = str(e.get("status", "ok"))
         self.state.status = status
+        if status == "interrupted":
+            self._append("interrupted", Text("  run interrupted", style=TOKENS["amber"]))
+        elif status == "failed":
+            self._append("error", self.registry.create("error", "RUN FAILED", "The run failed."))
         self.state.replanning = False
         if self.footer is not None:
             self.footer.set_live(False)

@@ -121,3 +121,7 @@ no server or sockets — through a complete narrated turn.
 | `TUI-11-real-done.png` | **Real terminal** against mock NDJSON server: resumed through answer |
 | `TUI-11-real-narrow.png` | **Real terminal**: live mock NDJSON at 80×24 |
 | `TUI-11-full-suite.png` | Full suite: **484 passed, 1 skipped** |
+| `TUI-12.png` | Interrupt and regression tests: **27 passed** |
+| `TUI-12-real-confirm.png` | **Real terminal**: interrupt confirmation against local mock server |
+| `TUI-12-real-interrupted.png` | **Real terminal**: server-confirmed interrupted run |
+| `TUI-12-full-suite.png` | Full suite: **486 passed, 1 skipped** |
