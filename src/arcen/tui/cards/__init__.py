@@ -31,6 +31,7 @@ __all__ = [
     "GOAL_GLYPH",
     "SPINE_BREAK",
     "SPINE_GLYPH",
+    "CardRegistry",
     "Check",
     "CommandCard",
     "PlanCard",
@@ -52,3 +53,23 @@ __all__ = [
     "streaming_text",
     "thought_card",
 ]
+
+
+class CardRegistry:
+    """Data-driven card/model constructors; extensions may register new kinds."""
+
+    def __init__(self):
+        self._factories = {
+            "goal": goal_card, "thought": thought_card, "plan": PlanCard,
+            "command": CommandCard, "diff": diff_card, "verify": VerifyCard,
+            "answer": answer_card, "run": run_marker, "memory": memory_chip,
+            "error": error_card, "spawn": spawn_card, "spawn.done": spawn_done_card,
+        }
+
+    def register(self, kind, factory):
+        if not kind or not callable(factory):
+            raise ValueError("a kind and callable factory are required")
+        self._factories[kind] = factory
+
+    def create(self, kind, *args, **kwargs):
+        return self._factories[kind](*args, **kwargs)

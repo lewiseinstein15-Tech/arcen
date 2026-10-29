@@ -109,3 +109,10 @@ no server or sockets — through a complete narrated turn.
 | `TUI-09-real-run-marker.png` | **Real terminal**: run marker and paused history |
 | `TUI-09-real-terminal-sheet.png` | Four fresh real-terminal captures |
 | `TUI-09-full-suite.png` | Full repository suite: **465 passed, 1 skipped** |
+| `TUI-10.png` | Ticket and prior TUI tests: **101 passed, 1 skipped** |
+| `TUI-10-real-failure.png` | **Real terminal**: recorded failing command and amber re-plan |
+| `TUI-10-real-replan.png` | **Real terminal**: corrected plan after recorded failure |
+| `TUI-10-real-done.png` | **Real terminal**: adapter-driven recovery and final answer |
+| `TUI-10-real-narrow.png` | **Real terminal**: 80×24 recorded replay |
+| `TUI-10-real-terminal-sheet.png` | Four fresh PTY/xterm captures from `arcen-tui --demo --replay` |
+| `TUI-10-full-suite.png` | Full repository suite: **479 passed, 1 skipped** |

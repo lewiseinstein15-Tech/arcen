@@ -159,7 +159,7 @@ tickets. Commit prefix `TUI-NN:`.
 
 | Ticket | Size | Deliverable | Verification |
 |---|---|---|---|
-| **TUI-10** View model + adapter | L | `state.py`, `adapter.py`, card factory registry; full §5 mapping | `test_tui_adapter.py` replays recorded session jsonl fixtures → exact card sequence assertions |
+| **TUI-10** View model + adapter ✅ | L | `ViewState`, extensible card factory and 17-event adapter drive `Narration.replace_at`, `RunStateRail.apply_state`, header and footer; amber re-plan state; offline `--demo --replay` uses a bundled real-server recording. NDJSON transport/reconnect remains TUI-11 | 14 adapter tests incl. two isolated real-server recordings, exact card order, mutation, replay dedupe, errors and extension events; real-terminal PTY captures `TUI-10-real-*.png`; full suite 479 passed, 1 skipped |
 | **TUI-11** Live integration | L | real `client.py` stream drives the adapter; reconnect with `Last-Event-ID`, gap banner, offline/degraded states | pilot test against a mock NDJSON server; recorded-fixture replay end to end |
 | **TUI-12** Interrupt + error paths | M | `^C` confirm card → `DELETE /api/run/{id}`; `run.error` rose card; non-zero command styling | adapter + pilot tests for each failure path |
 

@@ -30,6 +30,7 @@ class PlanCard:
     """A checklist whose steps can be updated or replaced in place."""
 
     def __init__(self, steps: list[PlanStep]):
+        self.reason = ""
         self.replace_steps(steps)
 
     def replace_steps(self, steps: list[PlanStep]) -> None:
@@ -53,6 +54,9 @@ class PlanCard:
         body.add_column(width=3)
         body.add_column(ratio=1)
         body.add_column(justify="right")
+        if self.reason:
+            body.add_row(Text("↻", style=TOKENS["amber"]),
+                         Text(self.reason, style=TOKENS["amber"]), Text(""))
         for step in self.steps:
             icon, color = _STYLES[step.status]
             body.add_row(

@@ -340,7 +340,11 @@ def run_demo(argv: list[str] | None = None,
     """
     if headless is None:
         headless = not sys.stdout.isatty()
-    app = DemoApp(headless_mode=headless)
+    if argv and "--replay" in argv:
+        from arcen.tui.replay_demo import ReplayDemo
+        app = ReplayDemo(headless_mode=headless)
+    else:
+        app = DemoApp(headless_mode=headless)
     if headless:
         app.run(headless=True, size=size)
     else:

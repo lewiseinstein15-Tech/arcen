@@ -78,6 +78,11 @@ class Narration(Static):
         self.items[-1] = renderable
         self._sync()
 
+    def replace_at(self, index: int, renderable) -> None:
+        """Mutate an existing card without moving it on the spine."""
+        self.items[index] = renderable
+        self._sync()
+
     def render(self):
         return Group(*self.items) if self.items else Text("")
 

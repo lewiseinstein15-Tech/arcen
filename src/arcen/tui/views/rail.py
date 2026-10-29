@@ -47,6 +47,7 @@ DEFAULT_TOKEN_LIMIT = 128_000
 class RailState:
     """Everything the rail renders. Plain data — no Textual imports needed."""
 
+    replanning: bool = False
     steps_done: int = 0
     steps_total: int = 0
     phase_idx: int = 0
@@ -168,7 +169,8 @@ class RunStateRail(Static):
         started = s.steps_total > 0
         timeline = Text()
         for i, phase in enumerate(PHASES):
-            color = _T[PHASE_COLORS[phase]]
+            is_replan = s.replanning and phase == "DRAFT" and i == s.phase_idx
+            color = _T["amber"] if is_replan else _T[PHASE_COLORS[phase]]
             if not started:
                 glyph, glyph_style, name_style = "○", LINE, MUTED
             elif i < s.phase_idx:
@@ -178,6 +180,8 @@ class RunStateRail(Static):
             else:
                 glyph, glyph_style, name_style = "○", LINE, MUTED
             timeline.append(glyph + " ", style=glyph_style).append(phase, style=name_style)
+            if is_replan:
+                timeline.append(" · re-plan", style=f"bold {_T['amber']}")
             if i < len(PHASES) - 1:
                 timeline.append("\n")
         return timeline
