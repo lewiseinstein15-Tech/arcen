@@ -27,6 +27,7 @@ from arcen.config import ArcenConfig, resolve_secrets
 from arcen.llm.client import ProviderError
 from arcen.stream.events import Answer, RunDone, RunError, RunStart, to_dict
 
+from .budget import BudgetExhausted, SharedBudget
 from .probe import ProbeUnavailable
 from .probe_container import open_probe_container, redact_probe_value
 from .probe_model import BoundProbeModel, bind_probe_model
@@ -70,8 +71,9 @@ class _BoundedGateway:
 
     supports_host_diff = False
 
-    def __init__(self, inner):
+    def __init__(self, inner, budget: SharedBudget | None = None):
         self._inner = inner
+        self._budget = budget
 
     def dispatch(self, name: str, args: dict) -> dict:
         if name != "bash" or type(args) is not dict:
@@ -92,6 +94,11 @@ class _BoundedGateway:
         if type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout < 0.1:
             return {"ok": False, "result": None, "error": "invalid probe timeout"}
         bounded = {"cmd": cmd, "timeout_s": min(timeout, _MAX_COMMAND_SECONDS)}
+        if self._budget is not None:
+            try:
+                self._budget.checkpoint()
+            except BudgetExhausted:
+                return {"ok": False, "result": None, "error": "shared probe budget closed"}
         return self._inner.dispatch("bash", bounded)
 
 
@@ -126,6 +133,7 @@ def run_reviewed_probe(
     commit: str,
     reviewed_inputs: bool = False,
     max_model_calls: int = 4,
+    budget: SharedBudget | None = None,
 ) -> ReviewedProbeResult:
     """Run one explicitly reviewed trial in a disposable Docker workspace.
 
@@ -133,7 +141,11 @@ def run_reviewed_probe(
     exposure. This does not prove the data secret-free. No adoption is performed.
     """
     cfg = _reviewed_config(config, reviewed_inputs)
-    model = bind_probe_model(store, baseline_id, candidate_id, task, cfg, max_calls=max_model_calls)
+    model = bind_probe_model(
+        store, baseline_id, candidate_id, task, cfg, max_calls=max_model_calls, budget=budget
+    )
+    if budget is not None:
+        budget.checkpoint()
     snapshot = snapshot_git_commit(repo, commit)
     return _run_bound_probe(snapshot, cfg, model)
 
@@ -142,6 +154,8 @@ def _run_bound_probe(
     snapshot: GitSnapshot, cfg: ArcenConfig, model: BoundProbeModel
 ) -> ReviewedProbeResult:
     """Run already-validated model and snapshot; never accept either from a CLI."""
+    if model.budget is not None:
+        model.budget.reserve_trial()
     baseline_id, candidate_id, task = (
         model.plan.baseline_id,
         model.plan.candidate_id,
@@ -154,7 +168,7 @@ def _run_bound_probe(
     executed = 0
     try:
         with open_probe_container(snapshot, cfg) as inner:
-            gateway = _BoundedGateway(inner)
+            gateway = _BoundedGateway(inner, model.budget)
             collector.emit(
                 RunStart(
                     seq=0,

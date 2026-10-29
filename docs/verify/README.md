@@ -461,3 +461,24 @@ with no skips. This covers the reviewed trial and paired comparison against real
 Docker. Their model responses and judge are mocked; the result does not verify
 an external model provider, unattended campaign, adoption or authentication.
 This is user-reported terminal output, not a captured screenshot.
+
+## H-17 shared admission accounting (experimental; partial)
+
+`H-17a-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+wheel, managed server and local mock provider answering a normal question. It is
+not a budget display or campaign; Docker was unavailable and tools were blocked.
+`H-17a-real-budget-tests.png` captures the new budget tests: **19 passed,
+1 skipped** (the new real-Docker budgeted-pair test). The full suite reported
+**753 passed, 7 skipped**. The built and installed wheel contained 113 entries.
+
+`H-17a-real-installed-smoke.png` captures an installed-wheel paired comparison
+using a real local HTTP mock provider, a mocked Docker boundary and a callback
+judge: two trial admissions, four model calls and one judge invocation were
+counted; an extra trial was refused. It is not a real-Docker budget test. The
+user previously reported the unbudgeted trial and pair passing with real Docker
+at `f34ea27`; the new budgeted path has not been tested with real Docker.
+
+This is opt-in in-process admission accounting, not token/USD spending control,
+a durable campaign budget or a hard deadline. It cannot stop in-flight work or
+control a trusted judge callback's internal requests. It does not enable a
+campaign, candidate adoption or autonomy; see `docs/HARNESS-BUDGET.md`.

@@ -29,9 +29,11 @@ These are experimental trusted-Python APIs, not an unattended campaign or CLI.
 They have no resume, full campaign-level token/USD budget, canaries, rollback,
 spawn events or adoption interface. A separate local review ledger can record
 an explicitly confirmed human opinion about successful paired evidence; it is
-unsigned and does not authorize adoption (see `HARNESS-REVIEW.md`). The per-trial call cap and command limits
-still apply, and TEMPER reruns the last command once inside each disposable
-container. Review the commit, prompts and task before provider exposure. The
+unsigned and does not authorize adoption (see `HARNESS-REVIEW.md`). The optional
+`SharedBudget` adds shared in-process admission counters (see
+`HARNESS-BUDGET.md`); it is not a token, USD or durable campaign budget. The
+per-trial call cap and command limits still apply, and TEMPER reruns the last
+command once inside each disposable container. Review the commit, prompts and task before provider exposure. The
 trusted Docker daemon and image are required, cleanup failure is fatal, and no
 host fallback exists. Most unit tests mock Docker. The user reported the opt-in
 real-Docker paired test passed on Omarchy at `f34ea27`, with a mocked model

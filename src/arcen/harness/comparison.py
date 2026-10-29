@@ -12,6 +12,7 @@ from pathlib import Path
 
 from arcen.config import ArcenConfig
 
+from .budget import SharedBudget
 from .judge import Judgment, Trajectory, compare
 from .probe import ProbeUnavailable
 from .probe_execution import ReviewedProbeResult, _reviewed_config, _run_bound_probe
@@ -42,6 +43,7 @@ def run_reviewed_comparison(
     reviewed_judge_inputs: bool = False,
     max_model_calls_per_trial: int = 4,
     sensitive_values: tuple[str, ...] = (),
+    budget: SharedBudget | None = None,
 ) -> ReviewedComparison:
     """Run two fresh trials over one snapshot, then judge reduced evidence.
 
@@ -53,6 +55,8 @@ def run_reviewed_comparison(
         raise HarnessError("explicit review of probe and judge inputs is required")
     if type(baseline_id) is not str or type(candidate_id) is not str or baseline_id == candidate_id:
         raise HarnessError("comparison requires distinct baseline and candidate manifests")
+    if budget is not None and type(budget) is not SharedBudget:
+        raise HarnessError("invalid shared budget")
     if not callable(judge):
         raise HarnessError("invalid judge callback")
     if (
@@ -69,13 +73,27 @@ def run_reviewed_comparison(
     # Preflight both candidates and freeze both provider bridges before a model
     # request or workspace execution. The same config and task are used for each.
     reference_model = bind_probe_model(
-        store, baseline_id, baseline_id, task, cfg, max_calls=max_model_calls_per_trial
+        store,
+        baseline_id,
+        baseline_id,
+        task,
+        cfg,
+        max_calls=max_model_calls_per_trial,
+        budget=budget,
     )
     candidate_model = bind_probe_model(
-        store, baseline_id, candidate_id, task, cfg, max_calls=max_model_calls_per_trial
+        store,
+        baseline_id,
+        candidate_id,
+        task,
+        cfg,
+        max_calls=max_model_calls_per_trial,
+        budget=budget,
     )
     # Git is archived exactly once: even a later working-tree or ref change
     # cannot alter the second trial's archived input.
+    if budget is not None:
+        budget.checkpoint()
     snapshot = snapshot_git_commit(repo, commit)
     reference = _run_bound_probe(snapshot, cfg, reference_model)
     if reference.status == "error":
@@ -83,12 +101,18 @@ def run_reviewed_comparison(
     candidate = _run_bound_probe(snapshot, cfg, candidate_model)
     if candidate.status == "error":
         return ReviewedComparison(reference, candidate, None)
+
+    def limited_judge(request):
+        if budget is not None:
+            budget.reserve_judge_call()
+        return judge(request)
+
     try:
         verdict = compare(
             task,
             Trajectory(baseline_id, reference.events),
             Trajectory(candidate_id, candidate.events),
-            judge,
+            limited_judge,
             sensitive_values=hidden,
         )
     except Exception:  # noqa: BLE001 — untrusted callback details can contain secrets

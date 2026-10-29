@@ -8,6 +8,7 @@ from pathlib import Path
 
 from arcen.config import ArcenConfig
 
+from .budget import SharedBudget
 from .comparison import ReviewedComparison, run_reviewed_comparison
 from .composer import Composition, compose_proposals
 from .editor import Proposal
@@ -35,6 +36,7 @@ def compare_reviewed_proposals(
     reviewed_judge_inputs: bool = False,
     max_model_calls_per_trial: int = 4,
     sensitive_values: tuple[str, ...] = (),
+    budget: SharedBudget | None = None,
 ) -> ProposalComparison:
     """Compose, trial twice, and judge; conflicts stop before any probe.
 
@@ -44,8 +46,12 @@ def compare_reviewed_proposals(
     """
     if reviewed_inputs is not True or reviewed_judge_inputs is not True:
         raise HarnessError("explicit review of proposals, probe and judge inputs is required")
+    if budget is not None and type(budget) is not SharedBudget:
+        raise HarnessError("invalid shared budget")
     if not callable(judge):
         raise HarnessError("invalid judge callback")
+    if budget is not None:
+        budget.checkpoint()
     composition = compose_proposals(store, baseline_id, proposals)
     if composition.candidate_id is None:
         return ProposalComparison(composition, None)
@@ -62,5 +68,6 @@ def compare_reviewed_proposals(
         reviewed_judge_inputs=True,
         max_model_calls_per_trial=max_model_calls_per_trial,
         sensitive_values=sensitive_values,
+        budget=budget,
     )
     return ProposalComparison(composition, comparison)

@@ -17,6 +17,7 @@ from arcen.llm.bridge import build_llm_client
 from arcen.llm.client import LLMResponse, ProviderError, identity_block
 from arcen.plugins.redact_secrets import redact_text
 
+from .budget import BudgetExhausted, SharedBudget
 from .probe import ProbePlan, prepare_probe
 from .resolver import HarnessError
 from .store import HarnessStore
@@ -56,12 +57,24 @@ def _review_input(text: str, secret: str) -> int:
 class BoundProbeModel:
     """A fixed model and immutable prompt snapshot with a hard call-count cap."""
 
-    def __init__(self, plan: ProbePlan, inner, secret: str, max_calls: int):
+    def __init__(
+        self,
+        plan: ProbePlan,
+        inner,
+        secret: str,
+        max_calls: int,
+        budget: SharedBudget | None = None,
+    ):
         self._plan = plan
         self._inner = inner
         self._secret = secret
         self._remaining = max_calls
+        self._budget = budget
         self._lock = threading.Lock()
+
+    @property
+    def budget(self) -> SharedBudget | None:
+        return self._budget
 
     @property
     def plan(self) -> ProbePlan:
@@ -119,6 +132,11 @@ class BoundProbeModel:
         with self._lock:
             if not self._remaining:
                 raise ProbeModelError("probe model call budget exhausted")
+            if self._budget is not None:
+                try:
+                    self._budget.reserve_model_call()
+                except BudgetExhausted:
+                    raise ProbeModelError("shared probe budget exhausted") from None
             self._remaining -= 1
         try:
             result = self._inner.complete(
@@ -153,6 +171,7 @@ def bind_probe_model(
     config: ArcenConfig,
     *,
     max_calls: int = 4,
+    budget: SharedBudget | None = None,
 ) -> BoundProbeModel:
     """Bind freshly verified candidate prompts to a configured fixed model.
 
@@ -160,6 +179,8 @@ def bind_probe_model(
     calls may transmit reviewed data to that provider and incur cost. No model
     output, budget, pin or filename check establishes safety or improvement.
     """
+    if budget is not None and type(budget) is not SharedBudget:
+        raise HarnessError("invalid shared budget")
     if type(max_calls) is not int or not 1 <= max_calls <= MAX_CALLS:
         raise HarnessError("probe model call budget must be between 1 and 8")
     # Resolve once into a private config copy; a caller mutating config/env
@@ -189,4 +210,4 @@ def bind_probe_model(
     inner = build_llm_client(cfg, prompts=plan.prompts)
     if inner is None:
         raise HarnessError("probe provider is not configured or credential is unavailable")
-    return BoundProbeModel(plan, inner, secret, max_calls)
+    return BoundProbeModel(plan, inner, secret, max_calls, budget)

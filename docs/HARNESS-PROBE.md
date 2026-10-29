@@ -112,3 +112,7 @@ content and can incur cost. The sandbox image, Docker daemon, Git repository,
 package and local Python caller must be trusted. The assistant environment has
 no Docker. The user reported the opt-in real-Docker test passed on Omarchy at
 `f34ea27` with a mocked model provider (see `docs/verify/README.md`).
+
+The optional `SharedBudget` can limit trial/model admissions across explicitly
+participating Python calls. It is not a token, USD, durable or hard wall-clock
+budget; see `HARNESS-BUDGET.md`.
