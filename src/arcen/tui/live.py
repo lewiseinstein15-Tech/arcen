@@ -287,16 +287,17 @@ class LiveApp(ArcenApp):
             if self._reader_task is None or self._reader_task.done():
                 self._stream_started.clear()
                 self._reader_task = asyncio.create_task(self._stream_loop())
-            await self._stream_started.wait()
+            await asyncio.wait_for(self._stream_started.wait(), timeout=6.0)
             await asyncio.sleep(0)  # allow the held stream request to start first
             run = await self.client.submit_run(goal, self.session_id)
             self.run_id = str(run.get("run_id", ""))
             composer = self.query_one(Composer)
             if composer.text.strip() == goal:
                 composer.load_text("")
-        except (ArcenAPIError, httpx.HTTPError, OSError) as exc:
+        except (ArcenAPIError, httpx.HTTPError, OSError, TimeoutError) as exc:
             self.busy = False
-            self.narration.push(error_card("SUBMIT", str(exc), "Your draft was preserved."))
+            detail = str(exc) or "stream could not connect in time"
+            self.narration.push(error_card("SUBMIT", detail, "Your draft was preserved."))
 
     def action_external_editor(self) -> None:
         editor = os.environ.get("VISUAL") or os.environ.get("EDITOR")

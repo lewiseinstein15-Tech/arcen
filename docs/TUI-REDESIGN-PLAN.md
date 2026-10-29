@@ -169,7 +169,7 @@ tickets. Commit prefix `TUI-NN:`.
 |---|---|---|---|
 | **TUI-13** Composer ✅ | L | multiline with `^T`, slash autocomplete, `^G` external editor, submit → `POST /api/run`; preserves drafts on errors | pilot typing, two consecutive turns, ordering, offline/rejection and editor; fresh PTY screenshots against mock HTTP server; full suite 490 passed, 1 skipped |
 | **TUI-14** Sessions drawer ✅ | M | list/replay from session store, `^R` resume, `^N` new; guarded during active runs | fixture session picker/replay/new/resume pilots; real terminal captures against isolated HTTP fixture; full suite 492 passed, 1 skipped |
-| **TUI-15** Modals ✅ | M | config + sandbox read-only modals, same GET API calls as legacy; defensive secret redaction | modal open/close and failure pilots, redaction tests; real terminal mock HTTP captures; full suite 495 passed, 1 skipped |
+| **TUI-15** Modals ✅ | M | config + sandbox modals; redacted views and explicit safe PUT editing added at cutover | modal open/close and failure pilots, redaction tests; real terminal mock HTTP captures; full suite 495 passed, 1 skipped |
 
 ### Phase 5 — Hardening
 
@@ -182,7 +182,7 @@ tickets. Commit prefix `TUI-NN:`.
 
 | Ticket | Size | Deliverable | Verification |
 |---|---|---|---|
-| **TUI-18** Delete legacy | M | remove `tui/_legacy/`; wheel contents check; `arcen-tui` single implementation; full suite (target ≥ existing 357, adjusted for rewritten tests), ruff clean | clean install into a fresh venv; demo + live run both work; no legacy imports remain |
+| **TUI-18** Delete legacy ✅ | M | removed `tui/_legacy/`; default is the redesigned app; wheel contains packaged demo fixture and no legacy TUI | fresh isolated venv installs wheel + dependencies; offline demo and real managed backend with local mock provider; real PTY captures, 64 TUI regression tests, full suite 482 passed / 1 skipped; scoped ruff clean |
 
 **Critical path:** TUI-01 → 02 → 03 → 04 → 07 → 10 → 11. Everything else
 parallelizes. Estimated total: ~10–12 focused working days.

@@ -40,6 +40,11 @@ async def config(request):
     )
 
 
+async def put_config(request):
+    payload = await request.json()
+    return web.json_response(payload)
+
+
 async def stream(request):
     response = web.StreamResponse(headers={"Content-Type": "application/x-ndjson"})
     await response.prepare(request)
@@ -56,5 +61,6 @@ app = web.Application()
 app.router.add_get("/api/health", health)
 app.router.add_get("/api/sandbox/status", sandbox)
 app.router.add_get("/api/config", config)
+app.router.add_put("/api/config", put_config)
 app.router.add_get("/api/stream", stream)
 web.run_app(app, host="127.0.0.1", port=18715)

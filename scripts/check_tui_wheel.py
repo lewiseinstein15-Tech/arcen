@@ -1,0 +1,34 @@
+"""Check that a built ARCEN wheel contains the single TUI and replay data."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from zipfile import ZipFile
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        raise SystemExit("usage: python scripts/check_tui_wheel.py PATH_TO_WHEEL")
+    path = Path(sys.argv[1])
+    with ZipFile(path) as wheel:
+        names = set(wheel.namelist())
+        required = {
+            "arcen/tui/__init__.py",
+            "arcen/tui/live.py",
+            "arcen/tui/composer.py",
+            "arcen/tui/sessions.py",
+            "arcen/tui/modals.py",
+            "arcen/tui/fixtures/server-replan.jsonl",
+        }
+        missing = required - names
+        legacy = [name for name in names if name.startswith("arcen/tui/_legacy/")]
+        if missing or legacy:
+            raise SystemExit(f"wheel invalid: missing={sorted(missing)}, legacy={legacy}")
+    print(f"Wheel {path.name}: {len(names)} entries")
+    print("Single TUI and recorded replay fixture present; legacy TUI absent.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -135,7 +135,7 @@ no server or sockets — through a complete narrated turn.
 | `TUI-14-real-replay.png` | **Real terminal**: selected recorded session replay |
 | `TUI-14-full-suite.png` | Full suite before final drawer styling: **492 passed, 1 skipped** |
 | `TUI-15.png` | Modal and regression tests: **16 passed** |
-| `TUI-15-real-config.png` | **Real terminal**: redacted read-only configuration and sandbox |
+| `TUI-15-real-config.png` | **Real terminal**: redacted configuration and sandbox (before editing was added in TUI-18) |
 | `TUI-15-real-sandbox.png` | **Real terminal**: degraded sandbox detail |
 | `TUI-15-full-suite.png` | Full suite: **495 passed, 1 skipped** |
 | `TUI-16.png` | Terminal matrix and regression tests: **41 passed** |
@@ -147,3 +147,10 @@ no server or sockets — through a complete narrated turn.
 | `TUI-17-real-live.png` | **Real terminal**: redesigned TUI against isolated mock HTTP server |
 | `TUI-17-real-help.png` | **Real terminal**: keyboard help |
 | `TUI-17-real-demo.png` | **Real terminal**: offline recorded-event demo |
+| `TUI-18.png` | Cutover and TUI regression tests: **64 passed** |
+| `TUI-18-real-clean-live.png` | **Real terminal**: clean-wheel TUI, actual managed ARCEN backend, isolated local mock model provider |
+| `TUI-18-real-clean-demo.png` | **Real terminal**: clean-wheel offline recorded-event demo |
+| `TUI-18-real-settings-edit.png` | **Real terminal**: clean-wheel configuration editor against isolated mock HTTP server |
+| `TUI-18-wheel.png` | Wheel contents: replay fixture present; legacy TUI absent |
+| `TUI-11-18-real-terminal-sheet.png` | Labeled overview assembled from one real PTY capture per ticket; originals remain available at full resolution |
+| `TUI-18-full-suite.png` | Full suite after removing legacy-only tests: **482 passed, 1 skipped** |

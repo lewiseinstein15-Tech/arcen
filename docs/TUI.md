@@ -25,10 +25,10 @@ uv tool install 'arcen[tui]'
 python -m pip install -e '.[tui]'
 ```
 
-During the staged redesign, opt into the new interface explicitly:
+Launch the terminal UI:
 
 ```sh
-ARCEN_TUI=new arcen-tui
+arcen-tui
 ```
 
 This is one command in one terminal. The launcher attaches to a healthy
@@ -39,10 +39,10 @@ TUI. See [the launcher](../src/arcen/tui/launcher.py) for its attach/spawn
 rules.
 
 ```sh
-ARCEN_TUI=new arcen-tui --no-serve                       # attach only
-ARCEN_TUI=new arcen-tui --url http://127.0.0.1:4004      # explicit server
-ARCEN_SERVER_URL=http://127.0.0.1:4004 ARCEN_TUI=new arcen-tui
-ARCEN_TUI=new arcen-tui --session 3f2504e0-4f89-11d3-9a0c-0305e82c3301
+arcen-tui --no-serve                       # attach only
+arcen-tui --url http://127.0.0.1:4004      # explicit server
+ARCEN_SERVER_URL=http://127.0.0.1:4004 arcen-tui
+arcen-tui --session 3f2504e0-4f89-11d3-9a0c-0305e82c3301
 arcen-tui --demo                  # scripted, no server or credentials
 arcen-tui --demo --replay         # offline recorded server-event fixture
 ```
@@ -63,7 +63,7 @@ connection failures and retries, and keeps unsent drafts on failure.
 | `Ctrl+N` | New session |
 | `Ctrl+B` | Open/close the sessions drawer; select with arrows and Enter |
 | `Ctrl+R` | Resume the newest saved session |
-| `Ctrl+O` / `Ctrl+S` | Open read-only configuration / sandbox status |
+| `Ctrl+O` / `Ctrl+S` | Open configuration / sandbox status |
 | `PageUp` / `PageDown` | Scroll narration while the composer has focus |
 | `Ctrl+End` | Return to the live edge |
 | `F1` | Open keyboard help |
@@ -72,10 +72,12 @@ connection failures and retries, and keeps unsent drafts on failure.
 
 Slash commands are `/help`, `/clear`, `/new`, `/sessions`, `/config`, and
 `/sandbox`. Session switching is blocked during an active run. `/clear`
-clears the visible transcript, not the server's saved session. Configuration
-is **read-only** in the TUI, matching the legacy TUI: use the web Settings
-interface or configuration file to change it. The config view masks API keys
-and strips credentials and query parameters from displayed provider URLs.
+clears the visible transcript, not the server's saved session. The config view masks API keys and strips credentials and query parameters
+from displayed provider URLs. Press `E` in the configuration view to edit
+provider name, model, endpoint, API key or sandbox backend, then explicitly
+save. Leave the API key blank to keep it. If the server has other redacted
+secrets that cannot be safely preserved by the PUT endpoint, saving is blocked;
+use the web Settings interface or configuration file instead.
 
 ![Keyboard help in the real terminal](verify/TUI-17-real-help.png)
 
@@ -103,7 +105,7 @@ needed for `--demo` or the fixture screenshots.
 | `src/arcen/tui/composer.py` | Multiline composer and slash completion |
 | `src/arcen/tui/adapter.py`, `state.py` | Frozen-event adapter and view state |
 | `src/arcen/tui/cards/`, `views/` | Narration cards, scroll view and run-state rail |
-| `src/arcen/tui/sessions.py`, `modals.py` | Session drawer and read-only information modals |
+| `src/arcen/tui/sessions.py`, `modals.py` | Session drawer and information / configuration modals |
 | `src/arcen/tui/client.py`, `launcher.py` | HTTP/NDJSON contract and managed server lifecycle |
 | `tests/test_tui_*.py` | Client, adapter, pilot, terminal and regression tests |
 | `scripts/terminal_shot.py` | PTY → xterm.js → Chromium real-terminal capture |

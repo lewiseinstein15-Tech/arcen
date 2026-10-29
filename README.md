@@ -71,12 +71,11 @@ npm shortcuts are wired at the repo root too: `npm run dev:backend`, `npm run de
 
 ### Terminal UI (TUI)
 
-The optional Textual client streams the same ARCEN events in one terminal.
-During the redesign, opt in with `ARCEN_TUI=new`:
+The optional Textual client streams the same ARCEN events in one terminal:
 
 ```bash
 uv tool install 'arcen[tui]'   # or pipx, or a virtual environment
-ARCEN_TUI=new arcen-tui        # attaches or manages a local server
+arcen-tui                      # attaches or manages a local server
 arcen-tui --demo --replay      # offline recorded-event demo; no credentials
 ```
 

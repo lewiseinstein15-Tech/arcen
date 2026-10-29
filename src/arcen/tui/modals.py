@@ -1,7 +1,8 @@
-"""Read-only configuration and sandbox views, fetched from the server."""
+"""Redacted configuration editing and sandbox views fetched from the server."""
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import ClassVar
 from urllib.parse import urlsplit, urlunsplit
 
@@ -13,7 +14,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Static
+from textual.widgets import Button, Input, Static
 
 from arcen.tui.client import ArcenAPIError, ArcenClient
 from arcen.tui.theme import TOKENS
@@ -93,7 +94,7 @@ def sandbox_view(status: dict) -> Table:
 
 
 class InfoScreen(ModalScreen[None]):
-    """Read-only parity with the legacy config view; no secret writes."""
+    """Redacted configuration and sandbox view with an explicit edit path."""
 
     CSS = """
     InfoScreen { align: center middle; background: #0B0E14 75%; }
@@ -101,11 +102,15 @@ class InfoScreen(ModalScreen[None]):
         background: #10141D; padding: 1 2; }
     #info-body { height: auto; width: 100%; }
     """
-    BINDINGS: ClassVar[list[Binding]] = [Binding("escape,q,enter", "close", "Close", priority=True)]
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape,q,enter", "close", "Close", priority=True),
+        Binding("e", "edit_config", "Edit", priority=True),
+    ]
 
     def __init__(self, client: ArcenClient, *, sandbox_only: bool = False) -> None:
         super().__init__()
         self.client, self.sandbox_only = client, sandbox_only
+        self.config: dict | None = None
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(id="info-modal"):
@@ -115,11 +120,10 @@ class InfoScreen(ModalScreen[None]):
         body = self.query_one("#info-body", Static)
         items = []
         if not self.sandbox_only:
-            items.append(
-                Text("CONFIGURATION  /  redacted · read-only\n", style=f"bold {TOKENS['accent']}")
-            )
+            items.append(Text("CONFIGURATION  /  redacted\n", style=f"bold {TOKENS['accent']}"))
             try:
                 cfg = await self.client.get_config()
+                self.config = cfg
                 items.append(config_view(cfg))
             except (ArcenAPIError, httpx.HTTPError, OSError, ValueError) as exc:
                 items.append(Text(f"Configuration unavailable: {exc}", style=TOKENS["rose"]))
@@ -129,11 +133,127 @@ class InfoScreen(ModalScreen[None]):
             items.append(sandbox_view(sandbox))
         except (ArcenAPIError, httpx.HTTPError, OSError, ValueError) as exc:
             items.append(Text(f"Sandbox unavailable: {exc}", style=TOKENS["rose"]))
-        items.append(Text("\nEsc / Enter  close", style=TOKENS["muted"]))
+        hint = (
+            "\nE  edit configuration   Esc / Enter  close"
+            if not self.sandbox_only
+            else "\nEsc / Enter  close"
+        )
+        items.append(Text(hint, style=TOKENS["muted"]))
         body.update(Group(*items))
+
+    def action_edit_config(self) -> None:
+        if not self.sandbox_only and self.config is not None:
+            self.app.push_screen(ConfigEditScreen(self.client, self.config), self._edited)
+
+    def _edited(self, saved: bool | None) -> None:
+        if saved:
+            # The old sandbox result may no longer be true after a PUT.
+            self.app.header.update_meta(quarantine="connected · sandbox unknown")
+            self.app.rail.apply_state({"environment": {"sandbox": "unknown"}})
+            self.app.pop_screen()
 
     def action_close(self) -> None:
         self.dismiss(None)
+
+
+def _has_unrecoverable_secrets(value: object, path: tuple[str, ...] = ()) -> bool:
+    """PUT preserves provider.api_key only; reject other opaque secrets."""
+    if isinstance(value, dict):
+        return any(_has_unrecoverable_secrets(v, (*path, str(k))) for k, v in value.items())
+    if isinstance(value, list):
+        return any(_has_unrecoverable_secrets(v, (*path, str(i))) for i, v in enumerate(value))
+    return value == "<redacted>" and path != ("provider", "api_key")
+
+
+class ConfigEditScreen(ModalScreen[bool]):
+    """Explicit save, preserving opaque provider keys and other settings."""
+
+    CSS = """
+    ConfigEditScreen { align: center middle; background: #0B0E14 75%; }
+    #edit-modal { width: 76; max-width: 96%; height: 90%; border: round #A78BFA;
+        background: #10141D; padding: 1 2; }
+    #edit-title { color: #A78BFA; text-style: bold; height: 2; }
+    #edit-status { color: #FBBF24; height: auto; min-height: 1; }
+    #edit-modal Input { height: 3; border: round #1D2430; background: #10141D; }
+    #edit-modal Button { margin-top: 1; }
+    """
+    BINDINGS: ClassVar[list[Binding]] = [Binding("escape", "cancel_edit", "Cancel", priority=True)]
+
+    def __init__(self, client: ArcenClient, config: dict) -> None:
+        super().__init__()
+        self.client = client
+        self.config = deepcopy(config)
+        self.original_url = str((config.get("provider") or {}).get("base_url") or "")
+        self.display_url = _safe_url(self.original_url) if self.original_url else ""
+        self.saving = False
+
+    def compose(self) -> ComposeResult:
+        provider = self.config.get("provider") or {}
+        sandbox = self.config.get("sandbox") or {}
+        with VerticalScroll(id="edit-modal"):
+            yield Static("EDIT CONFIGURATION  /  explicit save", id="edit-title")
+            yield Static("Provider name")
+            yield Input(str(provider.get("name") or ""), id="edit-provider")
+            yield Static("Model")
+            yield Input(str(provider.get("model") or ""), id="edit-model")
+            yield Static("Endpoint (credentials and query hidden)")
+            yield Input(self.display_url, id="edit-url")
+            yield Static("New API key (leave blank to keep current)")
+            yield Input(password=True, id="edit-key")
+            yield Static("Sandbox backend: auto / docker / process")
+            yield Input(str(sandbox.get("backend") or "auto"), id="edit-sandbox")
+            yield Static("Enter or Save to apply; Esc cancels.", id="edit-status")
+            yield Button("Save configuration", id="edit-save", variant="primary")
+
+    def on_mount(self) -> None:
+        self.query_one("#edit-provider", Input).focus()
+
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "edit-save":
+            await self.save()
+
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
+        await self.save()
+
+    async def save(self) -> None:
+        if self.saving:
+            return
+        status = self.query_one("#edit-status", Static)
+        if _has_unrecoverable_secrets(self.config):
+            status.update(
+                "Cannot safely save: another secret is redacted. Use web Settings or the config file."
+            )
+            return
+        backend = self.query_one("#edit-sandbox", Input).value.strip().lower()
+        if backend not in ("auto", "docker", "process"):
+            status.update("Sandbox backend must be auto, docker or process.")
+            return
+        config = deepcopy(self.config)
+        provider = config.setdefault("provider", {})
+        provider["name"] = self.query_one("#edit-provider", Input).value.strip()
+        provider["model"] = self.query_one("#edit-model", Input).value.strip()
+        url = self.query_one("#edit-url", Input).value.strip()
+        provider["base_url"] = self.original_url if url == self.display_url else url
+        key = self.query_one("#edit-key", Input).value
+        prior_key = str(provider.get("api_key") or "")
+        provider["api_key"] = (
+            key
+            if key
+            else (prior_key if prior_key.startswith("$") else "<redacted>" if prior_key else "")
+        )
+        config.setdefault("sandbox", {})["backend"] = backend
+        self.saving = True
+        try:
+            await self.client.put_config(config)
+        except (ArcenAPIError, httpx.HTTPError, OSError, ValueError) as exc:
+            status.update(f"Save failed: {exc}")
+        else:
+            self.dismiss(True)
+        finally:
+            self.saving = False
+
+    def action_cancel_edit(self) -> None:
+        self.dismiss(False)
 
 
 class HelpScreen(ModalScreen[None]):

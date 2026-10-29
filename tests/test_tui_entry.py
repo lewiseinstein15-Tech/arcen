@@ -1,76 +1,54 @@
-"""TUI-01 — entry point selects between legacy and redesigned shells.
-
-The redesign parks the shipped client in ``arcen.tui._legacy`` and keeps it
-as the default behind ``arcen-tui`` until the TUI-18 cut-over. These tests
-pin that behavior so later tickets cannot silently change the default.
-"""
+"""Single TUI entry point, optional dependency hint and demo precedence."""
 
 from __future__ import annotations
+
+import builtins
+import sys
 
 import pytest
 
 pytest.importorskip("textual")
-
-import arcen.tui as tui_pkg
-import arcen.tui._legacy.app as legacy_app
-import arcen.tui.app as new_app
+from arcen import tui
+from arcen.tui import demo, live
 
 
-def test_default_impl_is_legacy(monkeypatch):
+def test_default_runs_live_with_arguments(monkeypatch):
+    called = []
     monkeypatch.delenv("ARCEN_TUI", raising=False)
-    assert tui_pkg._selected_impl() == "legacy"
+    monkeypatch.setattr(live, "run", lambda argv: called.append(argv) or 42)
+    assert tui.main(["--url", "http://example"]) == 42
+    assert called == [["--url", "http://example"]]
 
 
-def test_unknown_impl_falls_back_to_legacy(monkeypatch):
-    monkeypatch.setenv("ARCEN_TUI", "banana")
-    assert tui_pkg._selected_impl() == "legacy"
+@pytest.mark.parametrize("old_flag", ["new", "legacy", "anything"])
+def test_obsolete_env_flag_never_selects_another_app(monkeypatch, old_flag):
+    monkeypatch.setenv("ARCEN_TUI", old_flag)
+    monkeypatch.setattr(live, "run", lambda argv: 7)
+    assert tui.main([]) == 7
 
 
-def test_explicit_new_is_recognized(monkeypatch):
-    monkeypatch.setenv("ARCEN_TUI", "NEW")  # case-insensitive
-    assert tui_pkg._selected_impl() == "new"
+def test_demo_precedes_live_and_preserves_options(monkeypatch):
+    called = []
+    monkeypatch.setattr(demo, "run_demo", lambda argv: called.append(argv) or 0)
+    assert tui.main(["--demo", "--replay"]) == 0
+    assert called == [["--replay"]]
 
 
-def test_new_shell_routes_to_redesigned_app(monkeypatch):
-    # TUI-04 onward: ARCEN_TUI=new launches arcen.tui.app with argv intact.
-    monkeypatch.setenv("ARCEN_TUI", "new")
-    called = {}
-
-    def fake_run(argv):
-        called["argv"] = argv
-        return 0
-
-    monkeypatch.setattr(new_app, "run", fake_run)
-    assert tui_pkg.main(["--url", "http://x:3002"]) == 0
-    assert called == {"argv": ["--url", "http://x:3002"]}
+def test_no_explicit_argv_uses_process_arguments(monkeypatch):
+    called = []
+    monkeypatch.setattr(sys, "argv", ["arcen-tui", "--no-serve"])
+    monkeypatch.setattr(live, "run", lambda argv: called.append(argv) or 0)
+    assert tui.main() == 0 and called == [["--no-serve"]]
 
 
-def test_demo_flag_wins_over_impl_flag(monkeypatch):
-    # --demo routes before the legacy/new selection, regardless of ARCEN_TUI.
-    monkeypatch.setenv("ARCEN_TUI", "new")
-    called = {}
+def test_missing_textual_install_hint(monkeypatch):
+    original = builtins.__import__
 
-    def fake_run_demo(argv):
-        called["argv"] = argv
-        return 0
+    def guarded(name, *args, **kwargs):
+        if name == "textual":
+            raise ImportError("missing")
+        return original(name, *args, **kwargs)
 
-    import arcen.tui.demo as demo_mod
-
-    monkeypatch.setattr(demo_mod, "run_demo", fake_run_demo)
-    assert tui_pkg.main(["--demo"]) == 0
-    assert called == {"argv": []}
-
-
-def test_legacy_entry_resolves(monkeypatch):
-    monkeypatch.delenv("ARCEN_TUI", raising=False)
-    called = {}
-
-    def fake_run(argv):
-        called["argv"] = argv
-        return 0
-
-    # main() performs the from-import at call time, so the patched
-    # attribute is what gets invoked.
-    monkeypatch.setattr(legacy_app, "run", fake_run)
-    assert tui_pkg.main(["--help-ish"]) == 0
-    assert called == {"argv": ["--help-ish"]}
+    monkeypatch.setattr(builtins, "__import__", guarded)
+    with pytest.raises(SystemExit, match="arcen\\[tui\\]"):
+        tui.main([])

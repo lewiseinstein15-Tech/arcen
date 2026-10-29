@@ -102,3 +102,134 @@ async def test_modal_reports_api_errors_without_crashing():
             await pilot.press("escape")
     finally:
         await http.aclose()
+
+
+async def test_config_edit_explicit_save_preserves_key_other_settings_and_hidden_url():
+    from textual.widgets import Input
+
+    from arcen.tui.modals import ConfigEditScreen
+
+    saved = []
+    cfg = {
+        "provider": {
+            "name": "custom",
+            "model": "old",
+            "base_url": "https://user:pass@example.com/v1?token=secret",
+            "api_key": "<redacted>",
+        },
+        "sandbox": {"backend": "auto"},
+        "mcps": [],
+        "agents": {"draft": {"max_steps": 17}},
+    }
+
+    async def handler(req):
+        if req.url.path == "/api/health":
+            return httpx.Response(200, json={"ok": True})
+        if req.url.path == "/api/sandbox/status":
+            return httpx.Response(200, json={"effective": "docker"})
+        if req.url.path == "/api/config" and req.method == "GET":
+            return httpx.Response(200, json=cfg)
+        if req.url.path == "/api/config" and req.method == "PUT":
+            import json
+
+            saved.append(json.loads(req.content))
+            return httpx.Response(200, json=cfg)
+        return httpx.Response(503)
+
+    http = httpx.AsyncClient(base_url="http://mock", transport=httpx.MockTransport(handler))
+    app = LiveApp(client=ArcenClient("http://mock", http=http), retry_seconds=60)
+    try:
+        async with app.run_test(size=(132, 44)) as pilot:
+            await pilot.press("ctrl+o")
+            await pilot.pause()
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, ConfigEditScreen)
+            edit = app.screen
+            assert "pass" not in edit.query_one("#edit-url", Input).value
+            edit.query_one("#edit-model", Input).value = "new-model"
+            edit.query_one("#edit-sandbox", Input).value = "process"
+            await pilot.press("enter")
+            await pilot.pause()
+            assert saved[0]["provider"]["api_key"] == "<redacted>"
+            assert saved[0]["provider"]["base_url"] == cfg["provider"]["base_url"]
+            assert saved[0]["provider"]["model"] == "new-model"
+            assert saved[0]["agents"] == cfg["agents"]
+            assert saved[0]["sandbox"]["backend"] == "process"
+    finally:
+        await http.aclose()
+
+
+async def test_config_edit_refuses_opaque_other_secrets_and_cancel_never_saves():
+    from arcen.tui.modals import ConfigEditScreen
+
+    calls = []
+    cfg = {
+        "provider": {"api_key": "<redacted>"},
+        "mcps": [{"headers": {"Authorization": "<redacted>"}}],
+    }
+
+    async def handler(req):
+        calls.append((req.method, req.url.path))
+        if req.url.path == "/api/config":
+            return httpx.Response(200, json=cfg)
+        return httpx.Response(503)
+
+    http = httpx.AsyncClient(base_url="http://mock", transport=httpx.MockTransport(handler))
+    app = LiveApp(client=ArcenClient("http://mock", http=http), retry_seconds=60)
+    try:
+        async with app.run_test() as pilot:
+            await pilot.press("ctrl+o")
+            await pilot.pause()
+            await pilot.press("e")
+            await pilot.pause()
+            edit = app.screen
+            assert isinstance(edit, ConfigEditScreen)
+            await edit.save()
+            assert not any(method == "PUT" for method, path in calls)
+            assert "Cannot safely save" in str(edit.query_one("#edit-status").content)
+            await pilot.press("escape")
+            assert isinstance(app.screen, InfoScreen)
+            assert not any(method == "PUT" for method, path in calls)
+    finally:
+        await http.aclose()
+
+
+async def test_config_edit_validates_backend_and_shows_save_failure():
+    from textual.widgets import Input
+
+    from arcen.tui.modals import ConfigEditScreen
+
+    calls = []
+
+    async def handler(req):
+        calls.append((req.method, req.url.path))
+        if req.url.path == "/api/config" and req.method == "GET":
+            return httpx.Response(200, json={"provider": {}, "sandbox": {"backend": "auto"}})
+        if req.url.path == "/api/config" and req.method == "PUT":
+            return httpx.Response(500, json={"detail": "server refused save"})
+        return httpx.Response(503)
+
+    http = httpx.AsyncClient(base_url="http://mock", transport=httpx.MockTransport(handler))
+    app = LiveApp(client=ArcenClient("http://mock", http=http), retry_seconds=60)
+    try:
+        async with app.run_test() as pilot:
+            await pilot.press("ctrl+o")
+            await pilot.pause()
+            await pilot.press("e")
+            await pilot.pause()
+            edit = app.screen
+            assert isinstance(edit, ConfigEditScreen)
+            backend = edit.query_one("#edit-sandbox", Input)
+            backend.value = "bad"
+            await pilot.press("enter")
+            await pilot.pause()
+            assert "must be auto" in str(edit.query_one("#edit-status").content)
+            assert not any(method == "PUT" for method, path in calls)
+            backend.value = "auto"
+            await pilot.press("enter")
+            await pilot.pause()
+            assert "server refused save" in str(edit.query_one("#edit-status").content)
+            assert app.screen is edit
+    finally:
+        await http.aclose()

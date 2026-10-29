@@ -249,7 +249,7 @@ def run(
     headless: bool | None = None,
     size: tuple[int, int] = (132, 44),
 ) -> int:
-    """Entry point for ``ARCEN_TUI=new``.
+    """Entry point for the mission-control shell.
 
     Auto-detects a missing TTY so CI/headless runs paint one frame and exit
     0 instead of hanging on an event loop with no server attached.
