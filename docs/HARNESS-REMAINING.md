@@ -44,6 +44,11 @@ validated on real Docker or against a real external provider. See
   checks, not an adoption gate or security proof. An optional advisory combines
   a matching canary result with an unsigned paired review; it does not authorize
   adoption or establish baseline freshness.
+- An explicitly confirmed two-image portability comparison can run baseline
+  and candidate on two trusted local image IDs under one budget. It matches
+  snapshot hashes across profiles but does not establish independence, safety,
+  authenticated results or adoption eligibility. Real Docker remains untested;
+  see `HARNESS-PORTABILITY.md`.
 - A local, plaintext content-addressed task bank usable by manual editor and
   campaign commands; it does not schedule tasks or provide recursion.
 - Locally reviewed experience notes in a dedicated plaintext memory graph,

@@ -36,10 +36,35 @@ def test_validation_workflow_has_matrix_wheel_and_explicit_docker_opt_in():
     ]
     assert "cd /tmp" in selected and "--import-mode=importlib" in selected
     assert "test_harness_tui_demo.py" in selected and "test_harness_doctor_aux.py" in selected
+    assert "test_harness_portability.py" in selected and "test_portability_cli.py" in selected
     docker = data["jobs"]["docker-isolation"]
     steps = {step["name"]: step for step in docker["steps"]}
     assert "docker build" in steps["Build local sandbox image"]["run"]
+    assert "docker build" in steps["Build second local image for portability smoke test"]["run"]
+    assert (
+        "ARCEN_PORTABILITY_IMAGE_A"
+        in steps["Build second local image for portability smoke test"]["run"]
+    )
     live = steps["Run explicitly enabled real-Docker checks"]
     assert live["env"]["ARCEN_TEST_DOCKER_ISOLATION"] == "1"
-    for name in ("test_turn_isolation.py", "test_manual_campaign.py", "test_harness_canary.py"):
+    for name in (
+        "test_turn_isolation.py",
+        "test_manual_campaign.py",
+        "test_harness_canary.py",
+        "test_harness_portability.py",
+    ):
         assert name in live["run"]
+
+
+def test_portability_image_dockerfile_is_valid_multiline_text():
+    import subprocess
+
+    data = yaml.load(WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    steps = {step["name"]: step for step in data["jobs"]["docker-isolation"]["steps"]}
+    line = steps["Build second local image for portability smoke test"]["run"].splitlines()[0]
+    printf = line.split(" | ", 1)[0]
+    result = subprocess.run(["sh", "-c", printf], capture_output=True, text=True, check=True)
+    assert result.stdout.splitlines() == [
+        "FROM ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0",
+        "LABEL org.arcen.profile=portability-smoke",
+    ]

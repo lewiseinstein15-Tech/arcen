@@ -45,6 +45,8 @@ jobs:
           PYTHONPATH="$GITHUB_WORKSPACE/tests" python -m pytest --import-mode=importlib -o addopts='' -q \
             "$GITHUB_WORKSPACE/tests/test_harness_tui_demo.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_fusion.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_portability.py" \
+            "$GITHUB_WORKSPACE/tests/test_portability_cli.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_task_screen.py" \
             "$GITHUB_WORKSPACE/tests/test_probe_known_values.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_doctor_aux.py"
@@ -70,12 +72,19 @@ jobs:
           python -m pip install '.[dev,tui]'
       - name: Build local sandbox image
         run: docker build --tag ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0 docker/sandbox
+      - name: Build second local image for portability smoke test
+        run: |
+          printf 'FROM ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0\nLABEL org.arcen.profile=portability-smoke\n' | docker build --tag arcen-portability-second:local -f - .
+          echo "ARCEN_PORTABILITY_IMAGE_A=$(docker image inspect ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0 --format '{{.Id}}')" >> "$GITHUB_ENV"
+          echo "ARCEN_PORTABILITY_IMAGE_B=$(docker image inspect arcen-portability-second:local --format '{{.Id}}')" >> "$GITHUB_ENV"
       - name: Run explicitly enabled real-Docker checks
         env:
           ARCEN_TEST_DOCKER_ISOLATION: "1"
         run: |
+          test -n "$ARCEN_PORTABILITY_IMAGE_A" && test -n "$ARCEN_PORTABILITY_IMAGE_B"
+          test "$ARCEN_PORTABILITY_IMAGE_A" != "$ARCEN_PORTABILITY_IMAGE_B"
           python -m pytest -q \
-            tests/test_turn_isolation.py tests/test_probe_container.py tests/test_headless.py \
+            tests/test_harness_portability.py tests/test_turn_isolation.py tests/test_probe_container.py tests/test_headless.py \
             tests/test_probe_execution.py tests/test_harness_comparison.py \
             tests/test_manual_campaign.py tests/test_campaign_journal.py \
             tests/test_harness_budget.py tests/test_durable_budget.py \

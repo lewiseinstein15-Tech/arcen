@@ -90,6 +90,10 @@ merely because a sub-scope is complete.
 - [x] H-21b: CI configuration checks installed import origin and runs selected
       installed-wheel harness/TUI tests outside the checkout; wheel contents
       include the new modules. Remote execution has not been verified.
+- [x] H-21c: interactive and Python two-image baseline/candidate comparisons
+      share a budget and reject a changed second workspace snapshot. Local
+      Docker/provider are mocked; images and evidence remain untrusted claims,
+      no executor adapter or adoption gate, and H-21 remains open.
 
 ## Verification still required
 

@@ -1012,3 +1012,18 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
   suite: 1,153 passed, 12 skipped; selected installed-wheel tests: 76 passed.
   The demo is not live campaign integration, an approval interface, a real
   end-to-end campaign, or a safety proof. H-20, H-21 and H-22 remain open.
+
+### H-21c — advisory two-image comparisons (partial)
+
+- `H-21c-real-portability-preview.png`: fresh installed `arcen harness`
+  command in a real PTY rendered by xterm.js/Chromium. It stops at the explicit
+  confirmation prompt. Image IDs and provider are fabricated; no Docker,
+  provider or judge call occurred.
+- `H-21c-real-portability-tests.png`: fresh installed-wheel test run from
+  outside the checkout: 27 passed, 2 skipped. Docker and provider are mocked;
+  skipped cases include opt-in real-Docker coverage.
+- Final source suite: 1,173 passed, 13 skipped. A broader installed-wheel run:
+  36 passed, 2 skipped. Changed-file Ruff, format, wheel and documentation
+  checks passed. Two IDs are not evidence of independent environments or safety;
+  CI's second image is only a labelled variant, and remote CI has not run.
+  H-21 remains open, as do adoption, safe resume and unattended autonomy.

@@ -48,6 +48,7 @@ def main() -> int:
             "arcen/harness/manual_cli.py",
             "arcen/harness/canary.py",
             "arcen/harness/fusion.py",
+            "arcen/harness/portability.py",
             "arcen/harness/progress.py",
             "arcen/harness/probe_hygiene.py",
             "arcen/harness/task_screen.py",

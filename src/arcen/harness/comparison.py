@@ -6,6 +6,7 @@ improvement. All local inputs and the judge callback are trusted by the caller.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -50,6 +51,7 @@ def run_reviewed_comparison(
     max_model_calls_per_trial: int = 4,
     sensitive_values: tuple[str, ...] = (),
     budget: SharedBudget | DurableBudget | None = None,
+    expected_workspace_sha256: str | None = None,
 ) -> ReviewedComparison:
     """Run two fresh trials over one snapshot, then judge reduced evidence.
 
@@ -65,6 +67,11 @@ def run_reviewed_comparison(
         raise HarnessError("invalid shared budget")
     if not callable(judge):
         raise HarnessError("invalid judge callback")
+    if expected_workspace_sha256 is not None and (
+        type(expected_workspace_sha256) is not str
+        or not re.fullmatch(r"[0-9a-f]{64}", expected_workspace_sha256)
+    ):
+        raise HarnessError("invalid expected workspace hash")
     if (
         type(sensitive_values) is not tuple
         or len(sensitive_values) > 31
@@ -103,6 +110,8 @@ def run_reviewed_comparison(
     if budget is not None:
         budget.checkpoint()
     snapshot = snapshot_git_commit(repo, commit)
+    if expected_workspace_sha256 is not None and snapshot.sha256 != expected_workspace_sha256:
+        raise HarnessError("reviewed workspace snapshot does not match expected hash")
     _reject_snapshot_secrets(snapshot, hidden)
     reference = _run_bound_probe(snapshot, cfg, reference_model)
     if reference.status == "error":

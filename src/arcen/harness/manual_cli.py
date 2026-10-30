@@ -802,3 +802,141 @@ def canary_interactive(
         )
     print("Result is unsigned and is not an adoption authorization. No refs moved.")
     return 0 if report.outcome == "passed" else 1
+
+
+def portability_interactive(
+    store: HarnessStore,
+    adopted_id: str,
+    baseline_id: str,
+    candidate_id: str,
+    task_file: str | None,
+    config_file: str,
+    repo: str,
+    commit: str,
+    budget_id: str,
+    image_ids: tuple[str, str],
+    *,
+    task_id: str | None = None,
+) -> int:
+    """Confirm two reviewed image comparisons with human judgments; never adopt."""
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        raise HarnessError("portability run requires an interactive terminal")
+    from .cli import _diff_objects, _safe
+    from .portability import run_portability_comparison, validate_image_ids
+
+    validate_image_ids(image_ids)
+    if type(commit) is not str or not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit):
+        raise HarnessError("commit must be a full lowercase Git object ID")
+    if not Path(repo).expanduser().is_dir():
+        raise HarnessError("repository directory is missing")
+    baseline = store.get_manifest(baseline_id)
+    packaged = default_manifest()
+    if (
+        baseline.schema_version != packaged.schema_version
+        or baseline.components != packaged.components
+    ):
+        raise HarnessError("portability run requires the unchanged packaged baseline")
+    if baseline_id == candidate_id:
+        raise HarnessError("portability run requires a distinct candidate")
+    review_candidate(store, baseline_id, candidate_id)
+    task = _task_input(store, task_file, task_id)
+    config = _config(config_file)
+    if config.sandbox.network != "none" or config.sandbox.backend not in ("auto", "docker"):
+        raise HarnessError("portability comparison requires Docker with networking disabled")
+    budget = DurableBudget(store, budget_id)
+    budget.checkpoint()
+    try:
+        bind_probe_model(store, baseline_id, baseline_id, task, config, budget=budget)
+        bind_probe_model(store, baseline_id, candidate_id, task, config, budget=budget)
+    except ProbeModelError:
+        raise HarnessError("portability preflight rejected sensitive or invalid input") from None
+    usage = budget.snapshot()
+    if (
+        usage.stopped
+        or usage.max_trials - usage.trials < 4
+        or usage.max_model_calls - usage.model_calls < 4
+        or usage.max_judge_calls - usage.judge_calls < 2
+    ):
+        raise HarnessError(
+            "portability requires at least four trial, four model and two judge admissions"
+        )
+    try:
+        endpoint = urlsplit(config.provider.base_url).hostname or "provider default"
+    except ValueError:
+        raise HarnessError("invalid provider endpoint") from None
+
+    def display(value: str) -> str:
+        value = redact_text(value)
+        if config.provider.api_key:
+            value = value.replace(config.provider.api_key, "[REDACTED]")
+        return _safe(value)
+
+    print("Manual two-image portability comparison")
+    print(f"Baseline: {baseline_id}\nCandidate: {candidate_id}")
+    if baseline_id != adopted_id:
+        print("WARNING: the test baseline is not the currently adopted baseline.")
+    print(f"Profile A image: {image_ids[0]}\nProfile B image: {image_ids[1]}")
+    print(f"Repository: {_safe(str(Path(repo).expanduser().absolute()))}; commit: {commit}")
+    print(
+        f"Provider: {display(config.provider.name)}; model: {display(config.provider.model)}; host: {display(endpoint)}"
+    )
+    print(
+        f"Budget: {budget.id}; trials {usage.trials}/{usage.max_trials}; model calls {usage.model_calls}/{usage.max_model_calls}; judges {usage.judge_calls}/{usage.max_judge_calls}"
+    )
+    print(
+        "Four trials and two human judgments; up to 16 model calls. Admission minimum is not a reservation."
+    )
+    print("Task (sanitized display):\n" + _safe(task))
+    print("Candidate sanitized diff:\n" + _diff_objects(store, baseline_id, candidate_id), end="")
+    print("Review and trust BOTH image contents, the commit, full endpoint and inputs separately.")
+    print(
+        "Images must exist locally. Docker daemon/image are trusted; no host fallback; tool network disabled."
+    )
+    print(
+        "Provider and judge exposure may reveal data and cost money. No token/USD or hard-runtime cap."
+    )
+    print(
+        "Image IDs do not establish distinct kernels, safety, evidence authenticity or authorization."
+    )
+    _confirm(f"Type PORTABILITY {candidate_id} to start: ", f"PORTABILITY {candidate_id}")
+
+    def human_judge(request: dict) -> str:
+        print("\nBlinded evidence (untrusted; may contain sensitive data):")
+        print(json.dumps(request, ensure_ascii=True, indent=2))
+        try:
+            choice = input("Choose A, B, TIE or CANCEL: ").strip().upper()
+        except (EOFError, KeyboardInterrupt):
+            raise HarnessError("judge cancelled") from None
+        if choice not in {"A", "B", "TIE"}:
+            raise HarnessError("judge cancelled")
+        return json.dumps(
+            {
+                "winner": "tie" if choice == "TIE" else choice,
+                "confidence": 0.5,
+                "reason": "manual preference; confidence not assessed",
+            }
+        )
+
+    report = run_portability_comparison(
+        store,
+        baseline_id,
+        candidate_id,
+        task,
+        config,
+        human_judge,
+        image_ids=image_ids,
+        repo=repo,
+        commit=commit,
+        budget=budget,
+        reviewed_inputs=True,
+        reviewed_judge_inputs=True,
+        reviewed_images=True,
+    )
+    print(f"Portability result: {report.outcome}")
+    for label, pair in (("A", report.first), ("B", report.second)):
+        if pair is not None and pair.judgment is not None:
+            print(
+                f"Profile {label}: {pair.judgment.winner}; confidence is an unassessed placeholder."
+            )
+    print("Unsigned advisory only; no review recorded, no refs moved, no adoption authorized.")
+    return 0 if report.outcome == "compared" else 1

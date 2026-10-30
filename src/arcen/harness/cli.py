@@ -444,6 +444,24 @@ def main(argv: list[str] | None = None) -> int:
     canary_run.add_argument(
         "--review", help="optional paired review ID for advisory evidence fusion"
     )
+    portability = commands.add_parser(
+        "portability", help="manually compare across two reviewed local images"
+    )
+    portability_commands = portability.add_subparsers(dest="portability_command", required=True)
+    portable = portability_commands.add_parser(
+        "run", help="interactive two-image comparison; never adopts"
+    )
+    portable.add_argument("--baseline", required=True)
+    portable.add_argument("--candidate", required=True)
+    portable_task = portable.add_mutually_exclusive_group(required=True)
+    portable_task.add_argument("--task-file")
+    portable_task.add_argument("--task-id")
+    portable.add_argument("--image-a", required=True, help="local Docker image ID (sha256:...)")
+    portable.add_argument("--image-b", required=True, help="different local Docker image ID")
+    portable.add_argument("--config", required=True)
+    portable.add_argument("--repo", required=True)
+    portable.add_argument("--commit", required=True)
+    portable.add_argument("--budget", required=True)
     editor = commands.add_parser("editor", help="generate unadopted proposals interactively")
     editor_commands = editor.add_subparsers(dest="editor_command", required=True)
     propose = editor_commands.add_parser("propose", help="request reviewed model-generated patches")
@@ -651,6 +669,23 @@ def main(argv: list[str] | None = None) -> int:
                 args.commit,
                 args.budget,
                 review_id=args.review,
+            )
+        elif args.command == "portability":
+            from .manual_cli import portability_interactive
+
+            store, lineage = _existing(args.store)
+            return portability_interactive(
+                store,
+                lineage.resolve("refs/heads/adopted"),
+                args.baseline,
+                args.candidate,
+                args.task_file,
+                args.config,
+                args.repo,
+                args.commit,
+                args.budget,
+                (args.image_a, args.image_b),
+                task_id=args.task_id,
             )
         elif args.command == "editor":
             from .manual_cli import editor_interactive
