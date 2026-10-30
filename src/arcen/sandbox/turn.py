@@ -42,6 +42,9 @@ class DockerTurnRegistry:
         if sandbox.network != "none":
             raise IsolationUnavailable("Tool execution requires sandbox.network=none.")
         self._container = None
+        turn_id = uuid.uuid4().hex
+        container_name = "arcen-turn-" + turn_id
+        run_attempted = False
         snapshot = None
         if workspace is not None:
             try:
@@ -61,7 +64,11 @@ class DockerTurnRegistry:
             self._client = docker_client
             # Never pull automatically: an operator must supply the selected image.
             docker_client.images.get(sandbox.image)
+            # A locally generated name lets an operator find a container even
+            # if the daemon creates it but the client never receives its handle.
+            run_attempted = True
             self._container = docker_client.containers.run(
+                name=container_name,
                 image=sandbox.image,
                 entrypoint=["sleep"],
                 command=["infinity"],
@@ -87,7 +94,7 @@ class DockerTurnRegistry:
                     "LANG": "C.UTF-8",
                     "PATH": "/usr/local/bin:/usr/bin:/bin",
                 },
-                labels={"arcen.turn": uuid.uuid4().hex},
+                labels={"arcen.turn": turn_id},
             )
             self._container.reload()
             attrs = self._container.attrs
@@ -111,17 +118,36 @@ class DockerTurnRegistry:
                     import_workspace(self._client, self._container, snapshot)
                 except Exception as exc:
                     raise WorkspaceError("isolated workspace import failed") from exc
-        except Exception as exc:
+        except BaseException as exc:  # cleanup is also required on interrupt
             if self._container is not None:
-                self.close()
+                try:
+                    self.close(strict=True)
+                except IsolationUnavailable:
+                    # The container may still exist. Do not claim successful
+                    # cleanup or expose daemon exception text to the caller.
+                    log.error("Docker setup cleanup unconfirmed for %s", container_name)
+                    raise IsolationUnavailable(
+                        "Docker setup failed and container cleanup could not be confirmed; "
+                        f"tool execution is disabled. Inspect the Docker daemon for orphaned containers named {container_name}."
+                    ) from None
+            elif run_attempted:
+                # The request may have reached the daemon even though the SDK
+                # raised before handing us a container handle.
+                log.error("Docker creation outcome unconfirmed for %s", container_name)
+                raise IsolationUnavailable(
+                    "Docker container creation outcome could not be confirmed; "
+                    f"tool execution is disabled. Inspect the Docker daemon for {container_name}."
+                ) from None
+            if not isinstance(exc, Exception):
+                raise  # preserve cancellation after confirmed cleanup
             if isinstance(exc, WorkspaceError):
                 raise IsolationUnavailable(
                     "Workspace import failed inside the isolated container; tool execution is disabled."
-                ) from exc
+                ) from None
             raise IsolationUnavailable(
                 "Docker isolation unavailable; tool execution is disabled. "
                 "Ensure the Docker daemon is running and the configured sandbox image is installed."
-            ) from exc
+            ) from None
 
     def dispatch(self, name: str, args: dict) -> dict:
         if name not in self.policy.execution.allowed_tools:

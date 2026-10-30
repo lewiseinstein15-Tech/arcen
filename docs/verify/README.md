@@ -676,3 +676,26 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   comprehensive secret scanning, a provider egress allowlist, or completion of
   probe hygiene hardening. Parent directories and the local filesystem remain
   trusted.
+
+### H-19b — Docker startup and server cleanup uncertainty (partial)
+
+- `H-19b-real-startup-refusal.png`: installed sandbox code executed in a fresh
+  PTY rendered by xterm.js/Chromium, with a **mock Docker SDK** simulating an
+  unacknowledged container creation. The generated container name is reported;
+  no real Docker container or model call was involved.
+- `H-19b-real-server-cleanup.png`: installed server code executed in a fresh
+  PTY with a **mock provider and mock Docker registry**. A cleanup failure
+  produced the actual `SANDBOX_CLEANUP_UNCONFIRMED` terminal event and no
+  success terminal. This is not a real-Docker demonstration.
+- `H-19b-real-startup-tests.png`: fresh installed-wheel PTY run: 135 passed,
+  4 skipped. Includes mocked creation/cleanup/interrupt and server event-order
+  tests; real-Docker tests were skipped here.
+- Full source suite: 887 passed, 12 skipped. Wheel check: 119 entries. Scoped
+  sandbox/test Ruff and formatting passed. The existing server module has seven
+  pre-existing Ruff findings; the count and rule breakdown were unchanged by
+  this edit. Documentation link and diff checks passed.
+- Strict cleanup can detect uncertainty, not guarantee daemon cleanup after
+  connectivity loss, process termination or host crash. Inspect potentially
+  orphaned containers without disrupting live runs. Normal server results now
+  wait for cleanup; previously streamed output cannot be retracted. No
+  automatic recovery, safe resume or adoption gate was added.

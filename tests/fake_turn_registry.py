@@ -23,5 +23,5 @@ class FakeTurnRegistry:
                 "result": {"stdout": cmd[5:] + "\n" if cmd.startswith("echo ") else "",
                            "stderr": "", "exit": 0}}
 
-    def close(self):
+    def close(self, *, strict=False):
         self.closed = True

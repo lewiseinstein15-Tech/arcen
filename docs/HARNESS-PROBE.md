@@ -92,7 +92,29 @@ approval workflow. The container is opened before model calls, has no host bind
 mount or network, and is subject to the existing Docker policy. It is strictly
 removed before a result is returned; cleanup failure raises an error rather than
 returning success, though a daemon failure may leave a container for manual
-inspection. There is no host or process fallback.
+inspection. Container creation is named and labelled `arcen-turn-<id>` /
+`arcen.turn=<id>`. If setup fails after creation, strict removal is attempted;
+if removal fails or the daemon may have created a container without returning a
+handle, a sanitized error and log identify the name as unconfirmed. An interrupt
+after a handle is received attempts cleanup before propagating. These measures
+cannot prove cleanup when the daemon is unavailable, the process is killed, or
+the host crashes. There is no host or process fallback.
+
+After an uncertain failure, an operator can inspect their trusted local daemon:
+
+```sh
+docker ps -a --filter 'label=arcen.turn' --format '{{.Names}} {{.Status}}'
+```
+
+The regular server turn also waits for strict removal before emitting its
+terminal `run.done` event and final tool-work summary. If removal is
+unconfirmed, it emits `SANDBOX_CLEANUP_UNCONFIRMED` instead of a success
+terminal. Earlier streamed output cannot be recalled, and a daemon or host
+failure may still leave an orphan; the error is not evidence of cleanup.
+
+A listed container can belong to a **live** turn. Do not remove it merely
+because it appears here; independently verify ownership, liveness and outcome
+before any manual cleanup. Automatic reconciliation and safe resume do not exist.
 
 The trial collects an in-memory, recursively redacted event trajectory and
 supports at most four plan steps, bash only, a 30-second command limit, and the
@@ -103,9 +125,12 @@ it. That can repeat side effects inside the container; workspace changes are not
 copied back. A direct answer is also run with a container opened and closed.
 
 This is not the ordinary shared server turn or the complete H-09 campaign
-prober. The standard `run_probe` remains unavailable, there is no CLI, no
-persisted trajectory, approval, ref movement or adoption. An explicitly
-reviewed paired-comparison API is described in `HARNESS-COMPARISON.md`.
+prober. The standard `run_probe` remains unavailable. There is no persisted
+full trajectory, authenticated approval, ref movement or adoption. Separate
+experimental interactive commands can run manual comparisons and simple
+behavioral canaries; see `HARNESS-MANUAL-CLI.md` and `HARNESS-CANARIES.md`.
+An explicitly reviewed paired-comparison API is described in
+`HARNESS-COMPARISON.md`.
 Inputs and outputs can contain secrets that filtering does not recognize;
 review does not prove otherwise. The model provider may receive task and prompt
 content and can incur cost. The sandbox image, Docker daemon, Git repository,

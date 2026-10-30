@@ -247,12 +247,24 @@ def run_turn(
     emitter = state.emitter_for(session_id)
     interrupted = state.run_flags[run_id]
 
-    def emit(event) -> None:
+    isolated_registry = None
+    pending_terminal = None
+    pending_summary = None
+
+    def emit_now(event) -> None:
         wire = emitter.emit(event)
         state.note_event(session_id, wire)
         state.store.append(session_id, wire)
 
-    isolated_registry = None
+    def emit(event) -> None:
+        nonlocal pending_terminal
+        # A terminal event must not claim success before container removal has
+        # been confirmed. Preserve the normal event order on clean teardown.
+        if isolated_registry is not None and event.TYPE in {"run.done", "run.error"}:
+            pending_terminal = event
+        else:
+            emit_now(event)
+
     try:
         emit(RunStart(seq=0, run_id=run_id, goal=goal, depth=0, ts=0.0, harness_ref=harness_ref))
         # An explicitly requested workspace is never silently ignored, even
@@ -372,13 +384,13 @@ def run_turn(
         duration = round(time.time() - turn_start, 4)
         if failure is not None:
             # T-042: the honest terminal summary — what was tried, why it died
-            emit(Answer(seq=0, text=f"Turn failed: {failure}", ts=0.0))
+            pending_summary = Answer(seq=0, text=f"Turn failed: {failure}", ts=0.0)
             emit(RunDone(seq=0, status="failed", steps=executed, duration_s=duration, ts=0.0))
         elif verified:
-            emit(Answer(seq=0, text=f"Done. {executed} step(s) executed against: {goal}. Verification passed.", ts=0.0))
+            pending_summary = Answer(seq=0, text=f"Done. {executed} step(s) executed against: {goal}. Verification passed.", ts=0.0)
             emit(RunDone(seq=0, status="ok", steps=executed, duration_s=duration, ts=0.0))
         else:
-            emit(Answer(seq=0, text=f"Turn failed: verification did not pass after {executed} step(s).", ts=0.0))
+            pending_summary = Answer(seq=0, text=f"Turn failed: verification did not pass after {executed} step(s).", ts=0.0)
             emit(RunDone(seq=0, status="failed", steps=executed, duration_s=duration, ts=0.0))
     except IsolationUnavailable as exc:
         emit(RunError(seq=0, code="SANDBOX_UNAVAILABLE", message=str(exc), ts=0.0))
@@ -392,7 +404,22 @@ def run_turn(
         emit(RunError(seq=0, code="TURN_FAILED", message=str(exc), ts=0.0))
     finally:
         if isolated_registry is not None:
-            isolated_registry.close()
+            try:
+                isolated_registry.close(strict=True)
+            except Exception:  # noqa: BLE001 — untrusted daemon failures may contain secrets
+                emit_now(
+                    RunError(
+                        seq=0,
+                        code="SANDBOX_CLEANUP_UNCONFIRMED",
+                        message="Isolated container cleanup could not be confirmed; inspect the Docker daemon.",
+                        ts=0.0,
+                    )
+                )
+            else:
+                if pending_terminal is not None:
+                    if pending_summary is not None:
+                        emit_now(pending_summary)
+                    emit_now(pending_terminal)
 
 
 # ---------------------------------------------------------------------------

@@ -244,10 +244,244 @@ def test_real_docker_isolation_when_explicitly_enabled(monkeypatch, tmp_path):
 def test_strict_probe_cleanup_failure_is_generic(caplog):
     docker = FakeDocker()
     reg = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+
     def fail(*args, **kwargs):
         raise RuntimeError("sensitive-daemon-error")
+
     docker.container.remove = fail
     with pytest.raises(IsolationUnavailable, match="cleanup failed") as error:
         reg.close(strict=True)
     assert "sensitive-daemon-error" not in str(error.value)
     assert "sensitive-daemon-error" not in caplog.text
+
+
+def test_constructor_cleanup_failure_is_visible_and_does_not_leak_daemon_errors(caplog):
+    import traceback
+
+    docker = FakeDocker()
+    docker.container.attrs["HostConfig"]["NetworkMode"] = "bridge"
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("sensitive-daemon-secret-123")
+
+    docker.container.remove = fail
+    with pytest.raises(IsolationUnavailable, match="cleanup could not be confirmed") as caught:
+        DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    rendered = "".join(traceback.format_exception(caught.value))
+    assert "sensitive-daemon-secret-123" not in rendered + caplog.text
+    assert "disabled" in str(caught.value) and "orphaned containers" in str(caught.value)
+    assert not docker.container.calls
+
+
+def test_constructor_failure_cleans_existing_container_and_suppresses_exception_chain():
+    import traceback
+
+    docker = FakeDocker()
+
+    def reload():
+        raise RuntimeError("sensitive-reload-secret-456")
+
+    docker.container.reload = reload
+    with pytest.raises(IsolationUnavailable, match="tool execution is disabled") as caught:
+        DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    assert docker.container.removed and not docker.container.calls
+    assert "sensitive-reload-secret-456" not in "".join(traceback.format_exception(caught.value))
+
+
+def test_workspace_import_failure_reports_cleanup_uncertainty(monkeypatch, tmp_path, caplog):
+    import traceback
+
+    from arcen.sandbox import turn
+
+    docker = FakeDocker()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "file.txt").write_text("safe")
+
+    def fail_import(*args, **kwargs):
+        raise RuntimeError("sensitive-import-error")
+
+    def fail_remove(*args, **kwargs):
+        raise RuntimeError("sensitive-remove-error")
+
+    docker.container.remove = fail_remove
+    monkeypatch.setattr(turn, "import_workspace", fail_import)
+    with pytest.raises(IsolationUnavailable, match="cleanup could not be confirmed") as caught:
+        DockerTurnRegistry(ArcenConfig(), docker_client=docker, workspace=str(workspace))
+    rendered = "".join(traceback.format_exception(caught.value)) + caplog.text
+    assert "sensitive-import-error" not in rendered and "sensitive-remove-error" not in rendered
+    assert not docker.container.calls
+
+
+def test_named_container_links_label_and_cleanup_identity():
+    import re
+
+    docker = FakeDocker()
+    reg = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    identifier = docker.run_args["labels"]["arcen.turn"]
+    assert re.fullmatch(r"[a-f0-9]{32}", identifier)
+    assert docker.run_args["name"] == "arcen-turn-" + identifier
+    reg.close(strict=True)
+    assert docker.container.removed
+
+
+def test_unacknowledged_creation_reports_generated_name_without_secret(caplog):
+    import re
+    import traceback
+
+    docker = FakeDocker()
+    seen = []
+
+    def run(**kwargs):
+        seen.append(kwargs["name"])
+        raise RuntimeError("sensitive-post-create-secret")
+
+    docker.containers.run = run
+    with pytest.raises(
+        IsolationUnavailable, match="creation outcome could not be confirmed"
+    ) as caught:
+        DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    assert len(seen) == 1 and re.fullmatch(r"arcen-turn-[a-f0-9]{32}", seen[0])
+    assert seen[0] in str(caught.value) and seen[0] in caplog.text
+    assert (
+        "sensitive-post-create-secret"
+        not in "".join(traceback.format_exception(caught.value)) + caplog.text
+    )
+    assert not docker.container.calls
+
+
+def test_interrupt_during_setup_cleans_up_before_propagating():
+    docker = FakeDocker()
+
+    def interrupted():
+        raise KeyboardInterrupt
+
+    docker.container.reload = interrupted
+    with pytest.raises(KeyboardInterrupt):
+        DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    assert docker.container.removed and not docker.container.calls
+
+
+def test_interrupt_during_unacknowledged_creation_reports_uncertainty():
+    docker = FakeDocker()
+
+    def interrupted(**kwargs):
+        raise KeyboardInterrupt
+
+    docker.containers.run = interrupted
+    with pytest.raises(IsolationUnavailable, match="creation outcome could not be confirmed"):
+        DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    assert not docker.container.calls
+
+
+def test_interrupt_with_failed_cleanup_reports_uncertainty():
+    docker = FakeDocker()
+
+    def interrupted():
+        raise KeyboardInterrupt
+
+    def failed_remove(**kwargs):
+        raise RuntimeError("daemon-secret")
+
+    docker.container.reload = interrupted
+    docker.container.remove = failed_remove
+    with pytest.raises(IsolationUnavailable, match="cleanup could not be confirmed") as caught:
+        DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    assert "daemon-secret" not in str(caught.value)
+
+
+def _server_run_for_cleanup(
+    tmp_path, monkeypatch, registry, *, workspace=None, provider_fails=False
+):
+    import json
+    import threading
+
+    import arcen.server.app as server
+    from arcen.llm.client import LLMResponse, ProviderError
+
+    class Planner:
+        def is_available(self):
+            return True
+
+        def complete(self, role, messages, **kwargs):
+            if provider_fails:
+                raise ProviderError("private-provider-message")
+            if "Return ONLY the word" in messages[-1]["content"]:
+                return LLMResponse(text="CODE", model="stub")
+            return LLMResponse(
+                text=json.dumps([{"title": "check", "tool": "bash", "args": {"cmd": "true"}}]),
+                model="stub",
+            )
+
+    config = ArcenConfig()
+    config.session.dir = str(tmp_path)
+    state = server.ServerState(config)
+    state.llm = Planner()
+    monkeypatch.setattr(server, "create_turn_registry", lambda *a, **kw: registry)
+    state.run_flags["cleanup"] = threading.Event()
+    observed = []
+    original_note = state.note_event
+
+    def note(session, event):
+        if event["type"] in {"run.done", "run.error"}:
+            observed.append(registry.closed)
+        original_note(session, event)
+
+    monkeypatch.setattr(state, "note_event", note)
+    server.run_turn("run test", "session-cleanup", "cleanup", state, workspace=workspace)
+    return state.emitters["session-cleanup"].replay(0), observed
+
+
+def test_server_success_terminal_waits_for_strict_cleanup(tmp_path, monkeypatch):
+    from fake_turn_registry import FakeTurnRegistry
+
+    class StrictRegistry(FakeTurnRegistry):
+        def close(self, *, strict=False):
+            assert strict is True
+            self.closed = True
+
+    registry = StrictRegistry()
+    events, observed = _server_run_for_cleanup(tmp_path, monkeypatch, registry)
+    assert observed == [True]
+    assert events[-1]["type"] == "run.done" and events[-1]["status"] == "ok"
+    assert events[-2]["type"] == "answer" and "Verification passed" in events[-2]["text"]
+
+
+def test_server_cleanup_failure_replaces_success_without_leaking_secret(tmp_path, monkeypatch):
+    from fake_turn_registry import FakeTurnRegistry
+
+    class FailingRegistry(FakeTurnRegistry):
+        def close(self, *, strict=False):
+            assert strict is True
+            self.closed = True
+            raise RuntimeError("secret-daemon-cleanup-failure")
+
+    registry = FailingRegistry()
+    events, observed = _server_run_for_cleanup(tmp_path, monkeypatch, registry)
+    assert observed == [True]
+    assert events[-1]["type"] == "run.error" and events[-1]["code"] == "SANDBOX_CLEANUP_UNCONFIRMED"
+    assert not any(event["type"] == "run.done" for event in events)
+    assert not any(
+        event["type"] == "answer" and "Verification passed" in event.get("text", "")
+        for event in events
+    )
+    assert "secret-daemon-cleanup-failure" not in repr(events)
+
+
+def test_server_provider_failure_does_not_hide_cleanup_failure(tmp_path, monkeypatch):
+    from fake_turn_registry import FakeTurnRegistry
+
+    class FailingRegistry(FakeTurnRegistry):
+        def close(self, *, strict=False):
+            assert strict is True
+            self.closed = True
+            raise RuntimeError("secret-daemon-cleanup-failure")
+
+    registry = FailingRegistry()
+    events, observed = _server_run_for_cleanup(
+        tmp_path, monkeypatch, registry, workspace=str(tmp_path), provider_fails=True
+    )
+    assert observed == [True]
+    assert events[-1]["type"] == "run.error" and events[-1]["code"] == "SANDBOX_CLEANUP_UNCONFIRMED"
+    assert "secret-daemon-cleanup-failure" not in repr(events)
+    assert "private-provider-message" not in repr(events)
