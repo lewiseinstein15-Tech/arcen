@@ -409,3 +409,23 @@ def test_cli_rejects_wrong_or_legacy_unbound_budget_before_confirmation(
     assert main(changed) == 1
     assert "legacy unbound campaign" in capsys.readouterr().err
     assert journal.get(old.id).state == "ready"
+
+
+def test_campaign_detected_task_secret_refused_without_provider_or_traceback(
+    tmp_path, monkeypatch, capsys
+):
+    store, _, baseline, candidate, task, _, _, old_id, budget_id, run_args = setup(tmp_path, capsys)
+    task.write_text("Sensitive " + SECRET)
+    journal = CampaignJournal(store)
+    commit = journal.get(old_id).commit
+    plan = journal.plan(
+        baseline, (candidate,), task.read_text(), commit, budget=DurableBudget(store, budget_id)
+    )
+    run_args[4] = plan.id
+    tty(monkeypatch)
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("unexpected prompt"))
+    assert main(run_args) == 1
+    output = capsys.readouterr()
+    assert "model preflight rejected" in output.err and SECRET not in output.err + output.out
+    assert journal.get(plan.id).state == "ready"
+    assert DurableBudget(store, budget_id).snapshot().trials == 0

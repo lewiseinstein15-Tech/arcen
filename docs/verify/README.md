@@ -621,3 +621,21 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   transaction across databases. Legacy Python plans can remain unbound; CLI
   refuses them. This is not a monetary/token cap, hard runtime cancellation,
   resume, adoption or completion of the broader roadmap.
+
+### H-08b — confirmed model-backed manual editor (partial)
+
+- `H-08b-real-editor-prompt.png`: installed `arcen harness editor propose` in
+  a fresh real PTY rendered by xterm.js/Chromium. The fake provider endpoint was
+  not contacted: the screenshot was taken before the exact confirmation and the
+  terminal was closed at the prompt. No candidate was generated or adopted.
+- `H-08b-real-editor-tests.png`: fresh PTY run against the installed wheel:
+  9 passed. Tests include two actual loopback HTTP calls to a local mock provider;
+  the other provider responses are mocked in-process. Docker is not used by the
+  editor. No paid/external provider was contacted or verified.
+- Full source suite: 849 passed, 11 skipped. Wheel check: 118 entries. Scoped
+  lint, formatting, docs-link and diff checks passed.
+- The command sends the task and five editable components to the chosen pinned
+  provider only after explicit confirmation. Admission counts are not USD/token
+  caps. Candidates are independent, untrusted, unapproved and unadopted; this is
+  neither a model panel, automatic campaign, autonomous selection nor completion
+  of H-08/Harness². Candidate selection and adoption remain disabled.

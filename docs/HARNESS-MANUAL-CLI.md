@@ -1,8 +1,9 @@
 # Experimental interactive manual campaigns
 
 This is a limited operator-driven comparison, **not the complete Harness²
-runner**. It imports locally authored patches, compares them to an unchanged
-packaged baseline, and records pending reviews. It does not generate candidates,
+runner**. It imports locally authored patches or generates unadopted proposals
+through a separate confirmed editor command, compares selected candidates to an
+unchanged packaged baseline, and records pending reviews. It does not
 select, adopt, roll back, resume or run unattended. Docker isolation remains
 mandatory and fail-closed; there is no host fallback.
 
@@ -26,7 +27,8 @@ In a source checkout, `src/arcen/prompts/draft.md` is one possible original for
 an editable component. An imported patch must be an exact unified diff for one
 allowlisted component, with matching `a/` and `b/` paths; edits to immutable
 policy are rejected. The example presumes you have already created and reviewed
-such a patch and a task text file.
+such a patch and a task text file. Alternatively, see `HARNESS-EDITOR.md` for
+the separately confirmed model-backed proposal command.
 
 ```sh
 STORE="$HOME/.arcen/harness"

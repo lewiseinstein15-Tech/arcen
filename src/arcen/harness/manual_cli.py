@@ -24,7 +24,7 @@ from .manifest import Manifest, default_manifest
 from .model import content_hash
 from .policy import review_candidate
 from .probe_execution import _reviewed_config
-from .probe_model import bind_probe_model
+from .probe_model import ProbeModelError, _review_input, bind_probe_model
 from .resolver import HarnessError
 from .review import ReviewLedger
 from .store import HarnessStore
@@ -153,10 +153,13 @@ def run_interactive(
     budget = DurableBudget(store, budget_id)
     budget.checkpoint()
     # Preflight model bindings and all candidate policies without provider calls.
-    bind_probe_model(store, record.baseline, record.baseline, task, config, budget=budget)
-    for candidate in record.candidates:
-        review_candidate(store, record.baseline, candidate)
-        bind_probe_model(store, record.baseline, candidate, task, config, budget=budget)
+    try:
+        bind_probe_model(store, record.baseline, record.baseline, task, config, budget=budget)
+        for candidate in record.candidates:
+            review_candidate(store, record.baseline, candidate)
+            bind_probe_model(store, record.baseline, candidate, task, config, budget=budget)
+    except ProbeModelError:
+        raise HarnessError("model preflight rejected sensitive or invalid input") from None
     try:
         endpoint = urlsplit(config.provider.base_url).hostname or "provider default"
     except ValueError:
@@ -251,4 +254,97 @@ def run_interactive(
     print(
         "Campaign completed; pending reviews require separate human inspection. No adoption occurred."
     )
+    return 0
+
+
+def editor_interactive(
+    store: HarnessStore,
+    baseline_id: str,
+    task_file: str,
+    config_file: str,
+    budget_id: str,
+    k: int,
+) -> int:
+    """Generate unadopted independent proposals after interactive review."""
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        raise HarnessError("editor requires an interactive terminal")
+    if type(k) is not int or not 1 <= k <= 4:
+        raise HarnessError("editor k must be between 1 and 4")
+    from .cli import _diff_objects, _safe
+    from .editor import propose
+
+    baseline = store.get_manifest(baseline_id)
+    packaged = default_manifest()
+    if (
+        baseline.schema_version != packaged.schema_version
+        or baseline.components != packaged.components
+    ):
+        raise HarnessError("editor requires the unchanged packaged baseline")
+    task = _read_text(task_file, 16000)
+    config = _config(config_file)
+    budget = DurableBudget(store, budget_id)
+    budget.checkpoint()
+    try:
+        model = bind_probe_model(
+            store, baseline_id, baseline_id, task, config, max_calls=2 * k, budget=budget
+        )
+    except ProbeModelError:
+        raise HarnessError("model preflight rejected sensitive or invalid input") from None
+    # The editor sends the full component files, not just resolved prompt
+    # sections. Screen each before confirmation and before any request.
+    try:
+        for path in EDITABLE:
+            _review_input(
+                store.get_blob(baseline.components[path]).decode("utf-8"), config.provider.api_key
+            )
+    except Exception:  # noqa: BLE001 — never disclose detected secrets
+        raise HarnessError("editor input contains invalid or sensitive component data") from None
+    usage = budget.snapshot()
+    if usage.stopped or usage.max_model_calls - usage.model_calls < 2 * k:
+        raise HarnessError("editor requires sufficient open model-call admissions")
+    try:
+        endpoint = urlsplit(config.provider.base_url).hostname or "provider default"
+    except ValueError:
+        raise HarnessError("invalid provider endpoint") from None
+
+    def display(value: str) -> str:
+        value = redact_text(value)
+        if config.provider.api_key:
+            value = value.replace(config.provider.api_key, "[REDACTED]")
+        return _safe(value)
+
+    print(f"Editor baseline: {baseline_id}; budget: {budget.id}; proposals: {2 * k}")
+    print(
+        f"Provider: {display(config.provider.name)}; model: {display(config.provider.model)}; endpoint host: {display(endpoint)}"
+    )
+    print(
+        f"Budget model admissions: {usage.model_calls}/{usage.max_model_calls}; needed: {2 * k}; cutoff in {usage.admission_seconds_remaining:.1f}s"
+    )
+    print("Task (sanitized):\n" + _safe(task))
+    print("This sends the task and all five editable packaged components to the provider.")
+    print("Review the exact task, baseline components, full endpoint and config separately.")
+    print(
+        "Provider calls may transmit sensitive data and cost money; no USD/token cap is enforced."
+    )
+    print("Generated diffs are untrusted, untested and unapproved. Nothing is executed or adopted.")
+    _confirm(f"Type EDIT {baseline_id} to start: ", f"EDIT {baseline_id}")
+
+    def request_editor(request: dict) -> str:
+        message = json.dumps(request, ensure_ascii=False, separators=(",", ":"))
+        return model.complete("planner", [{"role": "user", "content": message}]).text
+
+    try:
+        proposals = propose(store, baseline_id, task, (request_editor,), k=k)
+    except Exception:  # noqa: BLE001 — untrusted provider/model details may contain secrets
+        raise HarnessError(
+            "editor generation failed; inspect budget usage before retrying"
+        ) from None
+    for proposal in proposals:
+        result = compose_proposals(store, baseline_id, (proposal,))
+        if result.candidate_id is None:
+            raise HarnessError("editor candidate composition failed")
+        review_candidate(store, baseline_id, result.candidate_id)
+        print(f"\nUnadopted {proposal.scope} candidate: {result.candidate_id}")
+        print(_diff_objects(store, baseline_id, result.candidate_id), end="")
+    print("\nCandidates are untrusted; inspect them before planning trials. No refs moved.")
     return 0

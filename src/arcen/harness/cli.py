@@ -236,6 +236,14 @@ def main(argv: list[str] | None = None) -> int:
     patch.add_argument("baseline")
     patch.add_argument("path", help="allowlisted component path")
     patch.add_argument("patch_file")
+    editor = commands.add_parser("editor", help="generate unadopted proposals interactively")
+    editor_commands = editor.add_subparsers(dest="editor_command", required=True)
+    propose = editor_commands.add_parser("propose", help="request reviewed model-generated patches")
+    propose.add_argument("--baseline", required=True)
+    propose.add_argument("--task-file", required=True)
+    propose.add_argument("--config", required=True)
+    propose.add_argument("--budget", required=True)
+    propose.add_argument("--k", type=int, default=1)
     review = commands.add_parser("review", help="record human review; adoption remains disabled")
     review_commands = review.add_subparsers(dest="review_command", required=True)
     review_open = review_commands.add_parser(
@@ -313,6 +321,13 @@ def main(argv: list[str] | None = None) -> int:
             store, _ = _existing(args.store)
             identifier = import_patch(store, args.baseline, args.path, args.patch_file)
             print(f"Unadopted candidate: {identifier}")
+        elif args.command == "editor":
+            from .manual_cli import editor_interactive
+
+            store, _ = _existing(args.store)
+            return editor_interactive(
+                store, args.baseline, args.task_file, args.config, args.budget, args.k
+            )
         elif args.command == "review":
             _review_command(args)
         elif args.command == "campaign":
