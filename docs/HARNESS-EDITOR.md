@@ -25,7 +25,9 @@ pin as the baseline**, not a separate editor model or model panel. It sends the
 task and all five editable baseline components to that provider. First inspect
 the exact task, packaged baseline components, config, provider and endpoint;
 network requests can disclose information and cost money. The command does not
-inspect the full endpoint for you, and secret detection is best effort.
+inspect the full endpoint for you, and secret detection is best effort. Manual
+commands use the stricter configuration parser described in
+`HARNESS-MANUAL-CLI.md`.
 
 ```sh
 arcen harness --store "$STORE" editor propose --baseline "$BASELINE" \

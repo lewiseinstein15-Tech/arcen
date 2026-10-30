@@ -20,7 +20,12 @@ The CLI's config is a YAML file with the existing ARCEN configuration schema;
 must match your intended provider and fixed pin. Environment references in the
 provider endpoint and key are resolved as in the reviewed probe; do not put
 credentials in command-line arguments. Unlike the normal config loader, this
-CLI does not seed environment variables from the config.
+CLI does not seed environment variables from the config. Its stricter YAML
+parser rejects duplicate or non-string keys, aliases, anchors, merge keys and
+explicit tags to avoid ambiguous or expansive input; use ordinary mappings
+instead. Config, task and patch inputs must be bounded UTF-8 regular files; the
+final path component cannot be a symlink. Parent directories and the local
+filesystem remain trusted.
 
 The following is a workflow outline; replace values with your reviewed inputs.
 In a source checkout, `src/arcen/prompts/draft.md` is one possible original for

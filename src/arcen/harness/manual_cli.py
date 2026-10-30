@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 import yaml
 
 from arcen.config import DEFAULT_CONFIG, ArcenConfig, deep_merge, migrate_legacy_config
+from arcen.guardrails.policy import _UniqueSafeLoader
 from arcen.plugins.redact_secrets import redact_text
 
 from .campaign_journal import CampaignJournal
@@ -54,7 +55,15 @@ def _read_text(path: str, limit: int) -> str:
 def _config(path: str) -> ArcenConfig:
     raw_text = _read_text(path, 64 * 1024)
     try:
-        raw = yaml.safe_load(raw_text) or {}
+        # Prevent ambiguous duplicate keys, YAML merge/alias expansion and
+        # explicit object tags in operator-reviewed config. This stricter
+        # parser is scoped to manual harness commands, not normal ARCEN boot.
+        if any(
+            isinstance(token, (yaml.AliasToken, yaml.AnchorToken, yaml.TagToken))
+            for token in yaml.scan(raw_text)
+        ):
+            raise ValueError("ambiguous YAML")
+        raw = yaml.load(raw_text, Loader=_UniqueSafeLoader) or {}
         if type(raw) is not dict:
             raise ValueError("config must be a mapping")
         config = ArcenConfig.model_validate(deep_merge(DEFAULT_CONFIG, migrate_legacy_config(raw)))

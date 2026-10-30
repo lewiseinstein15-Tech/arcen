@@ -657,3 +657,22 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   Results are ephemeral and unsigned; a pass is not an adoption gate, policy
   proof, authenticated approval, or authorization. No auto-rollback or
   autonomy was implemented. See `docs/HARNESS-CANARIES.md`.
+
+### H-19a — manual-command configuration hygiene (partial)
+
+- `H-19a-real-config-refusal.png`: fresh installed `arcen harness editor
+  propose` in a real PTY with a deliberately duplicate-key local YAML config.
+  The actual command refused it with exit status 1 before confirmation; the
+  wrapper displayed the exit code and held the terminal open for capture. No
+  provider call or Docker operation occurred.
+- `H-19a-real-config-tests.png`: fresh PTY run against the installed wheel:
+  11 passed. Tests cover duplicates, merge keys, aliases, anchors, explicit
+  tags, invalid mappings, bounded inputs, final-component symlinks, safe error
+  messages and environment-reference behavior.
+- Full source suite: 876 passed, 12 skipped. Wheel: 119 entries; scoped lint,
+  formatting, documentation links and diff checks passed.
+- This stricter parser applies only to interactive manual harness commands, not
+  ordinary ARCEN config loading. It is not prompt-injection detection,
+  comprehensive secret scanning, a provider egress allowlist, or completion of
+  probe hygiene hardening. Parent directories and the local filesystem remain
+  trusted.
