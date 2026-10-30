@@ -334,6 +334,16 @@ def main(argv: list[str] | None = None) -> int:
     diff.add_argument("ref", help="candidate ref, e.g. refs/candidates/example")
     rollback = commands.add_parser("rollback", help="unavailable until adoption gates exist")
     rollback.add_argument("ref", help="target ref (not applied yet)")
+    attestation = commands.add_parser(
+        "attestation", help="verify a detached signature; does not authorize adoption"
+    )
+    attestation_commands = attestation.add_subparsers(dest="attestation_command", required=True)
+    verify = attestation_commands.add_parser(
+        "verify", help="verify using an explicitly supplied key"
+    )
+    verify.add_argument("--manifest", required=True, help="expected stored manifest SHA-256")
+    verify.add_argument("--file", required=True, help="canonical detached attestation file")
+    verify.add_argument("--public-key", required=True, help="trusted raw Ed25519 public key as hex")
     baseline = commands.add_parser("pin-baseline", help="create an unadopted fixed-model baseline")
     baseline.add_argument("pin", help="fixed:provider:model")
     patch = commands.add_parser(
@@ -476,6 +486,22 @@ def main(argv: list[str] | None = None) -> int:
             print("Hashes do not authenticate provenance; candidate selection remains disabled.")
         elif args.command == "diff":
             print(_diff(args.store, args.ref), end="")
+        elif args.command == "attestation":
+            from .attestation import MAX_ATTESTATION_BYTES, verify_attestation
+            from .manual_cli import _read_text
+
+            if len(args.public_key) != 64 or any(
+                c not in "0123456789abcdef" for c in args.public_key
+            ):
+                raise HarnessError("public key must be 64 lowercase hexadecimal characters")
+            raw = _read_text(args.file, MAX_ATTESTATION_BYTES).encode("utf-8")
+            store, _ = _existing(args.store)
+            verified = verify_attestation(store, args.manifest, raw, bytes.fromhex(args.public_key))
+            print(f"Signature valid for manifest: {verified.manifest}")
+            print(f"Signer public-key SHA-256: {verified.public_key_sha256}")
+            print(f"Signed parent claim: {verified.parent or 'none'}")
+            print("Explicit key only; lineage, safety and authorization are not verified.")
+            print("Ordinary candidate runtime selection and adoption remain disabled.")
         elif args.command == "pin-baseline":
             from .manual_cli import pin_baseline
 

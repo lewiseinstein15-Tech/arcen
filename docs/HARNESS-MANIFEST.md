@@ -8,10 +8,12 @@ malformed, unexpected or changed files stop startup. The manifest is included
 in the wheel. The resolved manifest is immutable in memory.
 
 These hashes detect changes relative to the manifest; **they are not digital
-signatures**. An attacker who can alter both the manifest and component files
+signatures**. Optional detached signatures over stored version-1 manifest IDs
+are described in [HARNESS-ATTESTATION.md](HARNESS-ATTESTATION.md); they are not
+used at boot or for adoption. An attacker who can alter both the manifest and component files
 can replace the hashes. This mechanism does not make a hostile package safe.
-Ref resolution, an authenticated trust root, signed manifests, and adoption
-remain future work. The component list does not yet represent all eight planned
+Candidate runtime ref resolution, an authenticated trust root, signed packaged
+manifests, and adoption remain future work. The component list does not yet represent all eight planned
 Harness² components.
 
 The shipped model pin is `provider-configured`, which intentionally leaves the

@@ -45,6 +45,9 @@ merely because a sub-scope is complete.
 - [x] H-04a: disabled harnessing configuration rejects unsupported settings and
       non-boolean values; validated config updates fail without side effects.
       H-04 package, signatures and trust remain incomplete.
+- [x] H-04b: optional detached Ed25519 manifest-claim signing and explicit-key
+      offline verification, including stored component integrity. No trust
+      enrollment, authenticated lineage, runtime enforcement or adoption.
 - [x] H-11g: guided selection of one to five candidates for a single manually
       confirmed sequential campaign, with lower-bound admission checks. This
       completes only this sub-scope, not H-11, H-14 or the Governor.

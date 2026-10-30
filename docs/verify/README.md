@@ -843,3 +843,21 @@ adoption. This is user-reported terminal output, not a captured screenshot.
 - This is schema hardening only. Normal YAML parsing still permits duplicate
   keys and trusted Python code can bypass validation. The full H-04 package,
   signatures and trust integration remain incomplete.
+
+### H-04b — detached manifest-claim signatures (partial)
+
+- `H-04b-real-attestation.png`: fresh installed `arcen harness attestation
+  verify` commands in a real PTY rendered by xterm.js/Chromium. A freshly
+  generated **demonstration** key verifies the intact manifest claim and the
+  altered parent claim fails signature verification. The demo key is not a
+  production trust anchor; neither Docker nor a provider was used.
+- `H-04b-real-attestation-tests.png`: fresh installed-wheel PTY run of the
+  focused attestation suite, **15 passed**.
+- Source suite: **998 passed, 12 skipped**. Installed-wheel focused attestation,
+  config, manifest, store, baseline prompt and headless tests: **100 passed,
+  1 skipped**. The legacy CLI test helpers explicitly use source for some
+  subprocesses; the attestation CLI subprocess uses the installed package.
+  Wheel contents check: **123 entries**.
+- Detached signatures are not enforced by boot or adoption. The public key is
+  supplied explicitly; parent claims, signer identity, revocation and safety
+  are not independently verified. Full H-04 remains incomplete.
