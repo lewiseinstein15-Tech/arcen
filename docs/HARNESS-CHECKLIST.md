@@ -48,6 +48,9 @@ merely because a sub-scope is complete.
 - [x] H-04b: optional detached Ed25519 manifest-claim signing and explicit-key
       offline verification, including stored component integrity. No trust
       enrollment, authenticated lineage, runtime enforcement or adoption.
+- [x] H-04c: packaged prompts, guardrails and registry metadata consume one
+      immutable hash-verified default snapshot, including concurrent startup.
+      This does not authenticate the package or implement all components.
 - [x] H-11g: guided selection of one to five candidates for a single manually
       confirmed sequential campaign, with lower-bound admission checks. This
       completes only this sub-scope, not H-11, H-14 or the Governor.

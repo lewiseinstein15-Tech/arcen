@@ -3,9 +3,13 @@
 `arcen/harness.toml` contains schema version 1, a model-pin declaration and
 SHA-256 hashes for the seven packaged components currently implemented: the four
 prompt files, tool guidance, the guardrail policy and tool-registry metadata.
-ARCEN validates the allowlisted paths and file hashes at server startup. Missing,
-malformed, unexpected or changed files stop startup. The manifest is included
-in the wheel. The resolved manifest is immutable in memory.
+On first packaged-default access (normally during startup), ARCEN reads and
+validates the allowlisted paths and file hashes as one immutable, process-local
+snapshot. Packaged default prompts, guardrails and built-in registry metadata
+consume those exact verified bytes rather than rereading the files. Missing,
+malformed, unexpected or changed files at capture fail closed. After capture,
+disk edits are not observed by those consumers until a fresh process starts;
+this is not continuous tamper monitoring. The manifest ships in the wheel.
 
 These hashes detect changes relative to the manifest; **they are not digital
 signatures**. Optional detached signatures over stored version-1 manifest IDs
@@ -49,3 +53,19 @@ is validated. The stricter manual-campaign YAML parser has separate safeguards.
 The root config and other sections retain their existing validation rules. A
 complete eight-component package, authenticated signatures/trust, configuration
 integration, and safe candidate adoption remain unfinished.
+
+### Verified packaged snapshot (H-04c)
+
+The manifest and seven component byte strings are captured once per process;
+first access is serialized across threads. Parsing prompts, guardrails and the
+default built-in registry uses the same immutable captured bytes. Explicit
+trusted-root prompt/policy/registry APIs remain separate and are not
+authenticated by this packaged snapshot. A headless invocation reports invalid
+packaged bytes in its normal JSON error envelope instead of importing an
+unverified prompt first. Model payloads for valid defaults remain unchanged.
+
+This only binds those seven data files to their unsigned manifest. It does not
+authenticate the manifest or Python code, tool implementations, plugin code or
+configuration, nor protect against hostile filesystem races during capture.
+A signed, trusted full eight-component package and continuous runtime integrity
+monitoring are still absent. Restart the process to pick up package edits.

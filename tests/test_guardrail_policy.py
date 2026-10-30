@@ -131,7 +131,8 @@ def test_invalid_packaged_policy_aborts_real_server_boot(tmp_path, mode):
         timeout=60,
     )
     assert result.returncode != 0
-    assert "PolicyError" in result.stderr
+    # Packaged component integrity is checked before policy parsing.
+    assert "HarnessError" in result.stderr and "guardrails/policy.yaml" in result.stderr
 
 
 def test_tightened_policy_reaches_status_and_enforces_resources(monkeypatch, tmp_path):

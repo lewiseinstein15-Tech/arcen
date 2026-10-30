@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import threading
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -54,8 +55,16 @@ def _read(item, name: str, limit: int) -> bytes:
     return data
 
 
-def load_manifest(root: str | Path | None = None) -> Manifest:
-    """Verify every allowlisted component against the manifest before use.
+@dataclass(frozen=True, slots=True)
+class VerifiedBundle:
+    """Manifest and the exact component bytes verified against it."""
+
+    manifest: Manifest
+    components: Mapping[str, bytes]
+
+
+def load_bundle(root: str | Path | None = None) -> VerifiedBundle:
+    """Read each component once, verify it, and return immutable byte snapshots.
 
     Explicit roots are trusted local inputs, not an untrusted edit boundary.
     Hashes detect accidental change, not malicious edits to manifest and files.
@@ -79,15 +88,21 @@ def load_manifest(root: str | Path | None = None) -> Manifest:
     components = data["components"]
     if type(components) is not dict or set(components) != COMPONENT_PATHS:
         raise HarnessError("manifest components must match the shipped allowlist")
+    blobs: dict[str, bytes] = {}
     for name, expected in sorted(components.items()):
         if type(expected) is not str or not _HASH.fullmatch(expected):
             raise HarnessError(f"invalid component hash: {name}")
-        actual = hashlib.sha256(
-            _read(base.joinpath(*name.split("/")), name, MAX_COMPONENT_BYTES)
-        ).hexdigest()
-        if actual != expected:
+        blob = _read(base.joinpath(*name.split("/")), name, MAX_COMPONENT_BYTES)
+        if hashlib.sha256(blob).hexdigest() != expected:
             raise HarnessError(f"component hash mismatch: {name}")
-    return Manifest(1, data["model_pin"], MappingProxyType(dict(components)))
+        blobs[name] = blob
+    manifest = Manifest(1, data["model_pin"], MappingProxyType(dict(components)))
+    return VerifiedBundle(manifest, MappingProxyType(blobs))
+
+
+def load_manifest(root: str | Path | None = None) -> Manifest:
+    """Verify an explicit or packaged manifest and all component hashes."""
+    return load_bundle(root).manifest
 
 
 def check_model_pin(manifest: Manifest, config) -> None:
@@ -112,6 +127,19 @@ def check_model_pin(manifest: Manifest, config) -> None:
         raise HarnessError("agent model override does not match the manifest pin")
 
 
+_bundle_lock = threading.Lock()
+
+
 @lru_cache(maxsize=1)
+def _cached_default_bundle() -> VerifiedBundle:
+    return load_bundle()
+
+
+def default_bundle() -> VerifiedBundle:
+    """One verified bundle per process, including concurrent first callers."""
+    with _bundle_lock:
+        return _cached_default_bundle()
+
+
 def default_manifest() -> Manifest:
-    return load_manifest()
+    return default_bundle().manifest

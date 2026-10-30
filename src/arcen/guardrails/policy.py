@@ -8,7 +8,6 @@ reduce resource/snapshot limits. The trusted default is loaded at server boot.
 from __future__ import annotations
 
 from functools import lru_cache
-from importlib import resources
 from pathlib import Path
 from typing import Any, Literal
 
@@ -120,11 +119,11 @@ class GuardrailPolicy(BaseModel):
 
 def load_policy(path: str | Path | None = None) -> GuardrailPolicy:
     """Load the packaged policy or a trusted explicit file; reject unsafe input."""
-    item = (
-        resources.files("arcen").joinpath("guardrails", "policy.yaml")
-        if path is None
-        else Path(path)
-    )
+    if path is None:
+        from arcen.harness.manifest import default_bundle
+
+        return _parse_policy(default_bundle().components["guardrails/policy.yaml"])
+    item = Path(path)
     if isinstance(item, Path) and (item.is_symlink() or item.parent.is_symlink()):
         raise PolicyError("policy file and directory cannot be symlinks")
     try:
@@ -132,6 +131,10 @@ def load_policy(path: str | Path | None = None) -> GuardrailPolicy:
             raw = stream.read(MAX_POLICY_BYTES + 1)
     except OSError as exc:
         raise PolicyError("cannot read guardrail policy") from exc
+    return _parse_policy(raw)
+
+
+def _parse_policy(raw: bytes) -> GuardrailPolicy:
     if len(raw) > MAX_POLICY_BYTES:
         raise PolicyError("guardrail policy is too large")
     try:

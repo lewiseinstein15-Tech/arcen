@@ -861,3 +861,23 @@ adoption. This is user-reported terminal output, not a captured screenshot.
 - Detached signatures are not enforced by boot or adoption. The public key is
   supplied explicitly; parent claims, signer identity, revocation and safety
   are not independently verified. Full H-04 remains incomplete.
+
+### H-04c — verified packaged default snapshot (partial)
+
+- `H-04c-real-packaged-refusal.png`: a fresh installed `arcen run --json`
+  command in a real PTY rendered by xterm.js/Chromium, using a deliberately
+  altered **copy** of the installed package via `PYTHONPATH`. The original
+  installation was not modified. It returns a JSON error and exit 1 before a
+  run; no Docker or provider was used.
+- `H-04c-real-snapshot-tests.png`: fresh installed-wheel PTY run of the seven
+  snapshot tests, **7 passed**. The tests copy the package actually imported,
+  including the installed wheel, for their tamper and concurrency scenarios.
+- Full source suite: **1005 passed, 12 skipped**. Installed-wheel regression
+  selection: **142 passed, 1 skipped**. Some legacy tests explicitly copy or
+  subprocess the source tree; the snapshot tests exercise a wheel copy.
+  The pre-externalization golden prompt payload comparison passed. Wheel
+  contents check: **123 entries**.
+- The seven files are hash-bound to an unsigned manifest, not authenticated.
+  Python code, tool implementations, configuration and plugins are outside this
+  snapshot. Disk edits after capture are not monitored until a fresh process.
+  Full H-04 remains incomplete.

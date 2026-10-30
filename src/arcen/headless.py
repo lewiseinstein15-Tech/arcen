@@ -15,10 +15,7 @@ import threading
 import uuid
 from typing import Any
 
-from arcen.agents.draft import DIRECT_NO_PROVIDER_ANSWER, NO_PLAN_ANSWER, NO_PROVIDER_ANSWER
-
 SCHEMA_VERSION = 1
-REFUSALS = {NO_PROVIDER_ANSWER, NO_PLAN_ANSWER, DIRECT_NO_PROVIDER_ANSWER}
 
 
 def execute(
@@ -30,8 +27,12 @@ def execute(
     harness_store: str | None = None,
 ) -> dict:
     """Run the shared turn; only a verified packaged baseline may be selected."""
+    # Import inside execute so invalid packaged resources are reported by the
+    # headless error envelope instead of failing before main's error handler.
+    from arcen.agents.draft import DIRECT_NO_PROVIDER_ANSWER, NO_PLAN_ANSWER, NO_PROVIDER_ANSWER
     from arcen.server.app import ServerState, run_turn
 
+    refusals = {NO_PROVIDER_ANSWER, NO_PLAN_ANSWER, DIRECT_NO_PROVIDER_ANSWER}
     selected = None
     if harness is not None:
         from arcen.harness.selection import resolve_packaged_baseline
@@ -79,7 +80,7 @@ def execute(
     elif terminal["type"] == "run.error":
         status = "error"
         error = {"code": terminal.get("code"), "message": terminal.get("message")}
-    elif answer in REFUSALS:
+    elif answer in refusals:
         status = "failed"
         error = {"code": "TASK_REFUSED", "message": answer}
     else:

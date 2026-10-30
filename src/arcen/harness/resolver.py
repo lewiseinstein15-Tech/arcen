@@ -9,7 +9,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from functools import lru_cache
-from importlib import resources
 from pathlib import Path
 from string import Formatter
 from typing import Any
@@ -58,6 +57,10 @@ def _read_utf8(item: Any, name: str) -> str:
             raw = stream.read(MAX_PROMPT_BYTES + 1)
     except OSError as exc:
         raise HarnessError(f"cannot read prompt {name}") from exc
+    return _decode_utf8(raw, name)
+
+
+def _decode_utf8(raw: bytes, name: str) -> str:
     if len(raw) > MAX_PROMPT_BYTES:
         raise HarnessError(f"prompt {name} exceeds {MAX_PROMPT_BYTES} bytes")
     try:
@@ -107,50 +110,56 @@ class HarnessResolver:
 
     def resolve(self) -> ResolvedPrompts:
         if self.root is None:
-            directory = resources.files("arcen").joinpath("prompts")
-        else:
-            directory = self.root / "prompts"
-            if directory.is_symlink():
-                raise HarnessError("prompt directory cannot be a symlink")
+            return default_prompts()
+        directory = self.root / "prompts"
+        if directory.is_symlink():
+            raise HarnessError("prompt directory cannot be a symlink")
         raw: dict[str, str] = {}
         for component in ("system", "draft", "forge", "temper"):
             item = directory.joinpath(f"{component}.md")
             if isinstance(item, Path) and item.is_symlink():
                 raise HarnessError(f"prompt {component} cannot be a symlink")
             raw[component] = _read_utf8(item, component)
-        guidance_file = (
-            resources.files("arcen").joinpath("tool-guidance.md")
-            if self.root is None
-            else self.root / "tool-guidance.md"
-        )
+        guidance_file = self.root / "tool-guidance.md"
         if isinstance(guidance_file, Path) and guidance_file.is_symlink():
             raise HarnessError("tool guidance cannot be a symlink")
-        guidance = _sections(_read_utf8(guidance_file, "tool-guidance"), "tool-guidance")
-        identity = raw["system"].removesuffix("\n")
-        if not identity.strip():
-            raise HarnessError("system prompt cannot be empty")
-        draft = _sections(raw["draft"], "draft")
-        forge = _sections(raw["forge"], "forge")
-        temper = _sections(raw["temper"], "temper")
-        _template(identity, {"agent", "job"}, "system")
-        _template(draft["goal-template"], {"goal"}, "draft goal")
-        _template(draft["failed-step-template"], {"step"}, "draft failed step")
-        return ResolvedPrompts(
-            identity_template=identity,
-            planner_job=draft["job"],
-            executor_job=forge["job"],
-            verifier_job=temper["job"],
-            classify=draft["classify"],
-            plan=guidance["plan"],
-            research=guidance["research"],
-            strict=draft["strict"],
-            direct=draft["direct"],
-            goal_template=draft["goal-template"],
-            failed_step_template=draft["failed-step-template"],
-        )
+        return _resolve_text(raw, _read_utf8(guidance_file, "tool-guidance"))
+
+
+def _resolve_text(raw: dict[str, str], guidance_text: str) -> ResolvedPrompts:
+    guidance = _sections(guidance_text, "tool-guidance")
+    identity = raw["system"].removesuffix("\n")
+    if not identity.strip():
+        raise HarnessError("system prompt cannot be empty")
+    draft = _sections(raw["draft"], "draft")
+    forge = _sections(raw["forge"], "forge")
+    temper = _sections(raw["temper"], "temper")
+    _template(identity, {"agent", "job"}, "system")
+    _template(draft["goal-template"], {"goal"}, "draft goal")
+    _template(draft["failed-step-template"], {"step"}, "draft failed step")
+    return ResolvedPrompts(
+        identity_template=identity,
+        planner_job=draft["job"],
+        executor_job=forge["job"],
+        verifier_job=temper["job"],
+        classify=draft["classify"],
+        plan=guidance["plan"],
+        research=guidance["research"],
+        strict=draft["strict"],
+        direct=draft["direct"],
+        goal_template=draft["goal-template"],
+        failed_step_template=draft["failed-step-template"],
+    )
 
 
 @lru_cache(maxsize=1)
 def default_prompts() -> ResolvedPrompts:
     """One immutable packaged snapshot per process; restart to pick up edits."""
-    return HarnessResolver().resolve()
+    from .manifest import default_bundle
+
+    blobs = default_bundle().components
+    raw = {
+        name: _decode_utf8(blobs[f"prompts/{name}.md"], name)
+        for name in ("system", "draft", "forge", "temper")
+    }
+    return _resolve_text(raw, _decode_utf8(blobs["tool-guidance.md"], "tool-guidance"))

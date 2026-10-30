@@ -164,12 +164,15 @@ class Registry:
     @classmethod
     def load_builtin(cls, toml_path: str | None = None) -> "Registry":
         """Load the 40 core tools from registry.toml."""
-        import pathlib
-
-        path = pathlib.Path(toml_path) if toml_path else pathlib.Path(__file__).parent / "registry.toml"
         registry = cls()
-        with open(path, "rb") as fh:
-            manifest = tomllib.load(fh)
+        if toml_path is None:
+            from arcen.harness.manifest import default_bundle
+
+            raw = default_bundle().components["tools/registry.toml"]
+            manifest = tomllib.loads(raw.decode("utf-8"))
+        else:
+            with open(toml_path, "rb") as fh:
+                manifest = tomllib.load(fh)
         for entry in manifest.get("tool", []):
             module = importlib.import_module(entry["module"])
             klass = getattr(module, entry["class"])
