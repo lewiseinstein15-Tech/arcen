@@ -485,3 +485,77 @@ def test_server_provider_failure_does_not_hide_cleanup_failure(tmp_path, monkeyp
     assert events[-1]["type"] == "run.error" and events[-1]["code"] == "SANDBOX_CLEANUP_UNCONFIRMED"
     assert "secret-daemon-cleanup-failure" not in repr(events)
     assert "private-provider-message" not in repr(events)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        [],
+        None,
+        "no-new-privileges:true",
+        ["no-new-privileges:false"],
+        ["no-new-privileges=false"],
+        ["no-new-privileges:garbage"],
+        ["no-new-privileges-not-really"],
+        ["no-new-privileges:true", "no-new-privileges:false"],
+        ["no-new-privileges:true", None],
+        ["seccomp=default"],
+    ],
+)
+def test_unconfirmed_no_new_privileges_fails_closed_and_removes_container(options):
+    docker = FakeDocker()
+    docker.container.attrs["HostConfig"]["SecurityOpt"] = options
+    with pytest.raises(IsolationUnavailable, match="tool execution is disabled"):
+        DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    assert docker.container.removed and not docker.container.calls
+
+
+@pytest.mark.parametrize(
+    "option", ["no-new-privileges", "no-new-privileges:true", "no-new-privileges=true"]
+)
+def test_known_enabled_no_new_privileges_encodings_are_accepted(option):
+    docker = FakeDocker()
+    docker.container.attrs["HostConfig"]["SecurityOpt"] = ["seccomp=default", option]
+    registry = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    registry.close(strict=True)
+    assert docker.container.removed
+
+
+@pytest.mark.parametrize(
+    ("section", "key", "value", "missing"),
+    [
+        ("HostConfig", "Privileged", None, True),
+        ("HostConfig", "Privileged", 0, False),
+        ("HostConfig", "ReadonlyRootfs", None, True),
+        ("HostConfig", "ReadonlyRootfs", 1, False),
+        ("HostConfig", "Binds", None, True),
+        ("HostConfig", "Binds", ["/host:/workspace"], False),
+        ("HostConfig", "CapDrop", "ALL", False),
+        ("HostConfig", "CapDrop", ["ALL", None], False),
+        ("HostConfig", "PidsLimit", "128", False),
+        ("Config", "User", None, True),
+        (None, "Mounts", None, True),
+        (None, "Mounts", None, False),
+        (None, "Mounts", ["tmpfs"], False),
+        (None, "Mounts", [{"Type": "bind", "Source": "/host"}], False),
+    ],
+)
+def test_unconfirmed_container_policy_fields_fail_closed(section, key, value, missing):
+    docker = FakeDocker()
+    target = docker.container.attrs[section] if section else docker.container.attrs
+    if missing:
+        del target[key]
+    else:
+        target[key] = value
+    with pytest.raises(IsolationUnavailable, match="tool execution is disabled"):
+        DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    assert docker.container.removed and not docker.container.calls
+
+
+def test_docker_null_binds_and_tmpfs_mount_are_accepted():
+    docker = FakeDocker()
+    docker.container.attrs["HostConfig"]["Binds"] = None
+    docker.container.attrs["Mounts"] = [{"Type": "tmpfs"}]
+    registry = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    registry.close(strict=True)
+    assert docker.container.removed

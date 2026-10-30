@@ -24,6 +24,22 @@ class IsolationUnavailable(RuntimeError):
     """A turn cannot safely start its isolated executor."""
 
 
+def _no_new_privileges_enabled(options: Any) -> bool:
+    """Accept only unambiguous Docker inspect encodings of the enabled option.
+
+    A prefix check is unsafe: ``no-new-privileges:false`` is not enabled.
+    Contradictory or malformed entries fail closed instead of guessing Docker's
+    precedence. Other, unrelated security options are left to Docker.
+    """
+    if type(options) is not list or any(type(option) is not str for option in options):
+        return False
+    found = [option for option in options if option.startswith("no-new-privileges")]
+    return bool(found) and all(
+        option in {"no-new-privileges", "no-new-privileges:true", "no-new-privileges=true"}
+        for option in found
+    )
+
+
 class DockerTurnRegistry:
     """Own one network-disabled, disposable container for a single turn."""
 
@@ -99,18 +115,23 @@ class DockerTurnRegistry:
             self._container.reload()
             attrs = self._container.attrs
             host, inner = attrs["HostConfig"], attrs["Config"]
+            mounts = attrs.get("Mounts")
+            caps = host.get("CapDrop")
             if (
-                host.get("Privileged")
-                or not host.get("ReadonlyRootfs")
+                host.get("Privileged") is not False
+                or host.get("ReadonlyRootfs") is not True
                 or host.get("NetworkMode") != "none"
-                or host.get("Binds")
-                or host.get("PidsLimit") != self.policy.execution.max_pids
-                or "ALL" not in (host.get("CapDrop") or [])
-                or not any(
-                    x.startswith("no-new-privileges") for x in (host.get("SecurityOpt") or [])
-                )
+                or "Binds" not in host
+                or host["Binds"] not in (None, [])
+                or type(host.get("PidsLimit")) is not int
+                or host["PidsLimit"] != self.policy.execution.max_pids
+                or type(caps) is not list
+                or any(type(cap) is not str for cap in caps)
+                or "ALL" not in caps
+                or not _no_new_privileges_enabled(host.get("SecurityOpt"))
                 or inner.get("User") != "65534:65534"
-                or any(m.get("Type") != "tmpfs" for m in attrs.get("Mounts", []))
+                or type(mounts) is not list
+                or any(type(mount) is not dict or mount.get("Type") != "tmpfs" for mount in mounts)
             ):
                 raise RuntimeError("Docker did not enforce the required container policy")
             if snapshot is not None:

@@ -12,12 +12,16 @@ validated on real Docker or against a real external provider. See
 - Packaged behavior-neutral prompts and immutable guardrail declarations; a
   Docker-only tool boundary with no host-process fallback. Server terminal
   results now wait for strict cleanup; daemon failures can still leave an
-  orphan requiring inspection.
+  orphan requiring inspection. Inspection now rejects disabled or ambiguous
+  no-new-privileges and missing/malformed key isolation fields; these newer
+  checks need real-Docker validation.
 - Content-addressed manifests/objects, local lineage and review metadata,
   baseline selection, candidate diff inspection and strict static policy review.
   Explicit-key signed packages can be verified and manually imported as objects;
   unregistered objects can be inspected without changing refs. Neither operation
   establishes signer trust, safety, execution authorization or adoption.
+  Doctor also performs SQLite quick-check and schema validation for present
+  auxiliary databases; this does not validate all records or evidence.
 - Explicit interactive manual proposal generation or patch import; a
   reviewed sequential baseline/candidate campaign with local human A/B judging,
   unsigned pending reviews and no automatic adoption. A guided single-terminal

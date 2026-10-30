@@ -23,7 +23,11 @@ The `/api/sandbox/status` response includes a JSON `policy` snapshot and
 `supported_tools` derived from the active policy. It describes the intended
 validated requirements; `effective: unavailable` means the executor is not
 usable. Docker isolation is independently enforced and inspected when a
-turn starts, and a trusted Docker daemon is required. The returned JSON is a
+turn starts, and a trusted Docker daemon is required. Inspection fails closed
+if no-new-privileges is disabled, contradictory or unconfirmed, or key privilege,
+rootfs, bind, capability, user, PID or mount fields are missing or malformed.
+These newer inspection checks have only been verified with mocked Docker and need
+a real-Docker run; a daemon that omits required fields will be refused. The returned JSON is a
 copy, not a mutable handle to the runtime policy. The separate `registry.toml`
 remains tool metadata; it grants no host-execution authority.
 

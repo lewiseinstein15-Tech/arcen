@@ -6,8 +6,8 @@ blob; `get_blob` verifies its digest every time. Canonical manifest JSON is
 stable regardless of component-map order. `put_manifest` requires every listed
 component object to exist and match its hash; `get_manifest` checks the manifest
 and every referenced component again. Duplicate JSON keys, malformed paths,
-hashes, oversized files and symlinked objects fail closed. This API is not wired
-to server execution or a CLI yet.
+hashes, oversized files and symlinked objects fail closed. The CLI exposes
+metadata inspection, but candidate objects are not enabled in server execution.
 
 This is an integrity mechanism, **not authentication or a sandbox against a
 hostile local user**. The store root and its parent directories must be trusted;
@@ -37,13 +37,18 @@ Use `arcen harness --store /trusted/path <command>` to choose another local
 store. `init` stores the current packaged baseline and creates its metadata ref;
 repeating it is safe for the same baseline. `doctor` opens the existing database
 read-only and verifies indexed manifests, components, ref history, DAG integrity
-and every object file. `diff` compares a candidate against baseline and strips
-terminal control characters. Both inspection commands fail if the store is
+and every object file. It also runs SQLite quick-check and expected-schema
+validation on present task, review, campaign, budget and experience databases;
+it validates task entries but does not verify every other record or relationships
+across those databases. Checks are separate snapshots, not one atomic audit, and
+SQLite may use WAL sidecars. `diff` compares a candidate against baseline and
+strips terminal control characters. Both inspection commands fail if the store is
 missing or corrupt and do not create it. Task and trajectory metadata remain
 plaintext local data; protect the store directory.
 
 `arcen harness rollback <ref>` currently **refuses without changing anything**.
 There is no enabled adoption/approval gate or candidate ref selection, so
 claiming rollback works would be misleading and unsafe. `--harness` accepts
-only the verified packaged baseline. A successful `doctor` verifies local integrity, not authorship or
-security against a hostile user with access to the filesystem.
+only the verified packaged baseline. A successful `doctor` means these bounded
+checks passed; it does not prove full database integrity, evidence authenticity,
+authorization, safety or security against a hostile local filesystem user.

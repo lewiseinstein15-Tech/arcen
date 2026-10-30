@@ -59,6 +59,16 @@ class DurableBudget:
         self.snapshot()
 
     @classmethod
+    def validate_database_schema(cls, store: HarnessStore) -> None:
+        """Check the existing database schema without creating or updating a budget."""
+        if type(store) is not HarnessStore:
+            raise HarnessError("invalid durable budget store")
+        obj = cls.__new__(cls)
+        obj.store = store
+        obj.path = store.root / "budgets.sqlite3"
+        obj._prepare(create=False)
+
+    @classmethod
     def create(
         cls,
         store: HarnessStore,

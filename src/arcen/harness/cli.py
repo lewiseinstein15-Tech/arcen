@@ -51,6 +51,9 @@ def _doctor(root: str) -> dict[str, int]:
         # A stale/foreign file, symlink, or corrupt object is an error.
         store.get_blob(item.name)
     result["objects"] = len(objects)
+    from .database_audit import audit_auxiliary_databases
+
+    result["aux_databases"] = audit_auxiliary_databases(store)
     task_path = store.root / "tasks.sqlite3"
     if task_path.exists() or task_path.is_symlink():
         from .task_bank import TaskBank
@@ -540,6 +543,7 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 "Store integrity OK: " + ", ".join(f"{key}={value}" for key, value in stats.items())
             )
+            print("Auxiliary database checks cover SQLite integrity and schema, not every record.")
             print("Hashes do not authenticate provenance; candidate selection remains disabled.")
         elif args.command == "diff":
             print(_diff(args.store, args.ref), end="")

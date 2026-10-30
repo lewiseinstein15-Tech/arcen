@@ -983,3 +983,18 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
   while Chromium/another test suite ran; the isolated full-suite retry passed.
   Real-Docker and external-provider behavior for these changes remains untested.
   These partial checks do not complete H-19 or permit autonomous adoption.
+
+### H-07a / H-19e — auxiliary database checks and stricter Docker inspection
+
+- `H-07a-real-doctor-cli.png` shows a fresh installed `arcen harness doctor`
+  command in a real PTY: an initialized disposable store passes, then a locally
+  injected malformed budget database is rejected. The checks cover SQLite
+  quick-check and expected schema, not every record, provenance or authority.
+- `H-19e-real-inspection-tests.png` shows 28 fresh installed-wheel test cases
+  rejecting disabled, contradictory or missing/malformed isolation metadata and
+  accepting the tested enabled encodings. Docker is mocked; these checks have
+  **not** been validated against a real Docker daemon or all Docker versions.
+- Full source suite: 1,150 passed, 12 skipped. Selected installed-wheel suite:
+  143 passed, 3 skipped. Ruff for changed Python files and wheel/docs checks
+  passed. Real Docker and external-provider tests remain outstanding; H-07 and
+  H-19 are still open and adoption/rollback remain disabled.

@@ -79,6 +79,12 @@ merely because a sub-scope is complete.
 - [x] H-19d: extra caller-provided known values are checked in model-bound
       inputs and best-effort redacted from reviewed model/tool evidence.
       This is not comprehensive secret detection; H-19 remains open.
+- [x] H-19e: Docker inspection rejects disabled, contradictory or malformed
+      no-new-privileges options and unconfirmed key isolation fields. Mocked
+      verification only; real-Docker validation remains outstanding.
+- [x] H-07a: doctor checks integrity and expected schema of present auxiliary
+      SQLite files without creating absent databases. This is not full record,
+      cross-database or authorization verification; rollback remains disabled.
 
 ## Verification still required
 
