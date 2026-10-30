@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 VAR_PATTERN = re.compile(r"^\$[A-Z_]+$")
 
@@ -186,8 +186,20 @@ class MemoryConfig(BaseModel):
 
 
 class HarnessingConfig(BaseModel):
+    """The only supported setting is a literal, disabled boolean."""
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
     # Future campaigns cannot be enabled until the safety gates exist.
     enabled: Literal[False] = False
+
+    @field_validator("enabled", mode="before")
+    @classmethod
+    def require_false_boolean(cls, value: object) -> object:
+        # Literal[False] alone also accepts 0 because Python considers 0 == False.
+        if value is not False:
+            raise ValueError("only the boolean false is supported")
+        return value
 
 
 class ArcenConfig(BaseModel):
@@ -346,12 +358,22 @@ def load_config(path: str | Path | None = None) -> ArcenConfig:
         if not isinstance(raw, dict):
             raise ValueError(f"config {file} must be a YAML mapping")
     else:
-        warnings.warn(
-            "config file not found; using defaults", UserWarning, stacklevel=2
-        )
+        warnings.warn("config file not found; using defaults", UserWarning, stacklevel=2)
         raw = {}  # CONFIG_DEFAULTED — then seeded from env below (T-055)
     seeded, filled = seed_provider_from_env(migrate_legacy_config(raw))
-    config = ArcenConfig.model_validate(deep_merge(DEFAULT_CONFIG, seeded))
+    try:
+        config = ArcenConfig.model_validate(deep_merge(DEFAULT_CONFIG, seeded))
+    except ValidationError as exc:
+        # A rejected option/value may itself contain a secret. Do not echo the
+        # input in boot/one-shot errors; a failed load must not seed the file.
+        if any(
+            error["loc"] and error["loc"][0] == "harnessing"
+            for error in exc.errors(include_input=False)
+        ):
+            raise ValueError(
+                "invalid harnessing configuration: only enabled: false is supported"
+            ) from None
+        raise
     if filled:  # env contributed → persist the seeded file, exactly once
         try:
             save_config(file, config)

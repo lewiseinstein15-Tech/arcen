@@ -35,6 +35,7 @@ import uuid
 
 from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import ValidationError
 
 from arcen.agents.draft import DraftPlanner
 from arcen.agents.forge import ForgeExecutor
@@ -640,7 +641,11 @@ def put_config(payload: dict = Body(...)) -> dict:
     if provider.get("api_key") == "<redacted>":
         provider["api_key"] = STATE.config.provider.api_key
     incoming["provider"] = provider
-    updated = ArcenConfig.model_validate(incoming)
+    try:
+        updated = ArcenConfig.model_validate(incoming)
+    except ValidationError:
+        # Never return invalid input values (which may contain credentials).
+        raise HTTPException(status_code=422, detail="invalid configuration") from None
     try:
         check_model_pin(STATE.manifest, updated)
     except HarnessError as exc:

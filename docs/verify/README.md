@@ -827,3 +827,19 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   H-17. Admissions are snapshots rather than reservations or USD/token caps;
   no winner is automatically adopted, no auto-resume or autonomy was enabled.
   The maintained ticket checklist is `docs/HARNESS-CHECKLIST.md`.
+
+### H-04a — disabled harnessing configuration boundary (partial)
+
+- `H-04a-real-config-refusal.png`: fresh installed `arcen run` in a real PTY,
+  rendered by xterm.js/Chromium. A local config with an unsupported `autonomy`
+  option is rejected before a run, with exit 1 and no events. No Docker or
+  external provider was used.
+- `H-04a-real-config-tests.png`: separate fresh installed-wheel PTY run of the
+  focused configuration-boundary tests, **20 passed**. The ASGI API tests use
+  an in-process test client; they are not a real network or Docker test.
+- Complete source suite: **983 passed, 12 skipped**. Installed-wheel focused
+  configuration, manifest, baseline prompt and headless regression suite:
+  **118 passed, 1 skipped**. Wheel contents check: **122 entries**.
+- This is schema hardening only. Normal YAML parsing still permits duplicate
+  keys and trusted Python code can bypass validation. The full H-04 package,
+  signatures and trust integration remain incomplete.

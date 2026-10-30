@@ -27,3 +27,23 @@ component files and restart.
 The `harnessing.enabled` configuration field defaults to `false` and cannot be
 set true yet; no editor, campaign, or autonomous adoption is enabled by this
 manifest. The Docker-only guardrails remain independent hard requirements.
+
+### Disabled configuration boundary (H-04a)
+
+The only supported `harnessing` option is `enabled: false` (or an omitted or
+empty section). Unknown options and non-boolean values, including numeric zero,
+are rejected rather than silently ignored. Ordinary assignment to the nested
+`enabled` field is validated too. Invalid `harnessing` input loaded from the
+normal config produces a generic error before environment seeding is written;
+invalid validated config updates return a generic HTTP 422 before changing live
+state or writing the file. This is a compatibility tightening for users who
+previously put unsupported keys in the section.
+
+This is a schema guard, not an authorization boundary: trusted Python code can
+bypass Pydantic validation using construction/copy internals or by replacing
+objects. Normal config loading still uses PyYAML's existing parser, which can
+accept duplicate keys and YAML boolean spellings; only the final parsed value
+is validated. The stricter manual-campaign YAML parser has separate safeguards.
+The root config and other sections retain their existing validation rules. A
+complete eight-component package, authenticated signatures/trust, configuration
+integration, and safe candidate adoption remain unfinished.
