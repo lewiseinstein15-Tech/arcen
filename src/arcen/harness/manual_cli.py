@@ -253,6 +253,28 @@ def run_interactive(
             }
         )
 
+    def show_progress(event: dict) -> None:
+        # All values are validated, code-defined progress metadata. This is
+        # informational, not an authenticated event log or an approval.
+        kind = event["type"]
+        if kind == "harness.campaign.start":
+            message = f"Starting manual campaign with {event['candidate_count']} candidate(s)."
+        elif kind == "harness.policy":
+            message = f"Static review passed: {event['candidate_id']} (not adoption approval)."
+        elif kind == "harness.probe.start":
+            message = f"Starting {event['role']} probe: {event['candidate_id']}"
+        elif kind == "harness.probe.done":
+            message = f"Finished {event['role']} probe: {event['status']}"
+        elif kind == "harness.judge":
+            message = (
+                f"Manual comparison: {event['winner']} (confidence {event['confidence']:.2f})."
+            )
+        elif kind == "harness.review":
+            message = f"Review pending: {event['review_id']}"
+        else:
+            message = f"Campaign {event['status']}; pending reviews: {event['completed']}."
+        print(f"[harness] {message}", flush=True)
+
     result = run_manual_campaign(
         store,
         record.baseline,
@@ -268,6 +290,7 @@ def run_interactive(
         reviewed_judge_inputs=True,
         journal=journal,
         campaign_id=record.id,
+        on_progress=show_progress,
     )
     for item in result.completed:
         print(f"Pending review: {item.review.id}  candidate: {item.candidate_id}")

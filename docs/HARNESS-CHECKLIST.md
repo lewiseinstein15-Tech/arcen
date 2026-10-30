@@ -61,6 +61,12 @@ merely because a sub-scope is complete.
 - [x] H-11g: guided selection of one to five candidates for a single manually
       confirmed sequential campaign, with lower-bound admission checks. This
       completes only this sub-scope, not H-11, H-14 or the Governor.
+- [x] H-11h: metadata-only best-effort manual campaign progress in the CLI
+      and trusted callback API. Not durable, authenticated, replayable, or
+      integrated into the session NDJSON stream; safe resume remains absent.
+- [x] H-21a: CI workflow configuration for installed-wheel and opt-in Docker
+      validation, structurally tested locally. A remote run is still required;
+      this does not complete portability, CI verification or H-21.
 
 ## Verification still required
 

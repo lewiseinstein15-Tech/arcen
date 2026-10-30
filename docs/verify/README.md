@@ -946,3 +946,14 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
   **8 passed**. The focused installed-wheel suite passed **52 tests**; the
   full source suite passed **1032**, with **12 skipped**. Inspection verifies
   hashes, not signer trust or safety; no Docker validation was performed.
+
+### H-11h / H-21a — manual progress and validation workflow (partial)
+
+- `H-11-progress-real-tests.png`: fresh installed-wheel tests in a real PTY,
+  **6 passed**. Provider and Docker are mocked; progress is best effort, not
+  authenticated evidence, safe resume, or a session NDJSON stream.
+- `H-21-workflow-real-tests.png`: fresh real-PTY local workflow structure
+  checks, **2 passed**. These tests do not execute GitHub Actions or Docker.
+- Final full source suite: **1040 passed, 12 skipped**. The selected installed
+  wheel suite: **106 passed, 3 skipped**. The new workflow has not been pushed
+  or run on GitHub; Docker and external-provider validation remain open.

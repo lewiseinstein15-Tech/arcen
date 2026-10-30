@@ -147,6 +147,9 @@ def test_manual_cli_complete_flow_with_explicit_confirmation_and_human_judge(
     assert main(run_args) == 0
     text = capsys.readouterr().out
     assert "sanitized diff" in text and "Blinded evidence" in text and "Pending review:" in text
+    assert "[harness] Starting manual campaign" in text
+    assert "[harness] Finished candidate probe: ok" in text
+    assert "[harness] Campaign completed" in text
     assert "No adoption occurred" in text and SECRET not in text
     assert "trials=0/2" in text and "model calls=0/4" in text
     assert "judge callbacks=0/1" in text and "Time until admission cutoff:" in text

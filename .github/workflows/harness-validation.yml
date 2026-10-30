@@ -1,0 +1,70 @@
+name: Harness validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installed-wheel:
+    name: Installed wheel (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Build and install wheel with test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip wheel --no-deps . --wheel-dir /tmp/arcen-wheel
+          python -m pip install '/tmp/arcen-wheel/arcen-0.1.0-py3-none-any.whl[dev,tui]'
+      - name: Verify wheel and documentation
+        run: |
+          python scripts/check_tui_wheel.py /tmp/arcen-wheel/arcen-0.1.0-py3-none-any.whl
+          python scripts/check_tui_docs.py
+      - name: Run test suite without live providers or Docker opt-in
+        run: python -m pytest
+
+  docker-isolation:
+    name: Real Docker isolation and manual flows
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install wheel and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install '.[dev,tui]'
+      - name: Build local sandbox image
+        run: docker build --tag ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0 docker/sandbox
+      - name: Run explicitly enabled real-Docker checks
+        env:
+          ARCEN_TEST_DOCKER_ISOLATION: "1"
+        run: |
+          python -m pytest -q \
+            tests/test_turn_isolation.py tests/test_probe_container.py tests/test_headless.py \
+            tests/test_probe_execution.py tests/test_harness_comparison.py \
+            tests/test_manual_campaign.py tests/test_campaign_journal.py \
+            tests/test_harness_budget.py tests/test_durable_budget.py \
+            tests/test_manual_cli.py tests/test_harness_canary.py

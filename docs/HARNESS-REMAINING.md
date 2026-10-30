@@ -22,8 +22,10 @@ validated on real Docker or against a real external provider. See
   reviewed sequential baseline/candidate campaign with local human A/B judging,
   unsigned pending reviews and no automatic adoption. A guided single-terminal
   flow connects editor, optional manual syntactic composition, up to five
-  human-selected sequential comparisons and pending reviews. A separate command
-  can compose human-selected candidates from a completed campaign's local summaries.
+  human-selected sequential comparisons and pending reviews. Metadata-only,
+  best-effort CLI progress reports are not a persistent or authenticated stream.
+  A separate command can compose human-selected candidates from a completed
+  campaign's local summaries.
 - Durable journal and shared admission counts; optional stop at stage
   boundaries and budget binding for new CLI campaign plans.
 - Two experimental, public and gameable behavioral canaries, with exact file

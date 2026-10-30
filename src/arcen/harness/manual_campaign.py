@@ -22,6 +22,7 @@ from .probe import ProbeUnavailable
 from .probe_execution import ReviewedProbeResult, _reviewed_config, _run_bound_probe
 from .probe_model import bind_probe_model
 from .probe_workspace import snapshot_git_commit
+from .progress import Progress
 from .resolver import HarnessError
 from .review import ReviewLedger, ReviewRecord
 from .store import HarnessStore
@@ -62,6 +63,7 @@ def run_manual_campaign(
     sensitive_values: tuple[str, ...] = (),
     journal: CampaignJournal | None = None,
     campaign_id: str | None = None,
+    on_progress: Callable[[dict], None] | None = None,
 ) -> ManualCampaignResult:
     """Compare reviewed candidates with one reference trial, sequentially.
 
@@ -69,6 +71,7 @@ def run_manual_campaign(
     execution, judge or review-record error, stop with completed items retained.
     This API never selects a winner, authorizes execution, moves a ref or adopts.
     """
+    progress = Progress(on_progress)
     if reviewed_inputs is not True or reviewed_judge_inputs is not True:
         raise HarnessError("explicit review of campaign and judge inputs is required")
     if (
@@ -145,6 +148,9 @@ def run_manual_campaign(
         )
     completed: list[CampaignItem] = []
     reference: ReviewedProbeResult | None = None
+    progress.emit("harness.campaign.start", candidate_count=len(candidates))
+    for candidate in candidates:
+        progress.emit("harness.policy", candidate_id=candidate, decision="reviewed")
 
     def result(reason: str | None, candidate: str | None = None) -> ManualCampaignResult:
         if journal is not None and reason is not None:
@@ -154,6 +160,12 @@ def run_manual_campaign(
                 state = journal.get(campaign_id).state
             if state == "stopped":
                 reason = "stopped"
+        progress.emit(
+            "harness.campaign.done",
+            status="completed" if reason is None else "stopped",
+            reason=reason,
+            completed=len(completed),
+        )
         return ManualCampaignResult(reference, tuple(completed), reason, candidate)
 
     try:
@@ -169,12 +181,22 @@ def run_manual_campaign(
             journal.fail(campaign_id)
         raise
 
+    progress.emit("harness.probe.start", candidate_id=baseline_id, role="reference")
     try:
         reference = _run_bound_probe(snapshot, cfg, reference_model)
     except BudgetExhausted:
         return result("budget_closed")
     except ProbeUnavailable:
+        progress.emit(
+            "harness.probe.done", candidate_id=baseline_id, role="reference", status="unavailable"
+        )
         return result("reference_isolation_failed")
+    progress.emit(
+        "harness.probe.done",
+        candidate_id=baseline_id,
+        role="reference",
+        status="ok" if reference.status == "ok" else "failed",
+    )
     if reference.status != "ok":
         return result("budget_closed" if budget.snapshot().stopped else "reference_failed")
     try:
@@ -187,13 +209,23 @@ def run_manual_campaign(
         try:
             if journal is not None:
                 journal.checkpoint(campaign_id, "candidate", index)
+            progress.emit("harness.probe.start", candidate_id=candidate, role="candidate")
             trial = _run_bound_probe(snapshot, cfg, model)
         except CampaignStopped:
             return result("stopped", candidate)
         except BudgetExhausted:
             return result("budget_closed", candidate)
         except ProbeUnavailable:
+            progress.emit(
+                "harness.probe.done", candidate_id=candidate, role="candidate", status="unavailable"
+            )
             return result("candidate_isolation_failed", candidate)
+        progress.emit(
+            "harness.probe.done",
+            candidate_id=candidate,
+            role="candidate",
+            status="ok" if trial.status == "ok" else "failed",
+        )
         if trial.status != "ok":
             return result(
                 "budget_closed" if budget.snapshot().stopped else "candidate_failed", candidate
@@ -221,6 +253,12 @@ def run_manual_campaign(
             return result(
                 "budget_closed" if budget.snapshot().stopped else "judge_failed", candidate
             )
+        progress.emit(
+            "harness.judge",
+            candidate_id=candidate,
+            winner=judgment.winner,
+            confidence=judgment.confidence,
+        )
         pair = ReviewedComparison(reference, trial, judgment)
         try:
             if journal is not None:
@@ -239,4 +277,7 @@ def run_manual_campaign(
             state = journal.record_review(campaign_id, candidate, review.id)
             if state.state == "stopped":
                 return result("stopped", candidate)
+        progress.emit(
+            "harness.review", candidate_id=candidate, review_id=review.id, state="pending"
+        )
     return result(None)
