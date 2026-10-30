@@ -106,3 +106,82 @@ def test_invalid_commit_refused_before_confirmation(tmp_path, monkeypatch, capsy
     arguments[arguments.index("--commit") + 1] = "HEAD"
     assert main(arguments) == 1 and "full lowercase" in capsys.readouterr().err
     assert budget.snapshot().trials == 0
+
+
+def paired_review(store, baseline, candidate, commit, workspace):
+    """Fabricated local evidence for tests only; it is not authenticated."""
+    from arcen.harness.comparison import ReviewedComparison
+    from arcen.harness.judge import Judgment
+    from arcen.harness.probe_execution import ReviewedProbeResult
+    from arcen.harness.review import ReviewLedger
+
+    events = ({"type": "run.done", "status": "ok"},)
+    reference = ReviewedProbeResult(baseline, baseline, commit, workspace, "ok", events)
+    trial = ReviewedProbeResult(baseline, candidate, commit, workspace, "ok", events)
+    return ReviewLedger(store, create=True).request_from_comparison(
+        ReviewedComparison(reference, trial, Judgment("candidate", 0.9, "test"))
+    )
+
+
+def test_paired_advisory_matches_workspace_and_does_not_change_review_or_refs(
+    tmp_path, monkeypatch, capsys
+):
+    from arcen.harness.probe_workspace import snapshot_git_commit
+    from arcen.harness.review import ReviewLedger
+
+    store, adopted, baseline, candidate, budget, arguments = fixture(tmp_path, capsys)
+    repo = arguments[arguments.index("--repo") + 1]
+    commit = arguments[arguments.index("--commit") + 1]
+    digest = snapshot_git_commit(repo, commit).sha256
+    record = paired_review(store, baseline, candidate, commit, digest)
+    before = ReviewLedger(store).get(record.id)
+    tty(monkeypatch)
+    monkeypatch.setattr(probe_container, "DockerTurnRegistry", Boundary)
+    calls = provider(monkeypatch)
+    monkeypatch.setattr("builtins.input", lambda _: f"CANARY {candidate}")
+    assert main([*arguments, "--review", record.id]) == 0
+    out = capsys.readouterr().out
+    assert "Advisory: needs_human; basis: comparison_prefers_candidate" in out
+    assert "not authenticated" in out and "No refs moved" in out and len(calls) == 8
+    assert ReviewLedger(store).get(record.id) == before
+    assert HarnessLineage(store, read_only=True).resolve("refs/heads/adopted") == adopted
+    assert budget.snapshot().trials == 4
+
+
+def test_mismatched_workspace_refuses_before_any_trial(tmp_path, monkeypatch, capsys):
+    store, _, baseline, candidate, budget, arguments = fixture(tmp_path, capsys)
+    commit = arguments[arguments.index("--commit") + 1]
+    record = paired_review(store, baseline, candidate, commit, "e" * 64)
+    tty(monkeypatch)
+    monkeypatch.setattr("builtins.input", lambda _: f"CANARY {candidate}")
+    calls = provider(monkeypatch)
+    monkeypatch.setattr(
+        probe_container, "DockerTurnRegistry", lambda *a, **kw: pytest.fail("unexpected Docker")
+    )
+    assert main([*arguments, "--review", record.id]) == 1
+    assert "workspace does not match" in capsys.readouterr().err
+    assert not calls and budget.snapshot().trials == 0
+
+
+def test_review_changed_during_canary_cannot_produce_advisory(tmp_path, monkeypatch, capsys):
+    from arcen.harness.probe_workspace import snapshot_git_commit
+    from arcen.harness.review import ReviewLedger
+
+    store, _, baseline, candidate, _, arguments = fixture(tmp_path, capsys)
+    repo = arguments[arguments.index("--repo") + 1]
+    commit = arguments[arguments.index("--commit") + 1]
+    record = paired_review(
+        store, baseline, candidate, commit, snapshot_git_commit(repo, commit).sha256
+    )
+    tty(monkeypatch)
+    monkeypatch.setattr(probe_container, "DockerTurnRegistry", Boundary)
+
+    def mutate(n):
+        if n == 1:
+            ReviewLedger(store).resolve(record.id, "rejected", "local", saw_diff=True)
+
+    provider(monkeypatch, hook=mutate)
+    monkeypatch.setattr("builtins.input", lambda _: f"CANARY {candidate}")
+    assert main([*arguments, "--review", record.id]) == 1
+    output = capsys.readouterr()
+    assert "review changed" in output.err and "Advisory:" not in output.out

@@ -33,7 +33,9 @@ validated on real Docker or against a real external provider. See
   explicitly supplied sensitive values. Encoded, split and unknown secrets are
   not detected; inputs still require review.
 - Two experimental, public and gameable behavioral canaries, with exact file
-  checks, not an adoption gate or security proof.
+  checks, not an adoption gate or security proof. An optional advisory combines
+  a matching canary result with an unsigned paired review; it does not authorize
+  adoption or establish baseline freshness.
 - A local, plaintext content-addressed task bank usable by manual editor and
   campaign commands; it does not schedule tasks or provide recursion.
 - Locally reviewed experience notes in a dedicated plaintext memory graph,

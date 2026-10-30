@@ -7,6 +7,7 @@ all unsafe behavior. Local Python, the store, clock, daemon and image are truste
 
 from __future__ import annotations
 
+import re
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
@@ -95,10 +96,16 @@ def run_manual_canaries(
     commit: str,
     budget: DurableBudget,
     reviewed_inputs: bool = False,
+    expected_workspace_sha256: str | None = None,
 ) -> CanaryReport:
     """Run code-defined canaries manually; never authorize or adopt a change."""
     if reviewed_inputs is not True:
         raise HarnessError("explicit review of canary inputs is required")
+    if expected_workspace_sha256 is not None and (
+        type(expected_workspace_sha256) is not str
+        or re.fullmatch(r"[0-9a-f]{64}", expected_workspace_sha256) is None
+    ):
+        raise HarnessError("invalid expected workspace hash")
     if (
         type(store) is not HarnessStore
         or type(budget) is not DurableBudget
@@ -127,6 +134,8 @@ def run_manual_canaries(
         snapshot = snapshot_git_commit(repo, commit)
     except (OSError, ValueError):
         raise HarnessError("cannot prepare reviewed Git snapshot") from None
+    if expected_workspace_sha256 is not None and snapshot.sha256 != expected_workspace_sha256:
+        raise HarnessError("canary workspace does not match the paired review")
     findings: list[CanaryFinding] = []
 
     def report(outcome: str) -> CanaryReport:

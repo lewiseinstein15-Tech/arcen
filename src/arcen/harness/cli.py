@@ -438,6 +438,9 @@ def main(argv: list[str] | None = None) -> int:
     canary_run.add_argument("--repo", required=True)
     canary_run.add_argument("--commit", required=True)
     canary_run.add_argument("--budget", required=True)
+    canary_run.add_argument(
+        "--review", help="optional paired review ID for advisory evidence fusion"
+    )
     editor = commands.add_parser("editor", help="generate unadopted proposals interactively")
     editor_commands = editor.add_subparsers(dest="editor_command", required=True)
     propose = editor_commands.add_parser("propose", help="request reviewed model-generated patches")
@@ -643,6 +646,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.repo,
                 args.commit,
                 args.budget,
+                review_id=args.review,
             )
         elif args.command == "editor":
             from .manual_cli import editor_interactive

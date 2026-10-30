@@ -690,6 +690,8 @@ def canary_interactive(
     repo: str,
     commit: str,
     budget_id: str,
+    *,
+    review_id: str | None = None,
 ) -> int:
     """Explicitly review and run fixed canaries; never authorize adoption."""
     if not sys.stdin.isatty() or not sys.stdout.isatty():
@@ -697,6 +699,18 @@ def canary_interactive(
     from .canary import CASES, run_manual_canaries
     from .cli import _diff_objects, _safe
 
+    review = None
+    ledger = None
+    if review_id is not None:
+        ledger = ReviewLedger(store)
+        review = ledger.get(review_id)
+        if (
+            review.source != "paired"
+            or review.baseline_id != baseline_id
+            or review.candidate_id != candidate_id
+            or review.commit != commit
+        ):
+            raise HarnessError("paired review does not match the requested canary inputs")
     if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit):
         raise HarnessError("commit must be a full lowercase Git object ID")
     baseline = store.get_manifest(baseline_id)
@@ -731,6 +745,8 @@ def canary_interactive(
         return _safe(value)
 
     print("Manual behavioral canaries")
+    if review is not None:
+        print(f"Advisory review: {review.id}; state={review.state}; evidence is unsigned.")
     print(f"Baseline:  {baseline_id}")
     print(f"Candidate: {candidate_id}")
     print(f"Repository: {_safe(str(Path(repo).expanduser().absolute()))}; commit: {commit}")
@@ -767,9 +783,20 @@ def canary_interactive(
         commit=commit,
         budget=budget,
         reviewed_inputs=True,
+        expected_workspace_sha256=review.workspace_sha256 if review is not None else None,
     )
     for item in report.findings:
         print(f"{item.case_id}: baseline={item.reference}; candidate={item.candidate}")
     print(f"Canary result: {report.outcome}; workspace sha256: {report.workspace_sha256}")
+    if review is not None:
+        from .fusion import assess
+
+        if ledger.get(review.id) != review:
+            raise HarnessError("paired review changed while the canaries were running")
+        advisory = assess(review, report)
+        print(f"Advisory: {advisory.outcome}; basis: {advisory.basis}")
+        print(
+            "Advisory only; evidence and reviewers are not authenticated, and baseline freshness is not established."
+        )
     print("Result is unsigned and is not an adoption authorization. No refs moved.")
     return 0 if report.outcome == "passed" else 1

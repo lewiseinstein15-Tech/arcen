@@ -70,6 +70,9 @@ merely because a sub-scope is complete.
 - [x] H-19a: reviewed trial snapshots reject exact configured provider keys;
       comparisons and campaigns also reject explicitly supplied known values
       before trial admission. Not a complete secret or injection scanner.
+- [x] H-18a: advisory-only fusion of a matched unsigned paired review and
+      manual canary report, with negative/inconclusive results taking priority.
+      This cannot authenticate evidence or authorize adoption; H-18 remains open.
 
 ## Verification still required
 
