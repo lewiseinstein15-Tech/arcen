@@ -11,14 +11,18 @@ Distinct, non-touching base-line edits can be merged within a file, while
 identical edits are deduplicated. Overlapping or touching edits—including
 competing insertions at the same boundary—are conservatively returned as
 `Conflict(path, first, second)` records with zero-based proposal indices. On
-conflict it returns no candidate ID and writes no objects. Conflict handling is
-not wired to an editor or campaign. A no-conflict result creates immutable
-content-addressed blobs and a successor manifest; it never changes a ref or
-records a lineage decision. A storage failure can leave unreferenced blobs.
+conflict it returns no candidate ID and writes no objects. In the guided manual
+workflow, an operator can choose generated proposals for composition, inspect
+the resulting diff, and separately confirm a comparison. The workflow reports
+conflicts and stops; it does not resolve them. A no-conflict result creates
+immutable content-addressed blobs and a successor manifest; it never changes a
+ref or records a lineage decision. A storage failure can leave unreferenced blobs.
 
 This is a **syntactic** merge, not an assessment of prompt compatibility,
 correctness, safety or improvement. Candidates are unapproved. The standalone
 composer does not run a model, probe, judge, canary or approval. The separate
 reviewed proposal-comparison API can compose and then run experimental paired
-trials; candidate runtime selection and adoption still fail closed. H-12 remains incomplete until campaign integration,
-evidence-based selection and conflict resolution are implemented.
+trials; candidate runtime selection and adoption still fail closed. Guided
+composition happens before comparison of its inputs and is not evidence-based.
+H-12 remains incomplete until behavioral-contrast selection, iterative campaign
+integration and conflict resolution are implemented.

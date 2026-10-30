@@ -289,8 +289,8 @@ def _editor_candidates_interactive(
     k: int,
     *,
     task_id: str | None = None,
-) -> tuple[str, ...]:
-    """Generate and return unadopted independent proposals after review."""
+) -> tuple[tuple[str, Proposal], ...]:
+    """Generate and retain exact, unadopted independent proposals for this process."""
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise HarnessError("editor requires an interactive terminal")
     if type(k) is not int or not 1 <= k <= 4:
@@ -364,17 +364,17 @@ def _editor_candidates_interactive(
         raise HarnessError(
             "editor generation failed; inspect budget usage before retrying"
         ) from None
-    candidate_ids = []
+    generated = []
     for proposal in proposals:
         result = compose_proposals(store, baseline_id, (proposal,))
         if result.candidate_id is None:
             raise HarnessError("editor candidate composition failed")
         review_candidate(store, baseline_id, result.candidate_id)
-        candidate_ids.append(result.candidate_id)
+        generated.append((result.candidate_id, proposal))
         print(f"\nUnadopted {proposal.scope} candidate: {result.candidate_id}")
         print(_diff_objects(store, baseline_id, result.candidate_id), end="")
     print("\nCandidates are untrusted; inspect them before planning trials. No refs moved.")
-    return tuple(candidate_ids)
+    return tuple(generated)
 
 
 def editor_interactive(
@@ -440,7 +440,7 @@ def guided_workflow(
     except WorkspaceError:
         raise HarnessError("repository/commit preflight failed; inspect the Git snapshot") from None
     print(
-        "Guided manual workflow: editor → select one candidate → plan → confirmed comparison → pending review."
+        "Guided manual workflow: editor → select or compose → plan → confirmed comparison → pending review."
     )
     print(f"Repository: {_safe(str(Path(repo).expanduser().absolute()))}; commit: {commit}")
     print(f"Task ID: {task_id}; preliminary workspace SHA-256: {preview_sha}")
@@ -455,23 +455,66 @@ def guided_workflow(
     candidates = _editor_candidates_interactive(
         store, baseline_id, None, config_file, budget_id, k, task_id=task_id
     )
-    unique = tuple(dict.fromkeys(candidates))
+    # Each proposal is retained in memory only and must independently apply to
+    # the same baseline. Never reconstruct proposal patches from terminal text.
+    unique: dict[str, Proposal] = {}
+    for identifier, proposal in candidates:
+        unique.setdefault(identifier, proposal)
     if not unique:
         raise HarnessError("editor produced no candidates")
     print(
-        "\nChoose one of the generated candidates for a manual comparison; this does not approve it:"
+        "\nChoose or compose generated candidates for a manual comparison; this does not approve them:"
     )
-    for candidate in unique:
-        print(f"  {candidate}")
+    for identifier in unique:
+        print(f"  {identifier}")
+    print(
+        "COMPOSE merges exact proposals syntactically; conflicting or touching edits are refused."
+    )
+    print(
+        "Inputs have not been compared; a conflict-free merge does not prove safety or improvement."
+    )
     try:
-        selection = input("Type SELECT followed by the full candidate ID, or CANCEL: ").strip()
+        selection = input("Type SELECT ID, COMPOSE ID ID [ID ...], or CANCEL: ").strip()
     except (EOFError, KeyboardInterrupt):
         raise HarnessError(
             "workflow cancelled after editor; generated objects may remain"
         ) from None
-    prefix = "SELECT "
-    candidate = selection[len(prefix) :] if selection.startswith(prefix) else ""
-    if candidate not in unique:
+    if len(selection) > 1024:
+        raise HarnessError("workflow cancelled after editor; generated objects may remain")
+    words = selection.split()
+    if len(words) == 2 and words[0] == "SELECT" and words[1] in unique:
+        candidate = words[1]
+    elif (
+        3 <= len(words) <= 9
+        and words[0] == "COMPOSE"
+        and len(set(words[1:])) == len(words) - 1
+        and all(identifier in unique for identifier in words[1:])
+    ):
+        budget.checkpoint()
+        identifiers = tuple(words[1:])
+        # Verify stored inputs again before composing; candidate IDs and local
+        # proposal objects are not authenticated evidence or approvals.
+        for identifier in identifiers:
+            review_candidate(store, baseline_id, identifier)
+        composition = compose_proposals(store, baseline_id, tuple(unique[x] for x in identifiers))
+        if composition.conflicts:
+            for conflict in composition.conflicts:
+                print(
+                    f"Conflict: {conflict.path} between {identifiers[conflict.first]} and {identifiers[conflict.second]}"
+                )
+            raise HarnessError("composition conflicts; no composite candidate or plan created")
+        if composition.candidate_id is None:
+            raise HarnessError("composition did not produce a candidate")
+        candidate = composition.candidate_id
+        review_candidate(store, baseline_id, candidate)
+        from .cli import _diff_objects
+
+        print(f"\nUnadopted composite candidate: {candidate}")
+        print("Composite diff (sanitized; untrusted and untested):")
+        print(_diff_objects(store, baseline_id, candidate), end="")
+        print("Composition can persist even if cancelled. It is not approval or adoption.")
+        _confirm(f"Type USE {candidate} to plan its comparison: ", f"USE {candidate}")
+    else:
         raise HarnessError("workflow cancelled after editor; generated objects may remain")
     record = create_plan(store, baseline_id, (candidate,), None, commit, budget_id, task_id=task_id)
     print(f"Created campaign plan: {record.id}; state={record.state}; budget={budget_id}")

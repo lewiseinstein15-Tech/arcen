@@ -17,8 +17,8 @@ arcen harness --store "$STORE" workflow run \
   --repo . --commit "$(git rev-parse HEAD)" --budget "$BUDGET" --k 1
 ```
 
-The workflow requires a stored task ID, not a mutable task file, and supports
-one selected candidate per comparison. It preflights a bounded local Git
+The workflow requires a stored task ID, not a mutable task file, and compares
+one selected individual or composite candidate per run. It preflights a bounded local Git
 snapshot before editor calls, prints its hash, and rechecks the task object at
 later stages. The campaign takes a **new** snapshot after its confirmation;
 the preliminary hash is neither authenticated nor transactionally bound to
@@ -30,8 +30,16 @@ that later snapshot. Inspect the exact commit and data before proceeding.
    independent proposals; malformed responses can fail the step. Identical
    resulting candidate IDs are shown only once in the selection list.
 2. Inspect the displayed diffs and type `SELECT` plus one full generated
-   candidate ID. This chooses a comparison target, **not** a winner or approval.
-   Cancelling leaves any generated objects on disk but creates no new plan.
+   candidate ID, or `COMPOSE` followed by 2–8 distinct generated IDs from this
+   editor session. Each exact proposal is revalidated against the same baseline.
+   The merge is **syntactic** and conservative: touching/overlapping edits stop
+   with a conflict and create no composite or plan. The input proposals have
+   not been compared yet; a conflict-free merge does not prove compatibility,
+   safety or improvement. The command displays the complete composite diff and
+   asks for a separate exact `USE` confirmation before planning. This chooses a
+   comparison target, **not** a winner or approval. A composite object may
+   persist even if you cancel at `USE`; no new plan is created until confirmed.
+   The original candidates may also remain on disk.
 3. The workflow records a budget-bound campaign plan and prints its ID. Review
    the newly displayed task, baseline, candidate diff, provider, repository,
    commit and budget. Only the separate exact `RUN` confirmation starts trials.

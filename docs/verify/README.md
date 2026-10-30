@@ -738,3 +738,26 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   resume or recursive learning is provided. The preliminary Git snapshot is
   not transactionally bound to the later trial. Budget counts are not monetary
   caps or reservations. See `docs/HARNESS-GUIDED-WORKFLOW.md`.
+
+### H-12b — human-selected composition in guided comparison (partial)
+
+- `H-12b-real-composite-review.png`: fresh installed `arcen harness workflow
+  run` in a real PTY rendered by xterm.js/Chromium. Two editor responses came
+  over real loopback HTTP from a local mock provider; terminal input selected
+  both independent edits for composition. The command displayed the actual
+  combined diff and stopped at the separate `USE` confirmation. No plan,
+  Docker trial or external provider was used in this capture.
+- `H-12b-real-composition-conflict.png`: a separate fresh installed-command
+  PTY run with local mock editor responses proposing competing insertions. The
+  actual command reported the conflict, created no composite or plan, and
+  exited with status 1. The wrapper held the terminal open for capture.
+- `H-12b-real-composition-tests.png`: installed-wheel PTY run: 62 passed,
+  1 skipped. The guided end-to-end comparison uses mocked Docker and provider;
+  other editor tests exercise local HTTP mock responses. Real Docker was not
+  available in this environment.
+- Full source suite: 930 passed, 12 skipped. Wheel: 120 entries. Scoped Ruff,
+  formatting, documentation links and diff checks passed.
+- This is a syntactic, operator-chosen merge of **uncompared** proposals, not
+  evidence-based or recursive composition. A no-conflict merge is not proof of
+  compatibility or safety. Composite objects can remain after cancellation.
+  No approval, adoption, rollback or autonomous execution was enabled.

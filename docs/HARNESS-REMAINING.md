@@ -18,7 +18,8 @@ validated on real Docker or against a real external provider. See
 - Explicit interactive manual proposal generation or patch import; a
   reviewed sequential baseline/candidate campaign with local human A/B judging,
   unsigned pending reviews and no automatic adoption. A guided single-terminal
-  flow connects editor, one human-selected comparison and pending review.
+  flow connects editor, optional manual syntactic composition, one
+  human-selected comparison and pending review.
 - Durable journal and shared admission counts; optional stop at stage
   boundaries and budget binding for new CLI campaign plans.
 - Two experimental, public and gameable behavioral canaries, with exact file
@@ -43,8 +44,10 @@ validated on real Docker or against a real external provider. See
    separate confirmations and review; it is not an autonomous or recursive
    campaign. Full event streams, persistent evidence and safe recovery/resume
    remain absent.
-3. **H-12–14: recursion and learning.** The composer is an offline syntactic
-   foundation. It is not connected to an iterative behavioral comparison.
+3. **H-12–14: recursion and learning.** The composer can combine manually
+   chosen editor proposals before a guided comparison; it is syntactic and its
+   input proposals have not been compared. It is not connected to iterative
+   behavioral-contrast selection.
    The task bank is a manual storage foundation only. There is no model-backed
    reflector, experience-guided editor, parallel candidate scheduling or
    sequential carry-forward recursion.

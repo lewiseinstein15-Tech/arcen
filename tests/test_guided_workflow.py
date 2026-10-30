@@ -346,7 +346,7 @@ def test_identical_generated_candidates_are_only_listed_once(tmp_path, monkeypat
             if line.startswith("Unadopted ") and "candidate:" in line
         ]
         assert len(candidates) == 2 and candidates[0] == candidates[1]
-        choices = out.split("Choose one of the generated candidates", 1)[1]
+        choices = out.split("Choose or compose generated candidates", 1)[1]
         assert choices.count(candidates[0]) == 1
         return "CANCEL"
 
