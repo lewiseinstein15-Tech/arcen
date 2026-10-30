@@ -482,3 +482,22 @@ This is opt-in in-process admission accounting, not token/USD spending control,
 a durable campaign budget or a hard deadline. It cannot stop in-flight work or
 control a trusted judge callback's internal requests. It does not enable a
 campaign, candidate adoption or autonomy; see `docs/HARNESS-BUDGET.md`.
+
+## H-13 manual experience foundation (experimental; partial)
+
+`H-13a-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+wheel and managed server answering through a local mock provider; it does not
+show the experience library. Docker was unavailable and tools were blocked.
+`H-13a-real-experience-tests.png` shows the focused experience, memory and review
+tests: **59 passed**. The full suite reported **777 passed, 7 skipped**. The
+installed wheel contained 114 entries. `H-13a-real-installed-smoke.png` shows
+an installed-wheel persistence and rendering exercise using deliberately
+fabricated paired evidence and a local review record, not a real human review.
+
+The offline library stores bounded manual notes in the existing memory graph,
+links them to an approved local paired-review record, exposes a human-facing
+render, uses temporal conflict history and decay scores, and hides notes after
+30 days. The review/lesson attestations are unsigned and secret detection is
+incomplete. No model automatically generates or consumes these lessons; there
+is no campaign, authenticated approval, ref movement or adoption. See
+`docs/HARNESS-EXPERIENCE.md` for limits.

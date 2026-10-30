@@ -41,6 +41,7 @@ def main() -> int:
             "arcen/harness/proposal_comparison.py",
             "arcen/harness/review.py",
             "arcen/harness/budget.py",
+            "arcen/harness/experience.py",
             "arcen/harness/selection.py",
             "arcen/cli.py",
             "arcen/harness/model.py",
