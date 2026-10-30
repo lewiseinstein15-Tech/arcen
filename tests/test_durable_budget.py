@@ -203,3 +203,42 @@ def test_real_docker_durable_budget_when_explicitly_enabled(tmp_path, monkeypatc
         6,
         2,
     )
+
+
+def test_atomic_snapshot_exposes_limits_usage_and_remaining_time(tmp_path, monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr("arcen.harness.durable_budget.time.time", lambda: now[0])
+    store = HarnessStore(tmp_path / "store")
+    cap = create(store, max_trials=3, max_model_calls=6, max_judge_calls=2, admission_seconds=120)
+    cap.reserve_trial()
+    cap.reserve_model_call()
+    now[0] += 17
+    snap = DurableBudget(store, cap.id).snapshot()
+    assert (snap.max_trials, snap.max_model_calls, snap.max_judge_calls) == (3, 6, 2)
+    assert (snap.trials, snap.model_calls, snap.judge_calls) == (1, 1, 0)
+    assert snap.elapsed_seconds == 17 and snap.admission_seconds_remaining == 103
+    cap.stop()
+    assert cap.snapshot().admission_seconds_remaining == 0
+
+
+def test_cli_budget_status_reopens_and_shows_limits(tmp_path, capsys):
+    store = HarnessStore(tmp_path / "store")
+    _init(str(store.root))
+    cap = create(store, max_trials=2, max_model_calls=7, max_judge_calls=1)
+    assert main(["--store", str(store.root), "budget", "status", cap.id]) == 0
+    text = capsys.readouterr().out
+    assert "trials=2" in text and "model calls=7" in text and "judge callbacks=1" in text
+    assert "Time until admission cutoff:" in text
+    assert "no token/USD cap" in text
+
+
+def test_corrupted_limit_rejected_before_budget_display(tmp_path, capsys):
+    store = HarnessStore(tmp_path / "store")
+    _init(str(store.root))
+    cap = create(store)
+    with sqlite3.connect(cap.path) as db:
+        db.execute("UPDATE budgets SET max_model_calls=-1 WHERE id=?", (cap.id,))
+    assert main(["--store", str(store.root), "budget", "status", cap.id]) == 1
+    output = capsys.readouterr()
+    assert "invalid durable budget record" in output.err
+    assert "Limits:" not in output.out

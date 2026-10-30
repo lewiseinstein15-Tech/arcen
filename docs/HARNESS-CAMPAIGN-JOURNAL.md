@@ -11,9 +11,9 @@ from arcen.harness.campaign_journal import CampaignJournal
 from arcen.harness.manual_campaign import run_manual_campaign
 
 # Existing, explicitly reviewed values: store, baseline, candidates, task,
-# config, judge, repo, commit, reviews and an in-process SharedBudget.
+# config, judge, repo, commit, reviews and a DurableBudget for the same store.
 journal = CampaignJournal(store, create=True)
-plan = journal.plan(baseline, candidates, task, commit)
+plan = journal.plan(baseline, candidates, task, commit, budget=budget)
 result = run_manual_campaign(
     store, baseline, candidates, task, config, judge,
     repo=repo, commit=commit, reviews=reviews, budget=budget,
@@ -36,7 +36,7 @@ plan cannot be claimed again. A crash leaves the last phase as `running`: the
 record is **ambiguous**, not proof of whether a provider, judge or Docker action
 finished. Do not automatically rerun it. The user must inspect pending review
 records and any potentially orphaned containers. There is currently no lease,
-process-liveness proof, journal-bound durable budget or automatic recovery/resume.
+process-liveness proof or automatic recovery/resume.
 
 An initialized harness store can inspect or request stop from another terminal:
 
@@ -54,9 +54,16 @@ available to acknowledge it. Neither command starts, resumes or adopts a run.
 
 Journal use is optional for backward compatibility with the manual Python API;
 unjournaled runs have none of these persistence or stop properties. The run can
-use an in-process or durable admission budget, but the journal does not bind a
-durable budget ID. Neither option is a token/USD cap or a hard runtime
-limit. Separate SQLite databases for the journal and review
+use an in-process or durable admission budget. New plans can bind a durable
+budget ID; CLI plans require one. An existing legacy unbound plan stays unbound
+and the CLI refuses to run it. Unbound Python API plans remain supported for
+backward compatibility. A binding is local metadata, not authentication or an
+atomic transaction with the separate budget database. The budget can expire or
+be stopped between checks. Older database clients are blocked by a SQLite trigger
+from claiming a bound plan, but do not mix software versions during a run.
+Migration to schema version 2 occurs when a journal is opened with `create=True`;
+read-only opens of version 1 do not migrate it. Neither option is a token/USD
+cap or a hard runtime limit. Separate SQLite databases for the journal and review
 ledger are not one atomic transaction: an error or crash during review recording
 can leave a pending review without a matching journal entry. Never infer that a
 missing entry means an external action did not occur. See

@@ -135,7 +135,14 @@ def run_manual_campaign(
     )
     budget.checkpoint()
     if journal is not None:
-        journal.claim(campaign_id, baseline_id, candidates, task, commit)
+        journal.claim(
+            campaign_id,
+            baseline_id,
+            candidates,
+            task,
+            commit,
+            budget=budget if type(budget) is DurableBudget else None,
+        )
     completed: list[CampaignItem] = []
     reference: ReviewedProbeResult | None = None
 

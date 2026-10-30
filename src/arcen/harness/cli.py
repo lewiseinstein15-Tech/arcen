@@ -155,9 +155,9 @@ def _campaign_command(args) -> int:
         from .manual_cli import create_plan
 
         record = create_plan(
-            store, args.baseline, tuple(args.candidate), args.task_file, args.commit
+            store, args.baseline, tuple(args.candidate), args.task_file, args.commit, args.budget
         )
-        print(f"Campaign plan: {record.id}  state={record.state}")
+        print(f"Campaign plan: {record.id}  state={record.state}  budget={record.budget_id}")
         print("Metadata only; no provider calls, execution or adoption occurred.")
         return 0
     if args.campaign_command == "run":
@@ -183,6 +183,7 @@ def _campaign_command(args) -> int:
     print(
         f"Baseline: {record.baseline}\nCommit: {record.commit}\nTask SHA-256: {record.task_sha256}"
     )
+    print(f"Budget: {record.budget_id or 'unbound legacy plan'}")
     for candidate, review_id in zip(record.candidates, record.reviews):
         print(f"Review: {review_id}  candidate: {candidate}")
     print("Metadata only; no adoption or safe automatic resume. In-flight work may continue.")
@@ -207,10 +208,10 @@ def _budget_command(args) -> None:
             budget.stop()
     state = budget.snapshot()
     print(f"Budget: {budget.id}  stopped={state.stopped}  reason={state.reason or 'open'}")
-    if args.budget_command == "create":
-        print(
-            f"Limits: trials={args.trials}  model calls={args.model_calls}  judge callbacks={args.judge_calls}  admission seconds={args.seconds}"
-        )
+    print(
+        f"Limits: trials={state.max_trials}  model calls={state.max_model_calls}  judge callbacks={state.max_judge_calls}"
+    )
+    print(f"Time until admission cutoff: {state.admission_seconds_remaining:.1f}s")
     print(
         f"Admitted: trials={state.trials}  model calls={state.model_calls}  judge callbacks={state.judge_calls}"
     )
@@ -270,6 +271,7 @@ def main(argv: list[str] | None = None) -> int:
     plan.add_argument("--candidate", required=True, action="append")
     plan.add_argument("--task-file", required=True)
     plan.add_argument("--commit", required=True)
+    plan.add_argument("--budget", required=True, help="durable admission budget ID")
     run = campaign_commands.add_parser("run", help="interactive reviewed run with human A/B judge")
     run.add_argument("id")
     run.add_argument("--task-file", required=True)

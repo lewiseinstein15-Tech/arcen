@@ -38,20 +38,23 @@ arcen harness --store "$STORE" import-patch "$BASELINE" prompts/draft.md ./candi
 # Copy printed ID into CANDIDATE. No ref was moved.
 arcen harness --store "$STORE" budget create --trials 2 --model-calls 8 --judge-calls 1 --seconds 600
 # Copy printed ID into BUDGET. Deadline starts at creation, not at run.
-arcen harness --store "$STORE" campaign plan --baseline "$BASELINE" --candidate "$CANDIDATE" --task-file ./task.txt --commit "$(git rev-parse HEAD)"
+arcen harness --store "$STORE" campaign plan --baseline "$BASELINE" --candidate "$CANDIDATE" --task-file ./task.txt --commit "$(git rev-parse HEAD)" --budget "$BUDGET"
 # Copy printed ID into CAMPAIGN.
 arcen harness --store "$STORE" campaign run "$CAMPAIGN" --task-file ./task.txt --config ./arcen.yaml --repo . --budget "$BUDGET"
 ```
 
 Specify up to five distinct candidates by repeating `--candidate`. One baseline
 trial is shared across candidates. The run requires an interactive terminal and
-prints the commit, repository, budget ID and usage, provider host, task and
-sanitized diffs, then requires exactly `RUN CAMPAIGN_ID`. It does **not** show
-the full endpoint, config, repository tree or budget limits: verify those
-separately. Budget limits are shown when the budget is created; record them.
-The budget is not bound to the plan. Confirming is not authenticated identity
+prints the commit, repository, bound budget ID, usage and limits, provider host,
+task and sanitized diffs, then requires exactly `RUN CAMPAIGN_ID`. It does **not**
+show the full endpoint, config or repository tree: verify those separately.
+The budget display is a snapshot, not a reservation; cooperating processes may
+consume admissions or stop it at any time. The admission cutoff is not a runtime
+limit. Confirming is not authenticated identity
 or proof of understanding; terminal sanitization is not byte-for-byte review.
-No provider or Docker activity is initiated before confirmation.
+No provider or Docker activity is initiated before confirmation. The CLI refuses
+legacy plans that do not bind a budget; create a new plan instead. The Python
+API still permits explicitly unbound plans for compatibility.
 
 After successful trials, inspect the untrusted, reduced A/B evidence and choose
 `A`, `B`, `TIE` or `CANCEL`. Labels are randomized but blinding can leak

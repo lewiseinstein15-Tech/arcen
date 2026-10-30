@@ -563,7 +563,8 @@ SQLite-backed counters and stop state can be shared by cooperating processes
 using the same ID, and clock rollback closes admission. This is still not a
 USD/token cap, hard runtime limit, in-flight kill, automatic resume or
 campaign-wide enforcement against other IDs or nonparticipating callers. The
-journal does not bind the budget ID. See `docs/HARNESS-DURABLE-BUDGET.md`.
+At this historical verification point, the journal did not bind the budget ID.
+See `docs/HARNESS-DURABLE-BUDGET.md` for current behavior.
 
 
 ### User-reported real-Docker campaign and budget verification on Omarchy
@@ -601,3 +602,22 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   Harness² roadmap. Adoption, selection, rollback, safe resume and autonomy
   remain disabled. Budget admissions are not USD/token/runtime caps. Earlier
   user-run Docker results tested the underlying APIs, not this new CLI.
+
+### H-11e — durable-budget plan binding and visibility (partial)
+
+- `H-11e-real-budget-bound-prompt.png`: fresh installed-wheel `arcen harness
+  campaign run` in a real PTY, rendered by xterm.js/Chromium. The local example
+  plan was bound to a durable budget, and the prompt displayed its usage,
+  limits and approximate admission cutoff. It was captured before confirmation;
+  no provider, judge or Docker activity occurred.
+- `H-11e-real-budget-bound-tests.png`: fresh PTY test run against the installed
+  wheel: 51 passed, 3 skipped. Tests cover version-1 migration, legacy records,
+  mixed-version claim blocking, competing claims, wrong budgets, display and
+  malformed records. Passing execution tests mock provider and Docker; the
+  opt-in real-Docker tests were skipped in the assistant environment.
+- Full source suite: 839 passed, 11 skipped. Wheel: 118 entries; scoped Ruff,
+  formatting, documentation links and diff checks passed.
+- The binding is unsigned local metadata, not authenticated authorization or a
+  transaction across databases. Legacy Python plans can remain unbound; CLI
+  refuses them. This is not a monetary/token cap, hard runtime cancellation,
+  resume, adoption or completion of the broader roadmap.

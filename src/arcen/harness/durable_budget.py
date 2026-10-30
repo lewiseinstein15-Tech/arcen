@@ -14,6 +14,7 @@ import sqlite3
 import stat
 import time
 from contextlib import contextmanager
+from dataclasses import dataclass
 
 from .budget import BudgetExhausted, BudgetSnapshot
 from .resolver import HarnessError
@@ -30,6 +31,16 @@ _REASONS = frozenset(
         "judge_calls limit reached",
     }
 )
+
+
+@dataclass(frozen=True, slots=True)
+class DurableBudgetSnapshot(BudgetSnapshot):
+    """An atomic snapshot of durable limits and admissions, not a reservation."""
+
+    max_trials: int
+    max_model_calls: int
+    max_judge_calls: int
+    admission_seconds_remaining: float
 
 
 class DurableBudget:
@@ -178,7 +189,7 @@ class DurableBudget:
         finally:
             db.close()
 
-    def _update(self, operation: str) -> BudgetSnapshot:
+    def _update(self, operation: str) -> DurableBudgetSnapshot:
         if operation not in {
             "snapshot",
             "checkpoint",
@@ -241,7 +252,14 @@ class DurableBudget:
                 "UPDATE budgets SET trials=?,model_calls=?,judge_calls=?,last_seen=?,reason=? WHERE id=?",
                 (*used, last, reason, self.id),
             )
-            snapshot = BudgetSnapshot(*used, reason is not None, reason, max(0.0, now - created))
+            snapshot = DurableBudgetSnapshot(
+                *used,
+                reason is not None,
+                reason,
+                max(0.0, now - created),
+                *limits,
+                max(0.0, deadline - now) if reason is None else 0.0,
+            )
         if blocked:
             raise BudgetExhausted("durable budget closed: " + reason)
         return snapshot
@@ -261,5 +279,5 @@ class DurableBudget:
     def stop(self) -> None:
         self._update("stop")
 
-    def snapshot(self) -> BudgetSnapshot:
+    def snapshot(self) -> DurableBudgetSnapshot:
         return self._update("snapshot")

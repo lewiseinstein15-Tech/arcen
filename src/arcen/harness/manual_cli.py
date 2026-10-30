@@ -102,10 +102,18 @@ def import_patch(store: HarnessStore, baseline_id: str, path: str, patch_file: s
 
 
 def create_plan(
-    store: HarnessStore, baseline: str, candidates: tuple[str, ...], task_file: str, commit: str
+    store: HarnessStore,
+    baseline: str,
+    candidates: tuple[str, ...],
+    task_file: str,
+    commit: str,
+    budget_id: str,
 ):
     task = _read_text(task_file, 16000)
-    return CampaignJournal(store, create=True).plan(baseline, candidates, task, commit)
+    budget = DurableBudget(store, budget_id)
+    return CampaignJournal(store, create=True).plan(
+        baseline, candidates, task, commit, budget=budget
+    )
 
 
 def run_interactive(
@@ -127,6 +135,10 @@ def run_interactive(
     record = journal.get(identifier)
     if record.state != "ready":
         raise HarnessError("campaign is not ready; automatic resume is unavailable")
+    if record.budget_id is None:
+        raise HarnessError("legacy unbound campaign; create a new plan with a durable budget")
+    if record.budget_id != budget_id:
+        raise HarnessError("campaign budget does not match the plan")
     baseline = store.get_manifest(record.baseline)
     packaged = default_manifest()
     if (
@@ -153,12 +165,19 @@ def run_interactive(
     if config.provider.api_key:
         endpoint = endpoint.replace(config.provider.api_key, "[REDACTED]")
     usage = budget.snapshot()
+    if usage.stopped:
+        raise HarnessError("durable budget closed")
     print(f"Campaign {record.id}; commit {record.commit}; budget {budget.id}")
     print(f"Repository: {_safe(str(Path(repo).expanduser().absolute()))}")
     print(
-        f"Budget used: trials={usage.trials}; model calls={usage.model_calls}; judge callbacks={usage.judge_calls}"
+        f"Budget admissions used/limit: trials={usage.trials}/{usage.max_trials}; "
+        f"model calls={usage.model_calls}/{usage.max_model_calls}; "
+        f"judge callbacks={usage.judge_calls}/{usage.max_judge_calls}"
     )
-    print("Budget is not bound to the plan; verify its limits and repository commit separately.")
+    print(
+        f"Time until admission cutoff: {usage.admission_seconds_remaining:.1f}s (not a runtime limit)."
+    )
+    print("The plan is bound to this budget ID; verify the repository commit separately.")
 
     def display_config(value: str) -> str:
         value = redact_text(value)

@@ -92,6 +92,8 @@ def setup(tmp_path, capsys):
                 str(task_file),
                 "--commit",
                 commit,
+                "--budget",
+                budget_id,
             ]
         )
         == 0
@@ -146,6 +148,8 @@ def test_manual_cli_complete_flow_with_explicit_confirmation_and_human_judge(
     text = capsys.readouterr().out
     assert "sanitized diff" in text and "Blinded evidence" in text and "Pending review:" in text
     assert "No adoption occurred" in text and SECRET not in text
+    assert "trials=0/2" in text and "model calls=0/4" in text
+    assert "judge callbacks=0/1" in text and "Time until admission cutoff:" in text
     assert len(calls) == 4 and all(bound.closed for bound in Boundary.instances[-2:])
     assert CampaignJournal(store).get(campaign_id).state == "completed"
     assert DurableBudget(store, budget_id).snapshot().model_calls == 4
@@ -350,7 +354,9 @@ def test_modified_baseline_rejected_before_prompt(tmp_path, monkeypatch, capsys)
     second = import_patch(store, candidate, component, str(patch_file))
     journal = CampaignJournal(store)
     commit = journal.get(run_args[4]).commit
-    new_plan = journal.plan(candidate, (second,), task.read_text(), commit)
+    new_plan = journal.plan(
+        candidate, (second,), task.read_text(), commit, budget=DurableBudget(store, budget_id)
+    )
     run_args[4] = new_plan.id
     tty(monkeypatch)
     monkeypatch.setattr("builtins.input", lambda _: pytest.fail("unexpected prompt"))
@@ -377,3 +383,29 @@ def test_real_docker_manual_cli_when_explicitly_enabled(tmp_path, monkeypatch, c
     assert DurableBudget(store, budget_id).snapshot().model_calls == 4
     assert len(ReviewLedger(store).list()) == 1
     assert HarnessLineage(store, read_only=True).resolve("refs/heads/adopted") == adopted
+
+
+def test_cli_rejects_wrong_or_legacy_unbound_budget_before_confirmation(
+    tmp_path, monkeypatch, capsys
+):
+    store, _, baseline, candidate, task, _, _, campaign_id, budget_id, run_args = setup(
+        tmp_path, capsys
+    )
+    tty(monkeypatch)
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("unexpected confirmation"))
+    replacement = DurableBudget.create(
+        store, max_trials=2, max_model_calls=4, max_judge_calls=1, admission_seconds=120
+    )
+    changed = run_args.copy()
+    changed[-1] = replacement.id
+    assert main(changed) == 1
+    assert "budget does not match" in capsys.readouterr().err
+    assert CampaignJournal(store).get(campaign_id).state == "ready"
+    journal = CampaignJournal(store)
+    commit = journal.get(campaign_id).commit
+    old = journal.plan(baseline, (candidate,), task.read_text(), commit)
+    changed[4] = old.id
+    changed[-1] = budget_id
+    assert main(changed) == 1
+    assert "legacy unbound campaign" in capsys.readouterr().err
+    assert journal.get(old.id).state == "ready"

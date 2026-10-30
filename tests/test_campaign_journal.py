@@ -220,3 +220,134 @@ def test_real_docker_journaled_campaign_when_explicitly_enabled(tmp_path, monkey
     result = run(args, journal=journal, campaign_id=rec.id)
     assert result.stop_reason is None and len(result.completed) == 2
     assert journal.get(rec.id).state == "completed"
+
+
+def durable(store):
+    from arcen.harness.durable_budget import DurableBudget
+
+    return DurableBudget.create(
+        store, max_trials=3, max_model_calls=6, max_judge_calls=2, admission_seconds=120
+    )
+
+
+def test_bound_plan_rejects_other_budget_before_git_docker_or_provider(tmp_path, monkeypatch):
+    args = setup(tmp_path)
+    journal = CampaignJournal(args[0], create=True)
+    expected, wrong = durable(args[0]), durable(args[0])
+    rec = journal.plan(args[1], args[2], "inspect project", args[5], budget=expected)
+    assert rec.budget_id == expected.id
+    monkeypatch.setattr(module, "snapshot_git_commit", lambda *a: pytest.fail("unexpected git"))
+    monkeypatch.setattr(
+        probe_container, "DockerTurnRegistry", lambda *a, **kw: pytest.fail("unexpected Docker")
+    )
+    with pytest.raises(HarnessError, match="mismatch"):
+        run(args, budget=wrong, journal=journal, campaign_id=rec.id)
+    with pytest.raises(HarnessError, match="mismatch"):
+        run(args, budget=budget(), journal=journal, campaign_id=rec.id)
+    assert journal.get(rec.id).state == "ready"
+    assert expected.snapshot().trials == wrong.snapshot().trials == 0
+
+
+def test_bound_plan_executes_only_with_the_bound_budget(tmp_path, monkeypatch):
+    args = setup(tmp_path)
+    journal = CampaignJournal(args[0], create=True)
+    cap = durable(args[0])
+    rec = journal.plan(args[1], args[2], "inspect project", args[5], budget=cap)
+    monkeypatch.setattr(probe_container, "DockerTurnRegistry", Boundary)
+    calls = provider(monkeypatch)
+    result = run(args, budget=cap, journal=journal, campaign_id=rec.id)
+    assert result.stop_reason is None and len(calls) == 6
+    assert CampaignJournal(args[0]).get(rec.id).budget_id == cap.id
+    assert cap.snapshot().trials == 3
+
+
+def test_v1_read_only_compatibility_migration_and_old_instance_safety(tmp_path):
+    args = setup(tmp_path)
+    journal, legacy = plan(args)
+    with sqlite3.connect(journal.path) as db:
+        db.execute("DROP TRIGGER campaign_budget_guard")
+        db.execute("ALTER TABLE campaigns DROP COLUMN budget_id")
+        db.execute("PRAGMA user_version=1")
+    old = CampaignJournal(args[0])
+    assert old.get(legacy.id).budget_id is None
+    with sqlite3.connect(journal.path) as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 1
+    upgraded = CampaignJournal(args[0], create=True)
+    assert upgraded.get(legacy.id).budget_id is None
+    with sqlite3.connect(journal.path) as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 2
+    cap = durable(args[0])
+    new = upgraded.plan(args[1], args[2], "inspect project", args[5], budget=cap)
+    assert old.get(new.id).budget_id == cap.id
+    with pytest.raises(HarnessError, match="mismatch"):
+        old.claim(new.id, args[1], args[2], "inspect project", args[5])
+    assert upgraded.get(new.id).state == "ready"
+    old.claim(legacy.id, args[1], args[2], "inspect project", args[5])
+    assert upgraded.get(legacy.id).state == "running"
+
+
+def test_budget_binding_requires_same_store_live_budget_and_well_formed_record(tmp_path):
+    args = setup(tmp_path)
+    journal = CampaignJournal(args[0], create=True)
+    from arcen.harness.store import HarnessStore
+
+    other = durable(HarnessStore(tmp_path / "other"))
+    with pytest.raises(HarnessError, match="same store"):
+        journal.plan(args[1], args[2], "inspect project", args[5], budget=other)
+    cap = durable(args[0])
+    rec = journal.plan(args[1], args[2], "inspect project", args[5], budget=cap)
+    with sqlite3.connect(journal.path) as db:
+        db.execute("UPDATE campaigns SET budget_id='not-an-id' WHERE id=?", (rec.id,))
+    with pytest.raises(HarnessError, match="invalid campaign record"):
+        journal.get(rec.id)
+    cap.stop()
+    with pytest.raises(HarnessError, match="budget closed"):
+        journal.plan(args[1], args[2], "inspect project", args[5], budget=cap)
+
+
+def test_bound_plan_claim_race_has_one_winner(tmp_path):
+    args = setup(tmp_path)
+    journal = CampaignJournal(args[0], create=True)
+    cap = durable(args[0])
+    rec = journal.plan(args[1], args[2], "inspect project", args[5], budget=cap)
+
+    def claim(_):
+        try:
+            journal.claim(rec.id, args[1], args[2], "inspect project", args[5], budget=cap)
+            return True
+        except HarnessError:
+            return False
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        assert sum(pool.map(claim, range(8))) == 1
+    assert journal.get(rec.id).budget_id == cap.id
+
+
+def test_old_database_client_cannot_claim_bound_plan_without_new_guard(tmp_path):
+    args = setup(tmp_path)
+    journal = CampaignJournal(args[0], create=True)
+    cap = durable(args[0])
+    rec = journal.plan(args[1], args[2], "inspect project", args[5], budget=cap)
+    with (
+        sqlite3.connect(journal.path) as db,
+        pytest.raises(sqlite3.OperationalError, match="arcen_campaign_budget"),
+    ):
+        db.execute(
+            "UPDATE campaigns SET state='running',phase='reference' WHERE id=? AND state='ready'",
+            (rec.id,),
+        )
+    assert journal.get(rec.id).state == "ready"
+    journal.claim(rec.id, args[1], args[2], "inspect project", args[5], budget=cap)
+    assert journal.get(rec.id).state == "running"
+
+
+def test_guard_schema_tampering_rejected(tmp_path):
+    args = setup(tmp_path)
+    journal = CampaignJournal(args[0], create=True)
+    with sqlite3.connect(journal.path) as db:
+        db.execute("DROP TRIGGER campaign_budget_guard")
+        db.execute(
+            "CREATE TRIGGER campaign_budget_guard BEFORE UPDATE ON campaigns BEGIN SELECT 1; END"
+        )
+    with pytest.raises(HarnessError, match="schema"):
+        CampaignJournal(args[0])

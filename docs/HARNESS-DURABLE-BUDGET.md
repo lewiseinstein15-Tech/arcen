@@ -36,9 +36,13 @@ A newly created file uses owner-only permissions.
 
 This does **not** cap tokens, USD, retries inside provider SDKs, or requests
 made within the judge callback. It does not limit nonparticipating callers or
-a caller that creates a new budget ID. Campaign journal records do not yet bind
-or persist a budget ID; automatic resume remains disabled, because an earlier
-external action may have completed before a crash. There is no scheduler,
+a caller that creates a new budget ID. New campaign plans can bind this ID;
+CLI plans require it, while legacy and Python API plans can remain unbound.
+`status` and pre-confirmation display usage, limits and the approximate time to
+the admission cutoff from an atomic snapshot. These figures can change
+immediately; they reserve nothing. A binding is neither authentication nor an
+atomic transaction across the journal and budget databases. Automatic resume
+remains disabled because an earlier external action may have completed before a crash. There is no scheduler,
 concurrency semaphore, in-flight cancellation, provider price guarantee, canary
 or adoption gate. The existing `SharedBudget` remains available as an
 in-process alternative. The assistant environment could not run Docker; the
