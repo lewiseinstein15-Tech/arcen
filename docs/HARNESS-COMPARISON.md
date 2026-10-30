@@ -38,3 +38,7 @@ trusted Docker daemon and image are required, cleanup failure is fatal, and no
 host fallback exists. Most unit tests mock Docker. The user reported the opt-in
 real-Docker paired test passed on Omarchy at `f34ea27`, with a mocked model
 provider and judge (see `docs/verify/README.md`).
+
+A separate trusted-Python `run_manual_campaign` can run a caller-supplied set
+of candidates sequentially and create pending review records; it still does not
+select or adopt. See `HARNESS-MANUAL-CAMPAIGN.md`.

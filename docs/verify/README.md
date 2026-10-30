@@ -501,3 +501,27 @@ render, uses temporal conflict history and decay scores, and hides notes after
 incomplete. No model automatically generates or consumes these lessons; there
 is no campaign, authenticated approval, ref movement or adoption. See
 `docs/HARNESS-EXPERIENCE.md` for limits.
+
+## H-11 manual sequential comparisons (experimental; partial)
+
+`H-11b-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+wheel with its managed server and local mock provider. It is a normal direct
+answer, not a campaign display; Docker was unavailable and tools were blocked.
+`H-11b-real-campaign-tests.png` shows the focused campaign, budget, comparison
+and review tests: **58 passed, 3 skipped**. The full suite reported **788
+passed, 8 skipped**. The installed wheel had 115 entries.
+
+`H-11b-real-installed-smoke.png` shows an installed-wheel run with a real local
+HTTP mock provider, mocked Docker and a callback judge: one shared snapshot,
+three trials, six model calls, two judge invocations, and two pending review
+records. No candidate was selected or adopted. This is not real-Docker campaign
+verification. The new opt-in real-Docker manual campaign test was skipped locally
+and has not yet been run by the user; earlier unbudgeted trial and paired tests
+passed on Omarchy at `f34ea27`.
+
+This Python-only path requires explicit review attestations and a shared
+in-process admission budget; it is not an authenticated gate, a USD/token cap,
+a hard timeout, or a resumable campaign runner. Stop does not cancel in-flight
+work; callback blinding and redaction are best effort. No automatic selection,
+adoption, canaries, campaign CLI, recursion or safe resume is enabled. See
+`docs/HARNESS-MANUAL-CAMPAIGN.md`.
