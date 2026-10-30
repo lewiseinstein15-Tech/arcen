@@ -716,3 +716,25 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   hashes do not authenticate origin and a crash can orphan plaintext objects.
   This is local manual storage, not recursive scheduling, prompt-injection
   protection or an adoption gate. See `docs/HARNESS-TASK-BANK.md`.
+
+### H-11f — guided manual editor-to-review flow (partial)
+
+- `H-11f-real-guided-editor-prompt.png`: fresh installed `arcen harness
+  workflow run` in a real PTY, rendered by xterm.js/Chromium. The sample uses a
+  local Git repository and a loopback mock provider. Capture occurred before
+  the EDIT confirmation: no provider request or Docker trial occurred.
+- `H-11f-real-guided-select.png`: a separate fresh installed-command PTY run.
+  The editor confirmation was sent through the terminal; the installed command
+  made two real HTTP requests to a local mock provider, generated two unadopted
+  diffs, and waited for a manual selection. No candidate was selected, no
+  campaign was started, and no Docker or external provider was used.
+- `H-11f-real-guided-tests.png`: fresh installed-wheel PTY run: 105 passed,
+  4 skipped. The guided end-to-end test mocks Docker and provider calls; other
+  editor tests exercise a local HTTP mock. Real Docker paths were skipped here.
+- Full source suite: 920 passed, 12 skipped. Wheel: 120 entries. Scoped Ruff,
+  formatting, docs-link and diff checks passed.
+- This flow supports one human-selected candidate, separate confirmations and
+  pending reviews. No automatic selection, authenticated approval, adoption,
+  resume or recursive learning is provided. The preliminary Git snapshot is
+  not transactionally bound to the later trial. Budget counts are not monetary
+  caps or reservations. See `docs/HARNESS-GUIDED-WORKFLOW.md`.

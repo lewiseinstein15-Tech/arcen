@@ -1,7 +1,8 @@
 # Experimental interactive manual campaigns
 
 This is a limited operator-driven comparison, **not the complete Harness²
-runner**. It imports locally authored patches or generates unadopted proposals
+runner**. For a single-terminal editor-to-review flow, see
+`HARNESS-GUIDED-WORKFLOW.md`. It imports locally authored patches or generates unadopted proposals
 through a separate confirmed editor command, compares selected candidates to an
 unchanged packaged baseline, and records pending reviews. It does not
 select, adopt, roll back, resume or run unattended. Docker isolation remains

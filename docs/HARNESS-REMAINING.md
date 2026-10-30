@@ -17,7 +17,8 @@ validated on real Docker or against a real external provider. See
   baseline selection, candidate diff inspection and strict static policy review.
 - Explicit interactive manual proposal generation or patch import; a
   reviewed sequential baseline/candidate campaign with local human A/B judging,
-  unsigned pending reviews and no automatic adoption.
+  unsigned pending reviews and no automatic adoption. A guided single-terminal
+  flow connects editor, one human-selected comparison and pending review.
 - Durable journal and shared admission counts; optional stop at stage
   boundaries and budget binding for new CLI campaign plans.
 - Two experimental, public and gameable behavioral canaries, with exact file
@@ -37,9 +38,11 @@ validated on real Docker or against a real external provider. See
    until all mandatory policy and safety checks exist.
 2. **H-08–11: complete manual campaign.** The editor uses one model pinned to
    the baseline, not a separate multi-model panel. The probe only supports
-   Docker-isolated `bash`, not the full tool set or spawned subagents. Manual
-   CLI steps are not one integrated editor→probe→judge→review workflow. Full
-   event streams, persistent evidence and safe recovery/resume remain absent.
+   Docker-isolated `bash`, not the full tool set or spawned subagents. The
+   guided flow handles only one manually selected candidate and still requires
+   separate confirmations and review; it is not an autonomous or recursive
+   campaign. Full event streams, persistent evidence and safe recovery/resume
+   remain absent.
 3. **H-12–14: recursion and learning.** The composer is an offline syntactic
    foundation. It is not connected to an iterative behavioral comparison.
    The task bank is a manual storage foundation only. There is no model-backed

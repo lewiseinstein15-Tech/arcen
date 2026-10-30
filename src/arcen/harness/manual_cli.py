@@ -280,7 +280,7 @@ def run_interactive(
     return 0
 
 
-def editor_interactive(
+def _editor_candidates_interactive(
     store: HarnessStore,
     baseline_id: str,
     task_file: str | None,
@@ -289,8 +289,8 @@ def editor_interactive(
     k: int,
     *,
     task_id: str | None = None,
-) -> int:
-    """Generate unadopted independent proposals after interactive review."""
+) -> tuple[str, ...]:
+    """Generate and return unadopted independent proposals after review."""
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise HarnessError("editor requires an interactive terminal")
     if type(k) is not int or not 1 <= k <= 4:
@@ -364,15 +364,131 @@ def editor_interactive(
         raise HarnessError(
             "editor generation failed; inspect budget usage before retrying"
         ) from None
+    candidate_ids = []
     for proposal in proposals:
         result = compose_proposals(store, baseline_id, (proposal,))
         if result.candidate_id is None:
             raise HarnessError("editor candidate composition failed")
         review_candidate(store, baseline_id, result.candidate_id)
+        candidate_ids.append(result.candidate_id)
         print(f"\nUnadopted {proposal.scope} candidate: {result.candidate_id}")
         print(_diff_objects(store, baseline_id, result.candidate_id), end="")
     print("\nCandidates are untrusted; inspect them before planning trials. No refs moved.")
+    return tuple(candidate_ids)
+
+
+def editor_interactive(
+    store: HarnessStore,
+    baseline_id: str,
+    task_file: str | None,
+    config_file: str,
+    budget_id: str,
+    k: int,
+    *,
+    task_id: str | None = None,
+) -> int:
+    _editor_candidates_interactive(
+        store, baseline_id, task_file, config_file, budget_id, k, task_id=task_id
+    )
     return 0
+
+
+def guided_workflow(
+    store: HarnessStore,
+    baseline_id: str,
+    task_id: str,
+    config_file: str,
+    repo: str,
+    commit: str,
+    budget_id: str,
+    k: int,
+) -> int:
+    """Run an explicitly gated editor-to-manual-comparison flow; never adopt."""
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        raise HarnessError("guided workflow requires an interactive terminal")
+    if type(k) is not int or not 1 <= k <= 4:
+        raise HarnessError("editor k must be between 1 and 4")
+    if type(commit) is not str or not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit):
+        raise HarnessError("commit must be a full lowercase Git object ID")
+    if not Path(repo).expanduser().is_dir():
+        raise HarnessError("repository directory is missing")
+    # A stored ID is used throughout, so rereads verify the exact same task
+    # bytes rather than silently rereading a mutable file between stages.
+    _task_input(store, None, task_id)
+    budget = DurableBudget(store, budget_id)
+    budget.checkpoint()
+    usage = budget.snapshot()
+    if (
+        usage.stopped
+        or usage.max_trials - usage.trials < 2
+        or usage.max_judge_calls - usage.judge_calls < 1
+        or usage.max_model_calls - usage.model_calls < 2 * k + 2
+    ):
+        raise HarnessError(
+            "workflow requires at least two trial admissions, one judge admission and editor plus two model admissions"
+        )
+    # Preflight an actual bounded, sanitized Git snapshot before spending on
+    # editor requests. The campaign takes a fresh snapshot after confirmation;
+    # this local preview hash is not authenticated or transactionally bound.
+    from arcen.sandbox.workspace import WorkspaceError
+
+    from .cli import _safe
+    from .probe_workspace import snapshot_git_commit
+
+    try:
+        preview_sha = snapshot_git_commit(repo, commit).sha256
+    except WorkspaceError:
+        raise HarnessError("repository/commit preflight failed; inspect the Git snapshot") from None
+    print(
+        "Guided manual workflow: editor → select one candidate → plan → confirmed comparison → pending review."
+    )
+    print(f"Repository: {_safe(str(Path(repo).expanduser().absolute()))}; commit: {commit}")
+    print(f"Task ID: {task_id}; preliminary workspace SHA-256: {preview_sha}")
+    print(
+        "No automatic selection, approval, adoption or resume. Generated objects may persist if cancelled."
+    )
+    print("The budget minimum is not a reservation or a guarantee the comparison will finish.")
+    print(
+        "The campaign re-snapshots after confirmation; this preview is not an authenticated binding."
+    )
+    print("Review the commit and provider data exposure separately before each confirmation.")
+    candidates = _editor_candidates_interactive(
+        store, baseline_id, None, config_file, budget_id, k, task_id=task_id
+    )
+    unique = tuple(dict.fromkeys(candidates))
+    if not unique:
+        raise HarnessError("editor produced no candidates")
+    print(
+        "\nChoose one of the generated candidates for a manual comparison; this does not approve it:"
+    )
+    for candidate in unique:
+        print(f"  {candidate}")
+    try:
+        selection = input("Type SELECT followed by the full candidate ID, or CANCEL: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        raise HarnessError(
+            "workflow cancelled after editor; generated objects may remain"
+        ) from None
+    prefix = "SELECT "
+    candidate = selection[len(prefix) :] if selection.startswith(prefix) else ""
+    if candidate not in unique:
+        raise HarnessError("workflow cancelled after editor; generated objects may remain")
+    record = create_plan(store, baseline_id, (candidate,), None, commit, budget_id, task_id=task_id)
+    print(f"Created campaign plan: {record.id}; state={record.state}; budget={budget_id}")
+    print(
+        "If the next step is cancelled or fails, inspect campaign status and budget; do not auto-resume."
+    )
+    from .lineage import HarnessLineage
+
+    adopted = HarnessLineage(store, read_only=True).resolve("refs/heads/adopted")
+    result = run_interactive(
+        store, adopted, record.id, None, config_file, repo, budget_id, task_id=task_id
+    )
+    if result == 0:
+        print(
+            "Inspect the pending review with 'arcen harness --store STORE review show REVIEW_ID'; decisions never adopt."
+        )
+    return result
 
 
 def canary_interactive(

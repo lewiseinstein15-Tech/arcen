@@ -326,6 +326,18 @@ def main(argv: list[str] | None = None) -> int:
     propose.add_argument("--config", required=True)
     propose.add_argument("--budget", required=True)
     propose.add_argument("--k", type=int, default=1)
+    workflow = commands.add_parser("workflow", help="guided manual editor-to-review workflow")
+    workflow_commands = workflow.add_subparsers(dest="workflow_command", required=True)
+    guided = workflow_commands.add_parser(
+        "run", help="interactive, separately confirmed manual flow"
+    )
+    guided.add_argument("--baseline", required=True)
+    guided.add_argument("--task-id", required=True, help="stored task SHA-256")
+    guided.add_argument("--config", required=True)
+    guided.add_argument("--repo", required=True)
+    guided.add_argument("--commit", required=True)
+    guided.add_argument("--budget", required=True)
+    guided.add_argument("--k", type=int, default=1)
     review = commands.add_parser("review", help="record human review; adoption remains disabled")
     review_commands = review.add_subparsers(dest="review_command", required=True)
     review_open = review_commands.add_parser(
@@ -441,6 +453,20 @@ def main(argv: list[str] | None = None) -> int:
                 args.budget,
                 args.k,
                 task_id=args.task_id,
+            )
+        elif args.command == "workflow":
+            from .manual_cli import guided_workflow
+
+            store, _ = _existing(args.store)
+            return guided_workflow(
+                store,
+                args.baseline,
+                args.task_id,
+                args.config,
+                args.repo,
+                args.commit,
+                args.budget,
+                args.k,
             )
         elif args.command == "review":
             _review_command(args)
