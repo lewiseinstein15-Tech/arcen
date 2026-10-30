@@ -26,3 +26,10 @@ trials; candidate runtime selection and adoption still fail closed. Guided
 composition happens before comparison of its inputs and is not evidence-based.
 H-12 remains incomplete until behavioral-contrast selection, iterative campaign
 integration and conflict resolution are implemented.
+
+A separate interactive `campaign compose` command can reconstruct and combine
+operator-selected candidates from one completed campaign's locally recorded
+comparison summaries. The local summaries are unsigned, full trajectories
+are not retained, and the newly combined candidate must be tested separately.
+See `HARNESS-RECORDED-COMPOSITION.md`; this is not automatic behavioral
+selection, authenticated evidence or adoption.

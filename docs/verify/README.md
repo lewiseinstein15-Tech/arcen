@@ -761,3 +761,27 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   evidence-based or recursive composition. A no-conflict merge is not proof of
   compatibility or safety. Composite objects can remain after cancellation.
   No approval, adoption, rollback or autonomous execution was enabled.
+
+### H-12c — operator composition from recorded comparisons (partial)
+
+- `H-12c-real-recorded-prompt.png`: fresh installed `arcen harness campaign
+  compose` in a real PTY rendered by xterm.js/Chromium. The displayed source
+  campaign was prepared using **mock Docker and a mock provider/judge**; the
+  command displays its unsigned local summaries and stops for confirmation.
+- `H-12c-real-recorded-result.png`: separate fresh installed-command PTY run on
+  those mocked source records. Terminal input confirmed composition; the real
+  command displayed an unadopted composite and its diff, with no provider call,
+  Docker trial, new plan or approval during composition.
+- `H-12c-real-recorded-tests.png`: installed-wheel PTY suite: 106 passed,
+  3 skipped. Tests exercise linked-record validation, corruption, rechecking
+  after confirmation, conflicts, human cancellation and a separate composite
+  comparison; provider and Docker are mocked for those comparisons. Opt-in real
+  Docker tests were skipped here.
+- Full source suite: 941 passed, 12 skipped. Wheel: 121 entries. Scoped Ruff,
+  formatting, documentation links and diff checks passed.
+- The source journal and reviews are unsigned and can be fabricated; their
+  association with the task is local metadata, not proof that trials occurred.
+  Full trajectories and durable composite provenance are not retained. This is
+  an operator-selected syntactic merge, not authenticated evidence, automatic
+  behavioral selection, a safety gate or autonomous recursion. See
+  `docs/HARNESS-RECORDED-COMPOSITION.md`.

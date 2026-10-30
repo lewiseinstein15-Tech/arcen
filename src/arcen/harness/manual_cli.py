@@ -534,6 +534,67 @@ def guided_workflow(
     return result
 
 
+def compose_recorded_interactive(
+    store: HarnessStore, campaign_id: str, task_id: str, review_ids: tuple[str, ...]
+) -> int:
+    """Inspect local comparison metadata, then explicitly compose; never adopt."""
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        raise HarnessError("recorded composition requires an interactive terminal")
+    from .cli import _diff_objects, _safe
+    from .evidence_composition import prepare_recorded_composition
+
+    inputs = prepare_recorded_composition(store, campaign_id, task_id, review_ids)
+    campaign = inputs.campaign
+    print(f"Completed campaign: {campaign.id}; baseline: {campaign.baseline}")
+    print(f"Commit: {campaign.commit}; task SHA-256: {campaign.task_sha256}")
+    print(f"Recorded workspace SHA-256: {inputs.reviews[0].workspace_sha256}")
+    print("Task (sanitized):\n" + _safe(inputs.task))
+    print(
+        "These local records are unsigned and can be fabricated; full trajectories are not retained."
+    )
+    print(
+        "A recorded preference or approval is not authenticated, an adoption gate, or proof of improvement."
+    )
+    for record in inputs.reviews:
+        print(
+            f"\nReview {record.id}; candidate {record.candidate_id}; state={record.state}; "
+            f"recorded winner={record.judge_winner}; confidence={record.judge_confidence}"
+        )
+        print(_diff_objects(store, campaign.baseline, record.candidate_id), end="")
+    print("\nThe human chooses inputs, including ties or losses; no automatic winner is selected.")
+    print(
+        "Exact reconstructed diffs merge syntactically; conflicts abort. No provider or Docker is used."
+    )
+    print(
+        "A combined candidate is untested and unadopted and may persist even after later failures."
+    )
+    _confirm(
+        f"Type COMPOSE {campaign.id} to create an unadopted candidate: ", f"COMPOSE {campaign.id}"
+    )
+    # Local trusted databases are not one atomic transaction. Re-read and
+    # revalidate all linked records and content after the operator's review.
+    if prepare_recorded_composition(store, campaign_id, task_id, review_ids) != inputs:
+        raise HarnessError("campaign, task or reviews changed since display")
+    result = compose_proposals(store, campaign.baseline, inputs.proposals)
+    if result.conflicts:
+        for conflict in result.conflicts:
+            print(
+                f"Conflict: {conflict.path} between review {inputs.proposal_reviews[conflict.first]} "
+                f"and review {inputs.proposal_reviews[conflict.second]}"
+            )
+        raise HarnessError("composition conflicts; no composite candidate created")
+    if result.candidate_id is None:
+        raise HarnessError("composition did not produce a candidate")
+    review_candidate(store, campaign.baseline, result.candidate_id)
+    print(f"\nUnadopted composite candidate: {result.candidate_id}")
+    print("Composite diff (sanitized; untrusted and not behaviorally tested):")
+    print(_diff_objects(store, campaign.baseline, result.candidate_id), end="")
+    print(
+        "No plan, trial, approval or adoption occurred. A separate reviewed comparison is required."
+    )
+    return 0
+
+
 def canary_interactive(
     store: HarnessStore,
     baseline_id: str,

@@ -2,7 +2,8 @@
 
 This is a limited operator-driven comparison, **not the complete Harness²
 runner**. For a single-terminal editor-to-review flow, see
-`HARNESS-GUIDED-WORKFLOW.md`. It imports locally authored patches or generates unadopted proposals
+`HARNESS-GUIDED-WORKFLOW.md`. To manually compose candidates from recorded
+comparison summaries, see `HARNESS-RECORDED-COMPOSITION.md`. It imports locally authored patches or generates unadopted proposals
 through a separate confirmed editor command, compares selected candidates to an
 unchanged packaged baseline, and records pending reviews. It does not
 select, adopt, roll back, resume or run unattended. Docker isolation remains

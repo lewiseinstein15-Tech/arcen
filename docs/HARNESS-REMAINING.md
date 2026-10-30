@@ -19,7 +19,8 @@ validated on real Docker or against a real external provider. See
   reviewed sequential baseline/candidate campaign with local human A/B judging,
   unsigned pending reviews and no automatic adoption. A guided single-terminal
   flow connects editor, optional manual syntactic composition, one
-  human-selected comparison and pending review.
+  human-selected comparison and pending review. A separate command can compose
+  human-selected candidates from a completed campaign's local summaries.
 - Durable journal and shared admission counts; optional stop at stage
   boundaries and budget binding for new CLI campaign plans.
 - Two experimental, public and gameable behavioral canaries, with exact file
@@ -45,9 +46,10 @@ validated on real Docker or against a real external provider. See
    campaign. Full event streams, persistent evidence and safe recovery/resume
    remain absent.
 3. **H-12–14: recursion and learning.** The composer can combine manually
-   chosen editor proposals before a guided comparison; it is syntactic and its
-   input proposals have not been compared. It is not connected to iterative
-   behavioral-contrast selection.
+   chosen editor proposals before a guided comparison, or manually combine
+   selected candidates from one completed campaign's unsigned summaries.
+   Both merges are syntactic, and the composite needs its own separate trial.
+   There is no automatic iterative behavioral-contrast selection.
    The task bank is a manual storage foundation only. There is no model-backed
    reflector, experience-guided editor, parallel candidate scheduling or
    sequential carry-forward recursion.

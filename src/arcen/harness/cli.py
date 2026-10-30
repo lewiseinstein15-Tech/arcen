@@ -157,6 +157,10 @@ def _campaign_command(args) -> int:
     from .campaign_journal import CampaignJournal
 
     store, lineage = _existing(args.store)
+    if args.campaign_command == "compose":
+        from .manual_cli import compose_recorded_interactive
+
+        return compose_recorded_interactive(store, args.id, args.task_id, tuple(args.review))
     if args.campaign_command == "plan":
         from .manual_cli import create_plan
 
@@ -366,6 +370,17 @@ def main(argv: list[str] | None = None) -> int:
     for action in ("status", "stop"):
         command = campaign_commands.add_parser(action)
         command.add_argument("id")
+    compose = campaign_commands.add_parser(
+        "compose", help="manually compose candidates from one completed campaign"
+    )
+    compose.add_argument("id", help="completed campaign ID")
+    compose.add_argument("--task-id", required=True, help="matching stored task SHA-256")
+    compose.add_argument(
+        "--review",
+        required=True,
+        action="append",
+        help="linked paired review ID; repeat 2 to 5 times",
+    )
     plan = campaign_commands.add_parser(
         "plan", help="record a manual comparison plan; no execution"
     )
