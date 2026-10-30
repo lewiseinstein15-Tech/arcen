@@ -1,7 +1,8 @@
 # Manual sequential candidate comparisons (experimental)
 
 `run_manual_campaign` is an explicitly invoked **trusted Python API**, not a
-complete H-11 campaign runner. A caller supplies one to five distinct stored
+complete H-11 campaign runner. An experimental interactive CLI also exposes
+this manual path; see `HARNESS-MANUAL-CLI.md`. A caller supplies one to five distinct stored
 candidate manifest IDs; it does not generate or choose candidates. Before
 calling it, review the baseline, every candidate, task, Git commit, model
 provider and judge-data exposure. Both `reviewed_inputs=True` and
@@ -65,8 +66,8 @@ are best effort: the judge sees the same reference evidence repeatedly and may
 infer ordering or provenance. Git snapshots and outputs can contain undetected
 secrets. The Docker daemon, image, local caller, ledger and store are trusted.
 
-The CLI can inspect or request a stop for journaled runs, but cannot start or
-resume them. There is no parallel/sequential recursion, automatic editor,
+The interactive CLI can start this manual path and inspect or request a stop
+for journaled runs, but cannot resume them. There is no parallel/sequential recursion, automatic editor,
 resume, canary gate, authenticated approval, verifier fusion, spending governor,
 or adoption/rollback here. The standard `run_probe` remains blocked. See
 `HARNESS-BUDGET.md`, `HARNESS-PROBE.md`, and `HARNESS-COMPARISON.md`.

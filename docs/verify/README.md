@@ -582,3 +582,22 @@ admission budget and in-process budgeted pair against real Docker. These tests
 use mocked model responses and a callback judge. They do not verify an external
 model provider, authenticated approval, automatic resume, token/USD budgets or
 adoption. This is user-reported terminal output, not a captured screenshot.
+
+### H-11d — interactive manual campaign CLI (partial)
+
+- `H-11d-real-manual-prompt.png`: fresh installed-wheel `arcen harness campaign
+  run` in a real PTY, rendered by xterm.js/Chromium. A locally authored test
+  patch, sample task, disposable Git repository and fake provider configuration
+  were used. The screenshot is **before confirmation**; no trial, provider
+  request, judge or Docker operation occurred. The terminal was closed at the
+  prompt.
+- `H-11d-real-manual-tests.png`: fresh PTY run against the installed wheel:
+  12 passed, 1 skipped. The passed workflow tests mock the provider and Docker;
+  the new opt-in CLI real-Docker test was skipped in the assistant sandbox.
+- Full suite (source): 828 passed, 11 skipped. Wheel contents check: 118
+  entries. Documentation links, scoped Ruff and diff checks passed.
+- The new CLI is experimental and only covers explicitly confirmed, manually
+  judged, sequential comparisons. This is not completion of H-11 or the wider
+  Harness² roadmap. Adoption, selection, rollback, safe resume and autonomy
+  remain disabled. Budget admissions are not USD/token/runtime caps. Earlier
+  user-run Docker results tested the underlying APIs, not this new CLI.

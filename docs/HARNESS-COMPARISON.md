@@ -25,7 +25,7 @@ later stage fails. Neither API writes a ref or adopts anything. A judge result
 is not proof of quality, a verifier, a canary, an approval or permission to
 change the adopted harness.
 
-These are experimental trusted-Python APIs, not an unattended campaign or CLI.
+These are experimental trusted-Python APIs, not unattended autonomy. An interactive manual campaign CLI also wraps the comparison path; see `HARNESS-MANUAL-CLI.md`.
 They have no resume, full campaign-level token/USD budget, canaries, rollback,
 spawn events or adoption interface. A separate local review ledger can record
 an explicitly confirmed human opinion about successful paired evidence; it is

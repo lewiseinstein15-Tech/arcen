@@ -1,4 +1,4 @@
-"""Read-oriented harness CLI; execution and adoption are not enabled."""
+"""Harness metadata and opt-in interactive campaigns; adoption is disabled."""
 
 from __future__ import annotations
 
@@ -147,10 +147,31 @@ def _review_command(args) -> None:
         print(f"Recorded {decided.state}; candidate was not adopted.")
 
 
-def _campaign_command(args) -> None:
+def _campaign_command(args) -> int:
     from .campaign_journal import CampaignJournal
 
-    store, _ = _existing(args.store)
+    store, lineage = _existing(args.store)
+    if args.campaign_command == "plan":
+        from .manual_cli import create_plan
+
+        record = create_plan(
+            store, args.baseline, tuple(args.candidate), args.task_file, args.commit
+        )
+        print(f"Campaign plan: {record.id}  state={record.state}")
+        print("Metadata only; no provider calls, execution or adoption occurred.")
+        return 0
+    if args.campaign_command == "run":
+        from .manual_cli import run_interactive
+
+        return run_interactive(
+            store,
+            lineage.resolve("refs/heads/adopted"),
+            args.id,
+            args.task_file,
+            args.config,
+            args.repo,
+            args.budget,
+        )
     journal = CampaignJournal(store)
     record = (
         journal.request_stop(args.id) if args.campaign_command == "stop" else journal.get(args.id)
@@ -165,17 +186,31 @@ def _campaign_command(args) -> None:
     for candidate, review_id in zip(record.candidates, record.reviews):
         print(f"Review: {review_id}  candidate: {candidate}")
     print("Metadata only; no adoption or safe automatic resume. In-flight work may continue.")
+    return 0
 
 
 def _budget_command(args) -> None:
     from .durable_budget import DurableBudget
 
     store, _ = _existing(args.store)
-    budget = DurableBudget(store, args.id)
-    if args.budget_command == "stop":
-        budget.stop()
+    if args.budget_command == "create":
+        budget = DurableBudget.create(
+            store,
+            max_trials=args.trials,
+            max_model_calls=args.model_calls,
+            max_judge_calls=args.judge_calls,
+            admission_seconds=args.seconds,
+        )
+    else:
+        budget = DurableBudget(store, args.id)
+        if args.budget_command == "stop":
+            budget.stop()
     state = budget.snapshot()
     print(f"Budget: {budget.id}  stopped={state.stopped}  reason={state.reason or 'open'}")
+    if args.budget_command == "create":
+        print(
+            f"Limits: trials={args.trials}  model calls={args.model_calls}  judge callbacks={args.judge_calls}  admission seconds={args.seconds}"
+        )
     print(
         f"Admitted: trials={state.trials}  model calls={state.model_calls}  judge callbacks={state.judge_calls}"
     )
@@ -192,6 +227,14 @@ def main(argv: list[str] | None = None) -> int:
     diff.add_argument("ref", help="candidate ref, e.g. refs/candidates/example")
     rollback = commands.add_parser("rollback", help="unavailable until adoption gates exist")
     rollback.add_argument("ref", help="target ref (not applied yet)")
+    baseline = commands.add_parser("pin-baseline", help="create an unadopted fixed-model baseline")
+    baseline.add_argument("pin", help="fixed:provider:model")
+    patch = commands.add_parser(
+        "import-patch", help="create an unadopted candidate from a reviewed diff"
+    )
+    patch.add_argument("baseline")
+    patch.add_argument("path", help="allowlisted component path")
+    patch.add_argument("patch_file")
     review = commands.add_parser("review", help="record human review; adoption remains disabled")
     review_commands = review.add_subparsers(dest="review_command", required=True)
     review_open = review_commands.add_parser(
@@ -214,17 +257,35 @@ def main(argv: list[str] | None = None) -> int:
             "--note", default="", help="optional plaintext note; do not include secrets"
         )
     campaign = commands.add_parser(
-        "campaign", help="inspect or request stop for a journaled manual run"
+        "campaign", help="plan, run, inspect or stop a manual comparison"
     )
     campaign_commands = campaign.add_subparsers(dest="campaign_command", required=True)
     for action in ("status", "stop"):
         command = campaign_commands.add_parser(action)
         command.add_argument("id")
-    budget = commands.add_parser("budget", help="inspect or stop a durable admission budget")
+    plan = campaign_commands.add_parser(
+        "plan", help="record a manual comparison plan; no execution"
+    )
+    plan.add_argument("--baseline", required=True)
+    plan.add_argument("--candidate", required=True, action="append")
+    plan.add_argument("--task-file", required=True)
+    plan.add_argument("--commit", required=True)
+    run = campaign_commands.add_parser("run", help="interactive reviewed run with human A/B judge")
+    run.add_argument("id")
+    run.add_argument("--task-file", required=True)
+    run.add_argument("--config", required=True)
+    run.add_argument("--repo", required=True)
+    run.add_argument("--budget", required=True)
+    budget = commands.add_parser("budget", help="create, inspect or stop an admission budget")
     budget_commands = budget.add_subparsers(dest="budget_command", required=True)
     for action in ("status", "stop"):
         command = budget_commands.add_parser(action)
         command.add_argument("id")
+    create_budget = budget_commands.add_parser("create", help="create durable admission limits")
+    create_budget.add_argument("--trials", type=int, required=True)
+    create_budget.add_argument("--model-calls", type=int, required=True)
+    create_budget.add_argument("--judge-calls", type=int, required=True)
+    create_budget.add_argument("--seconds", type=float, required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "init":
@@ -238,10 +299,22 @@ def main(argv: list[str] | None = None) -> int:
             print("Hashes do not authenticate provenance; candidate selection remains disabled.")
         elif args.command == "diff":
             print(_diff(args.store, args.ref), end="")
+        elif args.command == "pin-baseline":
+            from .manual_cli import pin_baseline
+
+            store, lineage = _existing(args.store)
+            identifier = pin_baseline(store, lineage.resolve("refs/heads/adopted"), args.pin)
+            print(f"Unadopted pinned baseline: {identifier}")
+        elif args.command == "import-patch":
+            from .manual_cli import import_patch
+
+            store, _ = _existing(args.store)
+            identifier = import_patch(store, args.baseline, args.path, args.patch_file)
+            print(f"Unadopted candidate: {identifier}")
         elif args.command == "review":
             _review_command(args)
         elif args.command == "campaign":
-            _campaign_command(args)
+            return _campaign_command(args)
         elif args.command == "budget":
             _budget_command(args)
         else:

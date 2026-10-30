@@ -68,7 +68,8 @@ record changes after display, the CLI refuses the decision. The Python API's
 compare-and-set semantics; wall-clock rollback is handled by clamping the
 recorded decision time to its creation time.
 
-Paired execution is available as a trusted Python API, not a campaign CLI.
+Paired execution is available through a trusted Python API and an experimental
+interactive manual campaign CLI (`HARNESS-MANUAL-CLI.md`), not unattended autonomy.
 The user reported the opt-in trial and paired-comparison real-Docker tests passed
 on Omarchy at `f34ea27`, with mocked provider responses and a callback judge.
 Before any future adoption mechanism is enabled, it must
