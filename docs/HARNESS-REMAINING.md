@@ -15,6 +15,9 @@ validated on real Docker or against a real external provider. See
   orphan requiring inspection.
 - Content-addressed manifests/objects, local lineage and review metadata,
   baseline selection, candidate diff inspection and strict static policy review.
+  Explicit-key signed packages can be verified and manually imported as objects;
+  unregistered objects can be inspected without changing refs. Neither operation
+  establishes signer trust, safety, execution authorization or adoption.
 - Explicit interactive manual proposal generation or patch import; a
   reviewed sequential baseline/candidate campaign with local human A/B judging,
   unsigned pending reviews and no automatic adoption. A guided single-terminal

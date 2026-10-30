@@ -937,3 +937,12 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
   import tests, **7 passed**. The focused installed-wheel package/store suite
   passed **37 tests**; the full source suite passed **1024**, with **12 skipped**.
   Docker was unavailable here, and signature verification is not key trust.
+
+### H-04f — read-only manifest inspection (partial)
+
+- `H-04f-real-inspect.png`: fresh installed-command PTY run inspecting a
+  test-key-imported, unregistered manifest and showing its opt-in diff.
+- `H-04f-real-installed-tests.png`: fresh installed-wheel PTY test run,
+  **8 passed**. The focused installed-wheel suite passed **52 tests**; the
+  full source suite passed **1032**, with **12 skipped**. Inspection verifies
+  hashes, not signer trust or safety; no Docker validation was performed.

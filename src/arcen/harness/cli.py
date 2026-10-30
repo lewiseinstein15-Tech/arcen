@@ -73,7 +73,9 @@ def _diff(root: str, ref: str) -> str:
     return _diff_objects(store, db.resolve("refs/heads/adopted"), db.resolve(ref))
 
 
-def _diff_objects(store: HarnessStore, baseline_id: str, candidate_id: str) -> str:
+def _diff_objects(
+    store: HarnessStore, baseline_id: str, candidate_id: str, *, max_lines: int | None = None
+) -> str:
     baseline = store.get_manifest(baseline_id)
     candidate = store.get_manifest(candidate_id)
     output = []
@@ -88,12 +90,46 @@ def _diff_objects(store: HarnessStore, baseline_id: str, candidate_id: str) -> s
             new = _safe(store.get_blob(new_hash).decode("utf-8")).splitlines(keepends=True)
         except UnicodeDecodeError as exc:
             raise HarnessError(f"non-UTF-8 component: {name}") from exc
+        if max_lines is not None:
+            max_lines -= len(old) + len(new)
+            if max_lines < 0:
+                raise HarnessError("diff exceeds input line limit")
         output.extend(
             difflib.unified_diff(old, new, fromfile=f"baseline/{name}", tofile=f"candidate/{name}")
         )
         if sum(len(x) for x in output) > MAX_COMPONENT_BYTES:
             raise HarnessError("diff exceeds display limit")
     return "".join(output) if output else "No differences.\n"
+
+
+def _inspect_manifest(root: str, identifier: str, *, show_diff: bool = False) -> str:
+    """Inspect unregistered objects without modifying refs or authorizing use."""
+    store, lineage = _existing(root)
+    baseline_id = lineage.resolve("refs/heads/adopted")
+    baseline = store.get_manifest(baseline_id)
+    candidate = store.get_manifest(identifier)
+    # Prepare the entire output before printing, so corrupt objects or failed
+    # decoding cannot yield a misleading partial inspection.
+    diff = _diff_objects(store, baseline_id, identifier, max_lines=2048) if show_diff else None
+    lines = [
+        f"Stored manifest: {identifier}",
+        f"Local adopted baseline: {baseline_id}",
+        f"Schema: {candidate.schema_version}; model pin: {_safe(candidate.model_pin)}",
+        "Components (SHA-256; changed compared with the local baseline):",
+    ]
+    for path, digest in sorted(candidate.components.items()):
+        state = "changed" if digest != baseline.components[path] else "same"
+        lines.append(f"  {path}: {digest} [{state}]")
+    lines.extend(
+        [
+            "Integrity only: signer, provenance, safety and authorization are not established.",
+            "No refs, approval, execution or adoption were changed.",
+        ]
+    )
+    if diff is not None:
+        lines.append("Untrusted sanitized diff (may contain sensitive data):")
+        lines.append(diff.rstrip("\n"))
+    return "\n".join(lines) + "\n"
 
 
 def _show_review(store: HarnessStore, record, lineage: HarnessLineage) -> None:
@@ -332,6 +368,11 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("doctor", help="verify stored objects, refs and lineage")
     diff = commands.add_parser("diff", help="compare a candidate to baseline")
     diff.add_argument("ref", help="candidate ref, e.g. refs/candidates/example")
+    inspect = commands.add_parser("inspect", help="inspect unregistered manifest objects read-only")
+    inspect.add_argument("manifest", help="stored manifest SHA-256")
+    inspect.add_argument(
+        "--diff", action="store_true", help="also show a sanitized diff; may reveal plaintext"
+    )
     rollback = commands.add_parser("rollback", help="unavailable until adoption gates exist")
     rollback.add_argument("ref", help="target ref (not applied yet)")
     attestation = commands.add_parser(
@@ -499,6 +540,8 @@ def main(argv: list[str] | None = None) -> int:
             print("Hashes do not authenticate provenance; candidate selection remains disabled.")
         elif args.command == "diff":
             print(_diff(args.store, args.ref), end="")
+        elif args.command == "inspect":
+            print(_inspect_manifest(args.store, args.manifest, show_diff=args.diff), end="")
         elif args.command == "attestation":
             from .attestation import MAX_ATTESTATION_BYTES, verify_attestation
             from .manual_cli import _read_text

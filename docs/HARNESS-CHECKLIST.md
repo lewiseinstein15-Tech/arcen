@@ -56,6 +56,8 @@ merely because a sub-scope is complete.
       The full eight-component package and trusted runtime integration remain open.
 - [x] H-04e: TTY-confirmed verified v1 object import without refs, lineage or
       adoption; no signer enrollment. Object writes are not transactional.
+- [x] H-04f: read-only inspection of unregistered manifest objects, with an
+      opt-in sanitized diff and bounded output; no trust or execution approval.
 - [x] H-11g: guided selection of one to five candidates for a single manually
       confirmed sequential campaign, with lower-bound admission checks. This
       completes only this sub-scope, not H-11, H-14 or the Governor.

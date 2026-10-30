@@ -1,4 +1,4 @@
-# Signed portable harness package (H-04d/e, experimental)
+# Signed portable harness package (H-04d–f, experimental)
 
 The `package export`, `package verify` and `package import` commands transfer,
 inspect or store the **existing seven-component v1 manifest**, component blobs
@@ -32,6 +32,11 @@ arcen harness --store /trusted/destination package import \
   --manifest "$MANIFEST" --public-key "$PUBLIC_KEY" \
   --file /trusted/new-package.json
 # After reviewing the warning, type exactly: IMPORT <the full manifest SHA-256>
+
+# Inspect imported objects without registering or adopting them.
+arcen harness --store /trusted/destination inspect "$MANIFEST"
+# Optional: show plaintext, sanitized changes against the local adopted baseline.
+arcen harness --store /trusted/destination inspect "$MANIFEST" --diff
 ```
 
 The attestation is created by trusted code as described in
@@ -82,3 +87,25 @@ must be trusted. Preflight is not a lock against concurrent mutation, and no
 hostile-filesystem race protection is claimed. Package contents remain
 plaintext; storing them may persist sensitive material. Authenticate the public
 key and manifest out of band before using this feature.
+
+## Inspecting imported objects
+
+`inspect MANIFEST` verifies the stored manifest and all seven referenced blobs,
+then shows their hashes and whether they differ from the local adopted baseline.
+It does not require a candidate ref and does not create one. It does not show
+component text by default. `--diff` displays a sanitized UTF-8 comparison to
+the local adopted baseline, with a 2,048-line combined input limit and a
+1,048,576-character diff-output limit; invalid UTF-8, oversized diffs, missing objects, or corruption
+fail without printing a partial report. Sanitization removes terminal control
+and formatting characters; it is **not secret redaction** and untrusted text
+can still be misleading. Diffs can reveal sensitive plaintext. Comparison is a
+review aid, not evidence of behavioral safety or improvement.
+
+The imported object store retains no package signature or signer association.
+Inspection verifies hashes only; it does not authenticate the signer, prove
+provenance or authorize execution. Authenticate and separately verify the
+original package if that evidence is needed, and use only a trusted local
+store. Read-only inspection does not register lineage, change refs or grant
+approval. No protection from concurrent hostile local filesystem writers is
+claimed. Other separately gated experimental APIs may accept manifest IDs for
+manual testing; inspection itself never runs a candidate.
