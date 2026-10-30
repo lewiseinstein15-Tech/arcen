@@ -14,6 +14,7 @@ with docker, without docker, or with the image pulled.
 
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -143,13 +144,21 @@ def test_registry_routing_blocks_escape_via_file_tools() -> None:
     rt.destroy()
 
 
-def test_one_sandbox_per_session() -> None:
+@pytest.mark.parametrize("custom_tmpdir", [False, True])
+def test_one_sandbox_per_session(tmp_path, monkeypatch, custom_tmpdir) -> None:
+    if custom_tmpdir:
+        monkeypatch.setenv("TMPDIR", str(tmp_path))
+        monkeypatch.setattr(tempfile, "tempdir", None)
     a, b = SandboxRuntime(docker_client=False), SandboxRuntime(docker_client=False)
-    assert a.id != b.id
-    assert a.root != b.root
-    assert a.root.startswith("/tmp") and b.root.startswith("/tmp")
-    a.destroy()
-    b.destroy()
+    try:
+        assert a.id != b.id
+        assert a.root != b.root
+        expected = Path(tempfile.gettempdir()).resolve()
+        assert Path(a.root).parent.resolve() == expected
+        assert Path(b.root).parent.resolve() == expected
+    finally:
+        a.destroy()
+        b.destroy()
 
 
 def test_docker_lifecycle_via_fake_client() -> None:

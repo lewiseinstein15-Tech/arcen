@@ -1,11 +1,13 @@
 # ARCEN Rebuild — Master Plan
 
-> Status: TUI-01…18 merged; sandbox safety fix and H-01 are on local branches.
+> Status: TUI-01…18 merged; the sandbox safety and Harness² work remains
+> incomplete. Check the actual Git refs and deployment rather than treating this
+> plan as proof of a merge or release.
 > The user reported the H-01 live Docker workspace test passing on Omarchy.
 > H-01 remains partial: only the verified packaged adopted baseline can be selected;
 > candidate references remain rejected until their safety gates exist.
 > H-02 and H-03 completed file-based prompts, tool guidance and validated
-> guardrails on the local `feat/harness2` branch. H-04 has an unsigned bundled
+> guardrails in the Harness² work. H-04 has an unsigned bundled
 > manifest and optional configured-model pin; signatures and full components
 > remain future work. H-05 supplies a local content-addressed object API;
 > refs, adoption and a git-backed store remain future work.
@@ -18,8 +20,9 @@
 > Ticket mechanics (status markers, verification loop, max-5-iterations rule,
 > regression re-run before next ticket) follow [TICKETS.md](TICKETS.md).
 > Branch strategy: Track A was merged to `main` at `bc4ae47`. Track B
-> `feat/harness2` is based on the local `fix/sandbox-execution` safety branch;
-> neither Track B nor the safety branch has been merged to remote `main`.
+> `feat/harness2` includes the `fix/sandbox-execution` safety work. The current
+> local and remote Git refs are the source of truth for merge and push status;
+> a merge alone does not complete the Harness² roadmap or verify a deployment.
 
 ---
 

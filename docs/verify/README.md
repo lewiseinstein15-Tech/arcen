@@ -881,3 +881,16 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   Python code, tool implementations, configuration and plugins are outside this
   snapshot. Disk edits after capture are not monitored until a fresh process.
   Full H-04 remains incomplete.
+
+### Harness² pre-merge regression verification
+
+- `MERGE-HARNESS2-real-full-tests.png`: fresh source-suite run in a real PTY,
+  rendered with xterm.js/Chromium after the portable temporary-directory test
+  fix: **1006 passed, 12 skipped**. No real Docker daemon was available.
+- The prior full installed-wheel run passed **1005 tests, 12 skipped** before
+  the test-only portability fix; the installed-wheel sandbox/server subset was
+  rerun afterward: **61 passed**. Some older subprocess helpers explicitly
+  exercise the source tree. Wheel and documentation checks passed.
+- The repository-wide Ruff run still reports pre-existing findings on `main`;
+  this change fixes the import-order issue introduced by the branch and leaves
+  the unrelated script permission changes unstaged.

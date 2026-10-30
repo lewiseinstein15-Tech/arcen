@@ -1,6 +1,6 @@
 # Harness²: remaining work and safety status
 
-Status as of 30 October 2026. This is a work-in-progress branch, not a claim
+Status as of 30 October 2026. This is a work-in-progress implementation, not a claim
 that the Harness² roadmap is complete. The earlier Omarchy Docker runs covered
 the then-current isolation and manual-campaign foundations, using mocked models
 and judges. Newer editor, CLI, canary and cleanup paths have not all been
@@ -76,8 +76,8 @@ validated on real Docker or against a real external provider. See
    need work. New real-Docker paths and any paid-provider integration require
    validation on suitable systems; mock tests are not that validation.
 
-The remote `main` has not received the Harness² branch or its isolation fixes.
-A locally downloaded bundle is not a merge or deployment. Preserve Docker-only
+Check local and remote Git refs for the current merge state. A local checkout or
+bundle is not proof of a remote merge or a deployment. Preserve Docker-only
 fail-closed isolation and leave candidate adoption, automatic resume and
 unattended autonomy disabled until the actual gates above are implemented and
 verified. Never infer safety or improvement merely from a passing canary,

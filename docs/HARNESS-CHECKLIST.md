@@ -60,7 +60,8 @@ merely because a sub-scope is complete.
 - [ ] Real-Docker validation of the newer editor/CLI/canary, cleanup and guided
       paths on an appropriate machine. Earlier Docker tests covered older APIs.
 - [ ] External provider validation; current demonstrations use mocks.
-- [ ] Merge and deployment of the local Harness² branch and isolation fixes.
+- [ ] Release verification: confirm the remote merge and deploy the Harness²
+      work and isolation fixes on an appropriate system.
 
 Do not enable candidate adoption, unattended autonomy or automatic resume until
 the corresponding authorization and safety gates exist and have been verified.

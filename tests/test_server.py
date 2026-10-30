@@ -18,12 +18,12 @@ from types import SimpleNamespace
 import httpx
 import pytest
 import uvicorn
+from fake_turn_registry import FakeTurnRegistry
 
 import arcen.server.app as server_app
 from arcen.config import ArcenConfig, default_config_path
 from arcen.llm.client import LLMResponse, ProviderError
 from arcen.server.app import ServerState, app
-from fake_turn_registry import FakeTurnRegistry
 
 PORT = 3179
 BASE = f"http://127.0.0.1:{PORT}"
