@@ -147,6 +147,26 @@ def _review_command(args) -> None:
         print(f"Recorded {decided.state}; candidate was not adopted.")
 
 
+def _campaign_command(args) -> None:
+    from .campaign_journal import CampaignJournal
+
+    store, _ = _existing(args.store)
+    journal = CampaignJournal(store)
+    record = (
+        journal.request_stop(args.id) if args.campaign_command == "stop" else journal.get(args.id)
+    )
+    print(f"Campaign: {record.id}  state={record.state}  phase={record.phase}")
+    print(
+        f"Completed: {record.cursor}/{len(record.candidates)}  stop requested: {record.stop_requested}"
+    )
+    print(
+        f"Baseline: {record.baseline}\nCommit: {record.commit}\nTask SHA-256: {record.task_sha256}"
+    )
+    for candidate, review_id in zip(record.candidates, record.reviews):
+        print(f"Review: {review_id}  candidate: {candidate}")
+    print("Metadata only; no adoption or safe automatic resume. In-flight work may continue.")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="arcen harness")
     parser.add_argument("--store", default="~/.arcen/harness", help="trusted local store directory")
@@ -178,6 +198,13 @@ def main(argv: list[str] | None = None) -> int:
         decision.add_argument(
             "--note", default="", help="optional plaintext note; do not include secrets"
         )
+    campaign = commands.add_parser(
+        "campaign", help="inspect or request stop for a journaled manual run"
+    )
+    campaign_commands = campaign.add_subparsers(dest="campaign_command", required=True)
+    for action in ("status", "stop"):
+        command = campaign_commands.add_parser(action)
+        command.add_argument("id")
     args = parser.parse_args(argv)
     try:
         if args.command == "init":
@@ -193,6 +220,8 @@ def main(argv: list[str] | None = None) -> int:
             print(_diff(args.store, args.ref), end="")
         elif args.command == "review":
             _review_command(args)
+        elif args.command == "campaign":
+            _campaign_command(args)
         else:
             raise HarnessError(
                 "rollback unavailable: no adoption/approval safety gate is implemented"

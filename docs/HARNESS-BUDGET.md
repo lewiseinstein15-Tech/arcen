@@ -35,7 +35,8 @@ still applies independently.
 
 - The argument is optional for compatibility with existing experimental APIs.
   Calls that omit it or use a different instance are not counted. A future
-  campaign must require and consistently propagate its own budget.
+  full campaign runner must require and consistently propagate its own budget.
+  The experimental manual campaign requires one SharedBudget instance.
 - Counters and the stop flag live in one process, are not durable, and do not
   coordinate across processes or survive restart/resume. The trusted local
   caller can construct another instance or call the provider directly.

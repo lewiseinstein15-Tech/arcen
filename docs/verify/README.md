@@ -525,3 +525,22 @@ a hard timeout, or a resumable campaign runner. Stop does not cancel in-flight
 work; callback blinding and redaction are best effort. No automatic selection,
 adoption, canaries, campaign CLI, recursion or safe resume is enabled. See
 `docs/HARNESS-MANUAL-CAMPAIGN.md`.
+
+## H-11 journaled manual campaign (experimental; partial)
+
+`H-11c-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+wheel, managed server and local mock provider answering a direct question; it
+does not show a campaign. Docker was unavailable and tools were blocked.
+`H-11c-real-journal-cli.png` shows the actual installed CLI inspecting a local
+metadata-only plan; no trial was run. `H-11c-real-journal-tests.png` captures
+the focused journal, manual campaign, CLI, review and budget tests: **72 passed,
+3 skipped**. The full suite reported **800 passed, 9 skipped**. The built and
+installed wheel contained 116 entries. The new journaled real-Docker campaign
+test was skipped locally and has not been run by the user.
+
+The optional journal records phases and review IDs and prevents a plan from
+being claimed twice. Stop is a stage-boundary request, not cancellation of
+in-flight work. Crashed runs remain ambiguous and cannot automatically resume;
+review and journal databases are not jointly transactional. There is no
+campaign-start CLI, durable budget, authenticated approval or adoption. See
+`docs/HARNESS-CAMPAIGN-JOURNAL.md` for limitations.

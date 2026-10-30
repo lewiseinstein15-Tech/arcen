@@ -54,7 +54,8 @@ records remain. An existing pending review for a pair can cause a ledger failure
 database write can leave a record that must be inspected manually. Preflight
 errors and snapshot failures raise instead of returning a result. Abrupt process
 termination can leave partial records or a Docker container requiring manual
-inspection; there is no durable campaign checkpoint or safe automatic resume.
+inspection; optional durable metadata checkpoints are available, but there is no
+safe automatic resume. See `HARNESS-CAMPAIGN-JOURNAL.md`.
 
 The admission budget is not a token or USD cap, a hard wall-clock timeout, a
 cross-process limit, or an in-flight cancellation mechanism. The judge callback
@@ -63,7 +64,8 @@ are best effort: the judge sees the same reference evidence repeatedly and may
 infer ordering or provenance. Git snapshots and outputs can contain undetected
 secrets. The Docker daemon, image, local caller, ledger and store are trusted.
 
-There is no CLI campaign runner, parallel/sequential recursion, automatic editor,
+The CLI can inspect or request a stop for journaled runs, but cannot start or
+resume them. There is no parallel/sequential recursion, automatic editor,
 resume, canary gate, authenticated approval, verifier fusion, spending governor,
 or adoption/rollback here. The standard `run_probe` remains blocked. See
 `HARNESS-BUDGET.md`, `HARNESS-PROBE.md`, and `HARNESS-COMPARISON.md`.

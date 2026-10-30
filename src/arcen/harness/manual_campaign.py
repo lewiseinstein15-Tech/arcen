@@ -13,6 +13,7 @@ from pathlib import Path
 from arcen.config import ArcenConfig
 
 from .budget import BudgetExhausted, SharedBudget
+from .campaign_journal import CampaignJournal, CampaignStopped
 from .comparison import ReviewedComparison
 from .judge import Trajectory, compare
 from .policy import review_candidate
@@ -58,6 +59,8 @@ def run_manual_campaign(
     reviewed_judge_inputs: bool = False,
     max_model_calls_per_trial: int = 4,
     sensitive_values: tuple[str, ...] = (),
+    journal: CampaignJournal | None = None,
+    campaign_id: str | None = None,
 ) -> ManualCampaignResult:
     """Compare reviewed candidates with one reference trial, sequentially.
 
@@ -75,6 +78,10 @@ def run_manual_campaign(
         raise HarnessError("campaign requires a review ledger for the same store")
     if type(budget) is not SharedBudget:
         raise HarnessError("campaign requires a shared budget")
+    if (journal is None) != (campaign_id is None) or (
+        journal is not None and (type(journal) is not CampaignJournal or journal.store is not store)
+    ):
+        raise HarnessError("campaign journal and ID must match the store")
     if (
         type(baseline_id) is not str
         or type(candidates) is not tuple
@@ -124,12 +131,33 @@ def run_manual_campaign(
         for candidate in candidates
     )
     budget.checkpoint()
-    snapshot = snapshot_git_commit(repo, commit)
+    if journal is not None:
+        journal.claim(campaign_id, baseline_id, candidates, task, commit)
     completed: list[CampaignItem] = []
     reference: ReviewedProbeResult | None = None
 
     def result(reason: str | None, candidate: str | None = None) -> ManualCampaignResult:
+        if journal is not None and reason is not None:
+            state = journal.get(campaign_id).state
+            if state == "running":
+                journal.fail(campaign_id)
+                state = journal.get(campaign_id).state
+            if state == "stopped":
+                reason = "stopped"
         return ManualCampaignResult(reference, tuple(completed), reason, candidate)
+
+    try:
+        if journal is not None:
+            journal.checkpoint(campaign_id, "reference", 0)
+        snapshot = snapshot_git_commit(repo, commit)
+        if journal is not None:
+            journal.checkpoint(campaign_id, "reference", 0)
+    except CampaignStopped:
+        return result("stopped")
+    except Exception:
+        if journal is not None:
+            journal.fail(campaign_id)
+        raise
 
     try:
         reference = _run_bound_probe(snapshot, cfg, reference_model)
@@ -139,10 +167,19 @@ def run_manual_campaign(
         return result("reference_isolation_failed")
     if reference.status != "ok":
         return result("budget_closed" if budget.snapshot().stopped else "reference_failed")
+    try:
+        if journal is not None:
+            journal.advance(campaign_id, "reference", "candidate")
+    except CampaignStopped:
+        return result("stopped")
 
-    for candidate, model in zip(candidates, models, strict=True):
+    for index, (candidate, model) in enumerate(zip(candidates, models, strict=True)):
         try:
+            if journal is not None:
+                journal.checkpoint(campaign_id, "candidate", index)
             trial = _run_bound_probe(snapshot, cfg, model)
+        except CampaignStopped:
+            return result("stopped", candidate)
         except BudgetExhausted:
             return result("budget_closed", candidate)
         except ProbeUnavailable:
@@ -151,6 +188,12 @@ def run_manual_campaign(
             return result(
                 "budget_closed" if budget.snapshot().stopped else "candidate_failed", candidate
             )
+        try:
+            if journal is not None:
+                journal.advance(campaign_id, "candidate", "judge")
+                journal.checkpoint(campaign_id, "judge", index)
+        except CampaignStopped:
+            return result("stopped", candidate)
 
         def limited_judge(request):
             budget.reserve_judge_call()
@@ -170,11 +213,20 @@ def run_manual_campaign(
             )
         pair = ReviewedComparison(reference, trial, judgment)
         try:
+            if journal is not None:
+                journal.advance(campaign_id, "judge", "recording")
+                journal.checkpoint(campaign_id, "recording", index)
             budget.checkpoint()
             review = reviews.request_from_comparison(pair)
+        except CampaignStopped:
+            return result("stopped", candidate)
         except BudgetExhausted:
             return result("budget_closed", candidate)
         except Exception:  # noqa: BLE001 — no further work after ledger failure
             return result("review_record_failed", candidate)
         completed.append(CampaignItem(candidate, pair, review))
+        if journal is not None:
+            state = journal.record_review(campaign_id, candidate, review.id)
+            if state.state == "stopped":
+                return result("stopped", candidate)
     return result(None)
