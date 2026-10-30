@@ -44,6 +44,19 @@ unsupported nested result values are suppressed. The sandbox image and Docker
 daemon are trusted. Tool support is limited to the existing bash gateway.
 
 **Neither filename blocking nor output redaction proves an input secret-free.**
+Before a reviewed trial is admitted, its immutable Git archive is checked for
+the exact UTF-8 bytes of the configured provider key. Comparisons and manual
+campaigns also check their explicitly supplied `sensitive_values`. A match
+rejects the workspace before trial reservation, Docker creation or provider
+calls; no matched value or filename is printed. A journaled campaign records a
+failed run and reports `workspace_sensitive`; a canary returns inconclusive.
+The check includes archive metadata as well as file data, so it can reject a
+coincidental match. It only detects exact supplied bytes, not encoded, split,
+transformed or unknown credentials. The lower-level `open_probe_container`
+gateway separately checks the configured key (when at least four characters)
+before materializing or opening Docker. Local Python, Git and filesystem writers
+remain trusted.
+
 Committed source, task text, prompts, encoded/split values, errors outside the
 wrapped tool-result path, and other data may still contain or reveal secrets.
 Review every input before exposing it to a model/provider. The standard

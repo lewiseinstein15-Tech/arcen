@@ -28,6 +28,10 @@ validated on real Docker or against a real external provider. See
   campaign's local summaries.
 - Durable journal and shared admission counts; optional stop at stage
   boundaries and budget binding for new CLI campaign plans.
+- Reviewed trial archives reject exact occurrences of the configured provider
+  key before Docker or provider calls. Paired/manual campaigns also check
+  explicitly supplied sensitive values. Encoded, split and unknown secrets are
+  not detected; inputs still require review.
 - Two experimental, public and gameable behavioral canaries, with exact file
   checks, not an adoption gate or security proof.
 - A local, plaintext content-addressed task bank usable by manual editor and

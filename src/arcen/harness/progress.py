@@ -25,6 +25,7 @@ _STOP_REASONS = frozenset(
         "candidate_failed",
         "judge_failed",
         "review_record_failed",
+        "workspace_sensitive",
     }
 )
 

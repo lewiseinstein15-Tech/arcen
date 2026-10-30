@@ -67,6 +67,9 @@ merely because a sub-scope is complete.
 - [x] H-21a: CI workflow configuration for installed-wheel and opt-in Docker
       validation, structurally tested locally. A remote run is still required;
       this does not complete portability, CI verification or H-21.
+- [x] H-19a: reviewed trial snapshots reject exact configured provider keys;
+      comparisons and campaigns also reject explicitly supplied known values
+      before trial admission. Not a complete secret or injection scanner.
 
 ## Verification still required
 

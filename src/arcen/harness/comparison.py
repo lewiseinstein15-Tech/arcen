@@ -16,7 +16,12 @@ from .budget import SharedBudget
 from .durable_budget import DurableBudget
 from .judge import Judgment, Trajectory, compare
 from .probe import ProbeUnavailable
-from .probe_execution import ReviewedProbeResult, _reviewed_config, _run_bound_probe
+from .probe_execution import (
+    ReviewedProbeResult,
+    _reviewed_config,
+    _run_bound_probe,
+)
+from .probe_hygiene import _reject_snapshot_secrets
 from .probe_model import bind_probe_model
 from .probe_workspace import snapshot_git_commit
 from .resolver import HarnessError
@@ -96,6 +101,7 @@ def run_reviewed_comparison(
     if budget is not None:
         budget.checkpoint()
     snapshot = snapshot_git_commit(repo, commit)
+    _reject_snapshot_secrets(snapshot, hidden)
     reference = _run_bound_probe(snapshot, cfg, reference_model)
     if reference.status == "error":
         return ReviewedComparison(reference, None, None)

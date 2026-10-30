@@ -15,6 +15,7 @@ from arcen.config import ArcenConfig
 from arcen.plugins.redact_secrets import redact_text
 from arcen.sandbox.turn import DockerTurnRegistry
 
+from .probe_hygiene import _reject_snapshot_secrets
 from .probe_workspace import GitSnapshot, materialize_git_snapshot
 
 
@@ -74,6 +75,9 @@ def open_probe_container(snapshot: GitSnapshot, config: ArcenConfig):
     Docker creation/import failures propagate and never fall back to a host tool.
     This gateway is not wired to candidate model execution or campaigns.
     """
+    # Even callers of this lower-level gateway cannot import a snapshot
+    # containing the configured, resolved provider key in its exact form.
+    _reject_snapshot_secrets(snapshot, _provider_secret(config))
     with materialize_git_snapshot(snapshot) as workspace:
         registry = DockerTurnRegistry(config, workspace=str(workspace))
         try:

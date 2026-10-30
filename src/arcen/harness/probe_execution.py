@@ -31,6 +31,7 @@ from .budget import BudgetExhausted, SharedBudget
 from .durable_budget import DurableBudget
 from .probe import ProbeUnavailable
 from .probe_container import open_probe_container, redact_probe_value
+from .probe_hygiene import _reject_snapshot_secrets
 from .probe_model import BoundProbeModel, bind_probe_model
 from .probe_workspace import GitSnapshot, snapshot_git_commit
 from .resolver import HarnessError
@@ -168,6 +169,8 @@ def _run_bound_probe(
     canary: _CanaryCommands | None = None,
 ) -> ReviewedProbeResult:
     """Run already-validated model and snapshot; never accept either from a CLI."""
+    known = (cfg.provider.api_key,) if cfg.provider.api_key else ()
+    _reject_snapshot_secrets(snapshot, known)
     if model.budget is not None:
         model.budget.reserve_trial()
     baseline_id, candidate_id, task = (

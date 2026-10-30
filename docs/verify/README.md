@@ -957,3 +957,13 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
 - Final full source suite: **1040 passed, 12 skipped**. The selected installed
   wheel suite: **106 passed, 3 skipped**. The new workflow has not been pushed
   or run on GitHub; Docker and external-provider validation remain open.
+
+### H-19a — known credentials in reviewed probe snapshots (partial)
+
+- `H-19a-real-secret-preflight-tests.png`: fresh installed-wheel tests in an
+  actual PTY, **8 passed**. The tests cover exact configured key and explicitly
+  supplied-value rejection before container/provider use, including the lower
+  gateway; Docker and provider calls are mocked. Encoded/split/unknown secrets
+  remain outside this check.
+- Full source suite: **1048 passed, 12 skipped**. Selected installed-wheel
+  suite: **73 passed, 6 skipped**. Real Docker was unavailable for this run.

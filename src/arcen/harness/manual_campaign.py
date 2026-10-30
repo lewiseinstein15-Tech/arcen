@@ -19,7 +19,12 @@ from .durable_budget import DurableBudget
 from .judge import Trajectory, compare
 from .policy import review_candidate
 from .probe import ProbeUnavailable
-from .probe_execution import ReviewedProbeResult, _reviewed_config, _run_bound_probe
+from .probe_execution import (
+    ReviewedProbeResult,
+    _reviewed_config,
+    _run_bound_probe,
+)
+from .probe_hygiene import SensitiveSnapshot, _reject_snapshot_secrets
 from .probe_model import bind_probe_model
 from .probe_workspace import snapshot_git_commit
 from .progress import Progress
@@ -172,10 +177,13 @@ def run_manual_campaign(
         if journal is not None:
             journal.checkpoint(campaign_id, "reference", 0)
         snapshot = snapshot_git_commit(repo, commit)
+        _reject_snapshot_secrets(snapshot, hidden)
         if journal is not None:
             journal.checkpoint(campaign_id, "reference", 0)
     except CampaignStopped:
         return result("stopped")
+    except SensitiveSnapshot:
+        return result("workspace_sensitive")
     except Exception:
         if journal is not None:
             journal.fail(campaign_id)
