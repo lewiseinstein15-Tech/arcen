@@ -892,6 +892,7 @@ def portability_interactive(
     print(
         "Images must exist locally. Docker daemon/image are trusted; no host fallback; tool network disabled."
     )
+    print("After confirmation, both image IDs are checked locally; availability can change later.")
     print(
         "Provider and judge exposure may reveal data and cost money. No token/USD or hard-runtime cap."
     )

@@ -46,6 +46,27 @@ def validate_image_ids(image_ids: tuple[str, str]) -> None:
         raise HarnessError("two distinct local Docker image IDs are required")
 
 
+def _require_local_images(image_ids: tuple[str, str]) -> None:
+    """Check both IDs with the trusted daemon without pulling or starting images.
+
+    This is only an early availability check: images can disappear after it, and
+    the daemon and image contents are not authenticated by this check.
+    """
+    try:
+        import docker
+
+        client = docker.from_env()
+        try:
+            for image_id in image_ids:
+                if client.images.get(image_id).id != image_id:
+                    raise ValueError("image ID mismatch")
+        finally:
+            client.close()
+    except Exception:  # noqa: BLE001 - fail closed on any Docker SDK/daemon error
+        # Daemon messages may include credentials, paths or endpoints.
+        raise HarnessError("unable to verify both local Docker image IDs") from None
+
+
 def run_portability_comparison(
     store: HarnessStore,
     baseline_id: str,
@@ -90,6 +111,7 @@ def run_portability_comparison(
     if cfg.sandbox.network != "none" or cfg.sandbox.backend not in ("auto", "docker"):
         raise HarnessError("portability comparison requires Docker with networking disabled")
     budget.checkpoint()
+    _require_local_images(image_ids)
     first_config = cfg.model_copy(deep=True)
     second_config = cfg.model_copy(deep=True)
     first_config.sandbox.image, second_config.sandbox.image = image_ids

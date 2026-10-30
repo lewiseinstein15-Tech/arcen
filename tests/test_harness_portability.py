@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import sys
+from types import SimpleNamespace
 
 import litellm
 import pytest
@@ -13,6 +15,7 @@ from test_probe_model import SECRET, configured
 from test_probe_workspace import repository
 
 from arcen.harness import comparison as comparison_module
+from arcen.harness import portability as portability_module
 from arcen.harness import probe_container
 from arcen.harness.budget import SharedBudget
 from arcen.harness.cli import _init
@@ -21,6 +24,13 @@ from arcen.harness.portability import run_portability_comparison
 from arcen.harness.resolver import HarnessError
 
 IMAGES = ("sha256:" + "a" * 64, "sha256:" + "b" * 64)
+_REAL_PREFLIGHT = portability_module._require_local_images
+
+
+@pytest.fixture(autouse=True)
+def mocked_image_preflight(request, monkeypatch):
+    if request.node.name != "test_real_two_image_portability_when_explicitly_enabled":
+        monkeypatch.setattr(portability_module, "_require_local_images", lambda _: None)
 
 
 def budget(**changes):
@@ -230,3 +240,65 @@ def test_missing_second_image_fails_without_returning_complete_report(tmp_path, 
     with pytest.raises(ProbeUnavailable, match="isolation or cleanup failed"):
         run(args, verdict, budget=cap)
     assert len(calls) == 4 and cap.snapshot().trials == 3
+
+
+def test_image_preflight_checks_both_ids_and_closes_without_pull(monkeypatch):
+    seen = []
+    closed = []
+
+    class Images:
+        def get(self, image):
+            seen.append(image)
+            return SimpleNamespace(id=image)
+
+        def pull(self, *args):
+            pytest.fail("preflight must never pull")
+
+    client = SimpleNamespace(images=Images(), close=lambda: closed.append(True))
+    monkeypatch.setitem(sys.modules, "docker", SimpleNamespace(from_env=lambda: client))
+    _REAL_PREFLIGHT(IMAGES)
+    assert seen == list(IMAGES) and closed == [True]
+
+
+@pytest.mark.parametrize(
+    "failure", ["daemon", "missing_first", "missing_second", "wrong_id", "close"]
+)
+def test_image_preflight_refuses_daemon_errors_before_any_trial(tmp_path, monkeypatch, failure):
+    args = fixture(tmp_path)
+    seen = []
+    closed = []
+
+    def get(image):
+        seen.append(image)
+        if (failure == "missing_first" and image == IMAGES[0]) or (
+            failure == "missing_second" and image == IMAGES[1]
+        ):
+            raise RuntimeError("sensitive daemon message")
+        if failure == "wrong_id":
+            return SimpleNamespace(id=IMAGES[1])
+        return SimpleNamespace(id=image)
+
+    def close():
+        closed.append(True)
+        if failure == "close":
+            raise RuntimeError("sensitive daemon message")
+
+    client = SimpleNamespace(images=SimpleNamespace(get=get), close=close)
+
+    def connect():
+        if failure == "daemon":
+            raise RuntimeError("sensitive daemon message")
+        return client
+
+    monkeypatch.setitem(sys.modules, "docker", SimpleNamespace(from_env=connect))
+    monkeypatch.setattr(portability_module, "_require_local_images", _REAL_PREFLIGHT)
+    monkeypatch.setattr(comparison_module, "snapshot_git_commit", lambda *a: pytest.fail("git"))
+    monkeypatch.setattr(litellm, "completion", lambda **kw: pytest.fail("provider"))
+    cap = budget()
+    with pytest.raises(HarnessError, match="unable to verify both local Docker image IDs") as err:
+        run(args, lambda _: pytest.fail("judge"), budget=cap)
+    assert "sensitive" not in str(err.value)
+    assert cap.snapshot().trials == cap.snapshot().model_calls == cap.snapshot().judge_calls == 0
+    assert closed == ([] if failure == "daemon" else [True])
+    if failure == "missing_second":
+        assert seen == list(IMAGES)

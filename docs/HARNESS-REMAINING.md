@@ -46,9 +46,10 @@ validated on real Docker or against a real external provider. See
   adoption or establish baseline freshness.
 - An explicitly confirmed two-image portability comparison can run baseline
   and candidate on two trusted local image IDs under one budget. It matches
-  snapshot hashes across profiles but does not establish independence, safety,
-  authenticated results or adoption eligibility. Real Docker remains untested;
-  see `HARNESS-PORTABILITY.md`.
+  snapshot hashes across profiles and preflights both local image IDs before
+  trials, but does not establish independence, safety, authenticated results or
+  adoption eligibility. Image availability may change after preflight. Real
+  Docker remains untested; see `HARNESS-PORTABILITY.md`.
 - A local, plaintext content-addressed task bank usable by manual editor and
   campaign commands; it does not schedule tasks or provide recursion.
 - Locally reviewed experience notes in a dedicated plaintext memory graph,

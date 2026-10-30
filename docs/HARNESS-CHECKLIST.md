@@ -94,6 +94,9 @@ merely because a sub-scope is complete.
       share a budget and reject a changed second workspace snapshot. Local
       Docker/provider are mocked; images and evidence remain untrusted claims,
       no executor adapter or adoption gate, and H-21 remains open.
+- [x] H-21d: fail-closed availability checks for both local Docker image IDs
+      before portability trials; mock-tested only. This is not a reservation,
+      image trust verification, safety proof or complete portability validation.
 
 ## Verification still required
 

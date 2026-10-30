@@ -9,10 +9,13 @@ separate kernel/architecture, independent environments or trustworthy results.
 
 Obtain **local image IDs** only after inspecting them independently. Two
 canonical, distinct IDs of the form `sha256:<64 lowercase hex>` are required;
-tags are not accepted. The CLI does not pull images or inspect their safety, and
-a missing second image can fail after the first comparison already incurred
-costs. The CI smoke test creates a labelled variant of the same image: this is
-not meaningful evidence of real-world environment diversity.
+tags are not accepted. After confirmation and before any trial, the API checks
+that the trusted Docker daemon can resolve both IDs to the same full IDs. It
+never pulls an image or establishes its safety. This preflight is not a
+reservation: an image or daemon may become unavailable later, including after
+the first comparison has incurred costs. The CI smoke test creates a labelled
+variant of the same image: this is not meaningful evidence of real-world
+environment diversity.
 
 ```sh
 arcen harness --store "$STORE" portability run \

@@ -8,11 +8,17 @@ from test_harness_portability import IMAGES
 from test_manual_cli import setup, tty
 from test_probe_execution import Boundary
 
+from arcen.harness import portability as portability_module
 from arcen.harness import probe_container
 from arcen.harness.campaign_journal import CampaignJournal
 from arcen.harness.cli import main
 from arcen.harness.durable_budget import DurableBudget
 from arcen.harness.lineage import HarnessLineage
+
+
+@pytest.fixture(autouse=True)
+def mocked_image_preflight(monkeypatch):
+    monkeypatch.setattr(portability_module, "_require_local_images", lambda _: None)
 
 
 def fixture(tmp_path, capsys):

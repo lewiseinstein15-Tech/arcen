@@ -1027,3 +1027,15 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
   checks passed. Two IDs are not evidence of independent environments or safety;
   CI's second image is only a labelled variant, and remote CI has not run.
   H-21 remains open, as do adoption, safe resume and unattended autonomy.
+
+### H-21d — local image availability preflight (partial)
+
+- `H-21d-real-image-preflight-tests.png` is a fresh installed-wheel test run
+  in a real PTY rendered by xterm.js/Chromium. The six cases use a mocked Docker
+  daemon: both IDs must resolve exactly, no pull is permitted, failures are
+  sanitized and no trial, model or judge admission occurs on preflight failure.
+- Final source suite: 1,179 passed, 13 skipped. Selected installed-wheel suite:
+  42 passed, 2 skipped. Changed-file Ruff, format, wheel and docs checks passed.
+  This check has not been validated against a real Docker daemon. It does not
+  reserve images, attest their provenance, establish safety or prevent a later
+  disappearance; H-21 and the adoption/automation gates remain open.
