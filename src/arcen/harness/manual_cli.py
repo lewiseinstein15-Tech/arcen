@@ -52,6 +52,16 @@ def _read_text(path: str, limit: int) -> str:
         raise HarnessError("input file must be UTF-8") from None
 
 
+def _task_input(store: HarnessStore, task_file: str | None, task_id: str | None) -> str:
+    if (task_file is None) == (task_id is None):
+        raise HarnessError("choose exactly one task file or task ID")
+    if task_file is not None:
+        return _read_text(task_file, 16000)
+    from .task_bank import TaskBank
+
+    return TaskBank(store).read(task_id)
+
+
 def _config(path: str) -> ArcenConfig:
     raw_text = _read_text(path, 64 * 1024)
     try:
@@ -114,11 +124,13 @@ def create_plan(
     store: HarnessStore,
     baseline: str,
     candidates: tuple[str, ...],
-    task_file: str,
+    task_file: str | None,
     commit: str,
     budget_id: str,
+    *,
+    task_id: str | None = None,
 ):
-    task = _read_text(task_file, 16000)
+    task = _task_input(store, task_file, task_id)
     budget = DurableBudget(store, budget_id)
     return CampaignJournal(store, create=True).plan(
         baseline, candidates, task, commit, budget=budget
@@ -129,10 +141,12 @@ def run_interactive(
     store: HarnessStore,
     adopted_id: str,
     identifier: str,
-    task_file: str,
+    task_file: str | None,
     config_file: str,
     repo: str,
     budget_id: str,
+    *,
+    task_id: str | None = None,
 ) -> int:
     """Review all inputs interactively, then run with a human A/B judge."""
     if not sys.stdin.isatty() or not sys.stdout.isatty():
@@ -155,9 +169,9 @@ def run_interactive(
         or baseline.components != packaged.components
     ):
         raise HarnessError("interactive campaign requires the unchanged packaged baseline")
-    task = _read_text(task_file, 16000)
+    task = _task_input(store, task_file, task_id)
     if hashlib.sha256(task.encode("utf-8")).hexdigest() != record.task_sha256:
-        raise HarnessError("task file does not match the campaign plan")
+        raise HarnessError("task does not match the campaign plan")
     config = _config(config_file)
     budget = DurableBudget(store, budget_id)
     budget.checkpoint()
@@ -269,10 +283,12 @@ def run_interactive(
 def editor_interactive(
     store: HarnessStore,
     baseline_id: str,
-    task_file: str,
+    task_file: str | None,
     config_file: str,
     budget_id: str,
     k: int,
+    *,
+    task_id: str | None = None,
 ) -> int:
     """Generate unadopted independent proposals after interactive review."""
     if not sys.stdin.isatty() or not sys.stdout.isatty():
@@ -289,7 +305,7 @@ def editor_interactive(
         or baseline.components != packaged.components
     ):
         raise HarnessError("editor requires the unchanged packaged baseline")
-    task = _read_text(task_file, 16000)
+    task = _task_input(store, task_file, task_id)
     config = _config(config_file)
     budget = DurableBudget(store, budget_id)
     budget.checkpoint()

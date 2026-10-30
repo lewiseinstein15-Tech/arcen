@@ -33,7 +33,8 @@ an editable component. An imported patch must be an exact unified diff for one
 allowlisted component, with matching `a/` and `b/` paths; edits to immutable
 policy are rejected. The example presumes you have already created and reviewed
 such a patch and a task text file. Alternatively, see `HARNESS-EDITOR.md` for
-the separately confirmed model-backed proposal command.
+the separately confirmed model-backed proposal command, and
+`HARNESS-TASK-BANK.md` for optional stored task IDs.
 
 ```sh
 STORE="$HOME/.arcen/harness"

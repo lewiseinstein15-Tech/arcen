@@ -699,3 +699,20 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   orphaned containers without disrupting live runs. Normal server results now
   wait for cleanup; previously streamed output cannot be retracted. No
   automatic recovery, safe resume or adoption gate was added.
+
+### H-14a — local reusable task bank (partial)
+
+- `H-14a-real-task-bank.png`: fresh installed `arcen harness` commands in a
+  real PTY, rendered by xterm.js/Chromium. The local example initializes a
+  temporary store, imports and shows a task, lists it and runs doctor. No
+  provider, Docker container, campaign or adoption was invoked.
+- `H-14a-real-task-tests.png`: fresh installed-wheel PTY suite: 94 passed,
+  3 skipped. It covers task-bank and manual editor/campaign integration;
+  provider and Docker execution in these tests is mocked. The opt-in real
+  Docker tests were skipped in this environment.
+- Full source suite: 909 passed, 12 skipped. Wheel: 120 entries. Scoped Ruff,
+  formatting, documentation link and diff checks passed.
+- Tasks and hashes are retained in plaintext; secret detection is incomplete,
+  hashes do not authenticate origin and a crash can orphan plaintext objects.
+  This is local manual storage, not recursive scheduling, prompt-injection
+  protection or an adoption gate. See `docs/HARNESS-TASK-BANK.md`.

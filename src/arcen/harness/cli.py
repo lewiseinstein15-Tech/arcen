@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import hashlib
 import sqlite3
 import sys
 import unicodedata
@@ -50,6 +51,11 @@ def _doctor(root: str) -> dict[str, int]:
         # A stale/foreign file, symlink, or corrupt object is an error.
         store.get_blob(item.name)
     result["objects"] = len(objects)
+    task_path = store.root / "tasks.sqlite3"
+    if task_path.exists() or task_path.is_symlink():
+        from .task_bank import TaskBank
+
+        result["tasks"] = len(TaskBank(store).list())
     return result
 
 
@@ -155,7 +161,13 @@ def _campaign_command(args) -> int:
         from .manual_cli import create_plan
 
         record = create_plan(
-            store, args.baseline, tuple(args.candidate), args.task_file, args.commit, args.budget
+            store,
+            args.baseline,
+            tuple(args.candidate),
+            args.task_file,
+            args.commit,
+            args.budget,
+            task_id=args.task_id,
         )
         print(f"Campaign plan: {record.id}  state={record.state}  budget={record.budget_id}")
         print("Metadata only; no provider calls, execution or adoption occurred.")
@@ -171,6 +183,7 @@ def _campaign_command(args) -> int:
             args.config,
             args.repo,
             args.budget,
+            task_id=args.task_id,
         )
     journal = CampaignJournal(store)
     record = (
@@ -188,6 +201,51 @@ def _campaign_command(args) -> int:
         print(f"Review: {review_id}  candidate: {candidate}")
     print("Metadata only; no adoption or safe automatic resume. In-flight work may continue.")
     return 0
+
+
+def _task_command(args) -> None:
+    from .manual_cli import _confirm, _read_text
+    from .task_bank import MAX_TASK_BYTES, TaskBank, validate_name, validate_task
+
+    store, _ = _existing(args.store)
+    if args.task_command == "import":
+        validate_name(args.name)
+        task = _read_text(args.file, MAX_TASK_BYTES)
+        validate_task(task)
+        print("Tasks are stored unencrypted; secret detection is incomplete.")
+        entry = TaskBank(store, create=True).add(args.name, task)
+        print(f"Stored task: {entry.digest}  name={entry.name}")
+    elif args.task_command == "new":
+        if not sys.stdin.isatty() or not sys.stdout.isatty():
+            raise HarnessError("task creation requires an interactive terminal")
+        validate_name(args.name)
+        print(
+            "Enter a single-line task; it will be stored unencrypted. Secret detection is incomplete."
+        )
+        try:
+            task = input("Task: ")
+        except (EOFError, KeyboardInterrupt):
+            raise HarnessError("task creation cancelled") from None
+        digest = hashlib.sha256(validate_task(task)).hexdigest()
+        print("Task (sanitized for display):\n" + _safe(task))
+        _confirm(f"Type STORE {digest} to save: ", f"STORE {digest}")
+        entry = TaskBank(store, create=True).add(args.name, task)
+        print(f"Stored task: {entry.digest}  name={entry.name}")
+    elif args.task_command == "show":
+        task = TaskBank(store).read(args.id)
+        print(f"Task {args.id} (sanitized display; may contain sensitive data):")
+        print(_safe(task))
+    else:
+        path = store.root / "tasks.sqlite3"
+        if not path.exists() and not path.is_symlink():
+            print("No stored tasks; import or create one first.")
+            return
+        entries = TaskBank(store).list()
+        if not entries:
+            print("No stored tasks.")
+        for entry in entries:
+            print(f"{entry.name}  {entry.digest}")
+        print("Task texts are unencrypted; hashes do not authenticate origin or secrecy.")
 
 
 def _budget_command(args) -> None:
@@ -236,6 +294,16 @@ def main(argv: list[str] | None = None) -> int:
     patch.add_argument("baseline")
     patch.add_argument("path", help="allowlisted component path")
     patch.add_argument("patch_file")
+    task = commands.add_parser("task", help="manage a local plaintext task bank")
+    task_commands = task.add_subparsers(dest="task_command", required=True)
+    new_task = task_commands.add_parser("new", help="interactively store one line")
+    new_task.add_argument("name")
+    import_task = task_commands.add_parser("import", help="import a bounded UTF-8 task file")
+    import_task.add_argument("name")
+    import_task.add_argument("file")
+    task_commands.add_parser("ls", help="list stored tasks")
+    show_task = task_commands.add_parser("show", help="show one stored task")
+    show_task.add_argument("id")
     canary = commands.add_parser("canary", help="inspect or run fixed manual behavioral canaries")
     canary_commands = canary.add_subparsers(dest="canary_command", required=True)
     canary_commands.add_parser("list", help="show public fixed canary tasks")
@@ -252,7 +320,9 @@ def main(argv: list[str] | None = None) -> int:
     editor_commands = editor.add_subparsers(dest="editor_command", required=True)
     propose = editor_commands.add_parser("propose", help="request reviewed model-generated patches")
     propose.add_argument("--baseline", required=True)
-    propose.add_argument("--task-file", required=True)
+    propose_task = propose.add_mutually_exclusive_group(required=True)
+    propose_task.add_argument("--task-file")
+    propose_task.add_argument("--task-id")
     propose.add_argument("--config", required=True)
     propose.add_argument("--budget", required=True)
     propose.add_argument("--k", type=int, default=1)
@@ -289,12 +359,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     plan.add_argument("--baseline", required=True)
     plan.add_argument("--candidate", required=True, action="append")
-    plan.add_argument("--task-file", required=True)
+    plan_task = plan.add_mutually_exclusive_group(required=True)
+    plan_task.add_argument("--task-file")
+    plan_task.add_argument("--task-id")
     plan.add_argument("--commit", required=True)
     plan.add_argument("--budget", required=True, help="durable admission budget ID")
     run = campaign_commands.add_parser("run", help="interactive reviewed run with human A/B judge")
     run.add_argument("id")
-    run.add_argument("--task-file", required=True)
+    run_task = run.add_mutually_exclusive_group(required=True)
+    run_task.add_argument("--task-file")
+    run_task.add_argument("--task-id")
     run.add_argument("--config", required=True)
     run.add_argument("--repo", required=True)
     run.add_argument("--budget", required=True)
@@ -333,6 +407,8 @@ def main(argv: list[str] | None = None) -> int:
             store, _ = _existing(args.store)
             identifier = import_patch(store, args.baseline, args.path, args.patch_file)
             print(f"Unadopted candidate: {identifier}")
+        elif args.command == "task":
+            _task_command(args)
         elif args.command == "canary":
             if args.canary_command == "list":
                 from .canary import CASES
@@ -358,7 +434,13 @@ def main(argv: list[str] | None = None) -> int:
 
             store, _ = _existing(args.store)
             return editor_interactive(
-                store, args.baseline, args.task_file, args.config, args.budget, args.k
+                store,
+                args.baseline,
+                args.task_file,
+                args.config,
+                args.budget,
+                args.k,
+                task_id=args.task_id,
             )
         elif args.command == "review":
             _review_command(args)

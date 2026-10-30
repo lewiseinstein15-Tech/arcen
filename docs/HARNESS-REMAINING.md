@@ -22,6 +22,8 @@ validated on real Docker or against a real external provider. See
   boundaries and budget binding for new CLI campaign plans.
 - Two experimental, public and gameable behavioral canaries, with exact file
   checks, not an adoption gate or security proof.
+- A local, plaintext content-addressed task bank usable by manual editor and
+  campaign commands; it does not schedule tasks or provide recursion.
 - Locally reviewed experience notes in a memory graph; they are not
   automatically learned or placed into model prompts.
 
@@ -40,8 +42,9 @@ validated on real Docker or against a real external provider. See
    event streams, persistent evidence and safe recovery/resume remain absent.
 3. **H-12–14: recursion and learning.** The composer is an offline syntactic
    foundation. It is not connected to an iterative behavioral comparison.
-   There is no model-backed reflector, task bank, experience-guided editor,
-   parallel candidate scheduling or sequential carry-forward recursion.
+   The task bank is a manual storage foundation only. There is no model-backed
+   reflector, experience-guided editor, parallel candidate scheduling or
+   sequential carry-forward recursion.
 4. **H-15–16: adoption safety and canaries.** Static protected-file checks
    exist, but no authoritative policy gate or authenticated approval exists.
    The two small manual canaries are public and easy to game; there is no
