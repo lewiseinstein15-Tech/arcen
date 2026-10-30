@@ -71,6 +71,8 @@ resume or retry external side effects**. Editor calls may already have incurred
 charges, and partial results or unreferenced objects can remain. Tasks are
 plaintext, secret detection/redaction is incomplete, and local filesystem,
 SQLite, Git, Docker daemon and operator are trusted. Provider and model output,
-repository content and instructions are untrusted. No prompt-injection
-protection, authenticated approval, comprehensive safety check or authority to
-adopt is implied by a completed comparison or review.
+repository content and instructions are untrusted. A narrow task-text heuristic
+blocks some explicit injection patterns but is easily evaded and can reject
+benign tasks. No comprehensive prompt-injection protection, authenticated
+approval, safety check or authority to adopt is implied by a completed comparison
+or review; see `HARNESS-PROBE-HYGIENE.md`.

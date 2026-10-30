@@ -967,3 +967,19 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
   remain outside this check.
 - Full source suite: **1048 passed, 12 skipped**. Selected installed-wheel
   suite: **73 passed, 6 skipped**. Real Docker was unavailable for this run.
+
+### H-19c–d — narrow task screen and known-value handling (partial)
+
+- `H-19c-real-screen-cli.png`: fresh installed `arcen harness workflow run`
+  in a real PTY rejects a locally fabricated malicious task before the workflow
+  preview or trial admission. The subsequent real budget status shows zero
+  admitted trials and model calls. The task screen is heuristic, has false
+  positives, and is easily evaded.
+- `H-19d-real-known-values-tests.png`: fresh real-terminal installed-wheel run,
+  17 tests passed for exact known-value input checks and redaction, including
+  overlapping values. The provider and Docker boundary were mocked.
+- Full source suite: 1,105 passed, 12 skipped. Selected installed-wheel tests:
+  76 passed, 3 skipped. An earlier concurrent full run had one PTY timeout
+  while Chromium/another test suite ran; the isolated full-suite retry passed.
+  Real-Docker and external-provider behavior for these changes remains untested.
+  These partial checks do not complete H-19 or permit autonomous adoption.

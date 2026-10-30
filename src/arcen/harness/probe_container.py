@@ -24,10 +24,10 @@ def redact_probe_value(value: Any, secret_values: tuple[str, ...], depth: int = 
     if depth > 16:
         return "[REDACTED: nesting limit]"
     if isinstance(value, str):
-        text = redact_text(value)
+        text = value
         for secret in secret_values:
             text = text.replace(secret, "[REDACTED]")
-        return text
+        return redact_text(text)
     if isinstance(value, dict):
         result = {}
         for key, item in value.items():
@@ -67,7 +67,9 @@ def _provider_secret(config: ArcenConfig) -> tuple[str, ...]:
 
 
 @contextmanager
-def open_probe_container(snapshot: GitSnapshot, config: ArcenConfig):
+def open_probe_container(
+    snapshot: GitSnapshot, config: ArcenConfig, *, sensitive_values: tuple[str, ...] = ()
+):
     """Import a reviewed snapshot into a fresh hardened Docker container.
 
     The input is never bind-mounted or copied back. Tool results pass through
@@ -77,10 +79,13 @@ def open_probe_container(snapshot: GitSnapshot, config: ArcenConfig):
     """
     # Even callers of this lower-level gateway cannot import a snapshot
     # containing the configured, resolved provider key in its exact form.
-    _reject_snapshot_secrets(snapshot, _provider_secret(config))
+    # Validate before sorting; do not echo potentially sensitive values.
+    _reject_snapshot_secrets(snapshot, sensitive_values)
+    secrets = tuple(sorted({*sensitive_values, *_provider_secret(config)}, key=len, reverse=True))
+    _reject_snapshot_secrets(snapshot, secrets)
     with materialize_git_snapshot(snapshot) as workspace:
         registry = DockerTurnRegistry(config, workspace=str(workspace))
         try:
-            yield RedactingProbeRegistry(registry, _provider_secret(config))
+            yield RedactingProbeRegistry(registry, secrets)
         finally:
             registry.close(strict=True)

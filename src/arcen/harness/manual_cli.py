@@ -439,7 +439,9 @@ def guided_workflow(
         raise HarnessError("repository directory is missing")
     # A stored ID is used throughout, so rereads verify the exact same task
     # bytes rather than silently rereading a mutable file between stages.
-    _task_input(store, None, task_id)
+    from .task_screen import screen_task
+
+    screen_task(_task_input(store, None, task_id))
     budget = DurableBudget(store, budget_id)
     budget.checkpoint()
     usage = budget.snapshot()

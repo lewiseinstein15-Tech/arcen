@@ -45,15 +45,17 @@ daemon are trusted. Tool support is limited to the existing bash gateway.
 
 **Neither filename blocking nor output redaction proves an input secret-free.**
 Before a reviewed trial is admitted, its immutable Git archive is checked for
-the exact UTF-8 bytes of the configured provider key. Comparisons and manual
-campaigns also check their explicitly supplied `sensitive_values`. A match
+the exact UTF-8 bytes of the configured provider key. Reviewed trials,
+comparisons and manual campaigns can also check explicitly supplied
+`sensitive_values`; their model-bound inputs and evidence get best-effort
+known-value filtering. See `HARNESS-PROBE-HYGIENE.md`. A match
 rejects the workspace before trial reservation, Docker creation or provider
 calls; no matched value or filename is printed. A journaled campaign records a
 failed run and reports `workspace_sensitive`; a canary returns inconclusive.
 The check includes archive metadata as well as file data, so it can reject a
 coincidental match. It only detects exact supplied bytes, not encoded, split,
 transformed or unknown credentials. The lower-level `open_probe_container`
-gateway separately checks the configured key (when at least four characters)
+gateway separately checks the configured key (when at least four characters) and any supplied known values
 before materializing or opening Docker. Local Python, Git and filesystem writers
 remain trusted.
 

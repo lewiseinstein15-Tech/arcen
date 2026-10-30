@@ -128,6 +128,7 @@ def run_manual_campaign(
         cfg,
         max_calls=max_model_calls_per_trial,
         budget=budget,
+        sensitive_values=sensitive_values,
     )
     models = tuple(
         bind_probe_model(
@@ -138,6 +139,7 @@ def run_manual_campaign(
             cfg,
             max_calls=max_model_calls_per_trial,
             budget=budget,
+            sensitive_values=sensitive_values,
         )
         for candidate in candidates
     )

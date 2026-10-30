@@ -19,6 +19,7 @@ from .manifest import MAX_COMPONENT_BYTES
 from .model import content_hash
 from .resolver import HarnessError, HarnessResolver
 from .store import HarnessStore
+from .task_screen import screen_task
 
 EDITABLE = frozenset(
     {
@@ -138,6 +139,7 @@ def propose(
     """
     if type(task) is not str or not task.strip() or len(task) > 4000:
         raise HarnessError("invalid task")
+    screen_task(task)
     if type(k) is not int or not 1 <= k <= 5:
         raise HarnessError("k must be between 1 and 5")
     if (

@@ -73,6 +73,12 @@ merely because a sub-scope is complete.
 - [x] H-18a: advisory-only fusion of a matched unsigned paired review and
       manual canary report, with negative/inconclusive results taking priority.
       This cannot authenticate evidence or authorize adoption; H-18 remains open.
+- [x] H-19c: a narrow task-text injection heuristic rejects selected phrases
+      before manual editor callbacks or reviewed probe admission. Easily evaded,
+      can block benign tasks, and is not a safety or authorization gate.
+- [x] H-19d: extra caller-provided known values are checked in model-bound
+      inputs and best-effort redacted from reviewed model/tool evidence.
+      This is not comprehensive secret detection; H-19 remains open.
 
 ## Verification still required
 

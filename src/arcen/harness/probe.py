@@ -18,6 +18,7 @@ from .editor import EDITABLE
 from .manifest import check_model_pin, default_manifest
 from .resolver import HarnessError, HarnessResolver, ResolvedPrompts
 from .store import HarnessStore
+from .task_screen import screen_task
 
 
 class ProbeUnavailable(HarnessError):
@@ -51,6 +52,7 @@ def prepare_probe(
     """
     if type(task) is not str or not task.strip() or len(task) > 4000:
         raise HarnessError("invalid probe task")
+    screen_task(task)
     base = store.get_manifest(baseline_id)
     candidate = store.get_manifest(candidate_id)
     packaged = default_manifest()

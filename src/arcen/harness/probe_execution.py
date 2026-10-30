@@ -82,9 +82,16 @@ class _BoundedGateway:
 
     supports_host_diff = False
 
-    def __init__(self, inner, budget: SharedBudget | DurableBudget | None = None):
+    def __init__(
+        self,
+        inner,
+        budget: SharedBudget | DurableBudget | None = None,
+        *,
+        sensitive_values: tuple[str, ...] = (),
+    ):
         self._inner = inner
         self._budget = budget
+        self._sensitive_values = sensitive_values
 
     def dispatch(self, name: str, args: dict) -> dict:
         if name != "bash" or type(args) is not dict:
@@ -110,7 +117,7 @@ class _BoundedGateway:
                 self._budget.checkpoint()
             except BudgetExhausted:
                 return {"ok": False, "result": None, "error": "shared probe budget closed"}
-        return self._inner.dispatch("bash", bounded)
+        return redact_probe_value(self._inner.dispatch("bash", bounded), self._sensitive_values)
 
 
 def _reviewed_config(config: ArcenConfig, reviewed_inputs: bool) -> ArcenConfig:
@@ -145,6 +152,7 @@ def run_reviewed_probe(
     reviewed_inputs: bool = False,
     max_model_calls: int = 4,
     budget: SharedBudget | DurableBudget | None = None,
+    sensitive_values: tuple[str, ...] = (),
 ) -> ReviewedProbeResult:
     """Run one explicitly reviewed trial in a disposable Docker workspace.
 
@@ -153,7 +161,14 @@ def run_reviewed_probe(
     """
     cfg = _reviewed_config(config, reviewed_inputs)
     model = bind_probe_model(
-        store, baseline_id, candidate_id, task, cfg, max_calls=max_model_calls, budget=budget
+        store,
+        baseline_id,
+        candidate_id,
+        task,
+        cfg,
+        max_calls=max_model_calls,
+        budget=budget,
+        sensitive_values=sensitive_values,
     )
     if budget is not None:
         budget.checkpoint()
@@ -169,8 +184,7 @@ def _run_bound_probe(
     canary: _CanaryCommands | None = None,
 ) -> ReviewedProbeResult:
     """Run already-validated model and snapshot; never accept either from a CLI."""
-    known = (cfg.provider.api_key,) if cfg.provider.api_key else ()
-    _reject_snapshot_secrets(snapshot, known)
+    _reject_snapshot_secrets(snapshot, model._known_values)
     if model.budget is not None:
         model.budget.reserve_trial()
     baseline_id, candidate_id, task = (
@@ -178,15 +192,15 @@ def _run_bound_probe(
         model.plan.candidate_id,
         model.plan.task,
     )
-    secrets = (cfg.provider.api_key,) if cfg.provider.api_key else ()
+    secrets = model._known_values
     collector = _Collector(secrets)
     start = time.monotonic()
     status = "error"
     executed = 0
     canary_passed = None
     try:
-        with open_probe_container(snapshot, cfg) as inner:
-            gateway = _BoundedGateway(inner, model.budget)
+        with open_probe_container(snapshot, cfg, sensitive_values=secrets) as inner:
+            gateway = _BoundedGateway(inner, model.budget, sensitive_values=secrets)
             if canary is not None:
                 prepared = gateway.dispatch("bash", {"cmd": canary.prepare, "timeout_s": 10})
                 if prepared.get("ok") is not True:

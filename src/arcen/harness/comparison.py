@@ -86,6 +86,7 @@ def run_reviewed_comparison(
         cfg,
         max_calls=max_model_calls_per_trial,
         budget=budget,
+        sensitive_values=sensitive_values,
     )
     candidate_model = bind_probe_model(
         store,
@@ -95,6 +96,7 @@ def run_reviewed_comparison(
         cfg,
         max_calls=max_model_calls_per_trial,
         budget=budget,
+        sensitive_values=sensitive_values,
     )
     # Git is archived exactly once: even a later working-tree or ref change
     # cannot alter the second trial's archived input.

@@ -30,8 +30,12 @@ validated on real Docker or against a real external provider. See
   boundaries and budget binding for new CLI campaign plans.
 - Reviewed trial archives reject exact occurrences of the configured provider
   key before Docker or provider calls. Paired/manual campaigns also check
-  explicitly supplied sensitive values. Encoded, split and unknown secrets are
-  not detected; inputs still require review.
+  explicitly supplied sensitive values. Paired/campaign model inputs and
+  outputs and tool evidence also use caller-provided known-value checks and
+  redaction. An English task-text heuristic blocks selected injection patterns
+  but is easily evaded and can block benign tasks. Encoded, split and unknown
+  secrets and most injections are not detected; inputs still require review.
+  See `HARNESS-PROBE-HYGIENE.md`.
 - Two experimental, public and gameable behavioral canaries, with exact file
   checks, not an adoption gate or security proof. An optional advisory combines
   a matching canary result with an unsigned paired review; it does not authorize
@@ -76,8 +80,9 @@ validated on real Docker or against a real external provider. See
    in-flight kill switch, early elimination, convergence stopping or caching.
 6. **H-18–19: judging and probe hardening.** Reduced/blinded evidence and
    manual judgments do not constitute verifier fusion or a confidence gate.
-   Prompt-injection detection, provider egress restrictions, comprehensive
-   secret handling and adversarial safety-core checks remain incomplete.
+   The task-text heuristic is easily evaded; provider egress restrictions,
+   comprehensive secret handling and adversarial safety-core checks remain
+   incomplete.
    Model/provider output, repository content and local metadata are untrusted
    for purposes of future automation. Model pin names do not authenticate model
    weights, and local hashes/review labels are not signatures.

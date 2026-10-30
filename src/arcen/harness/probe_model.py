@@ -65,10 +65,14 @@ class BoundProbeModel:
         secret: str,
         max_calls: int,
         budget: SharedBudget | DurableBudget | None = None,
+        sensitive_values: tuple[str, ...] = (),
     ):
         self._plan = plan
         self._inner = inner
         self._secret = secret
+        self._known_values = tuple(
+            sorted({*sensitive_values, *((secret,) if secret else ())}, key=len, reverse=True)
+        )
         self._remaining = max_calls
         self._budget = budget
         self._lock = threading.Lock()
@@ -125,9 +129,13 @@ class BoundProbeModel:
                 raise ProbeModelError("invalid probe model message")
             content = message["content"]
             size += _review_input(content, self._secret)
+            for value in self._known_values:
+                _review_input(content, value)
             checked_messages.append({"role": message["role"], "content": content})
         system = identity if identity is not None else identity_block(role, prompts=self.prompts)
         size += _review_input(system, self._secret)
+        for value in self._known_values:
+            _review_input(system, value)
         if size > MAX_INPUT_BYTES:
             raise ProbeModelError("probe model input exceeds limit")
         with self._lock:
@@ -152,11 +160,11 @@ class BoundProbeModel:
                 raise ProbeModelError("probe model returned no output")
             if len(result.text.encode("utf-8")) > MAX_OUTPUT_BYTES:
                 raise ProbeModelError("probe model output exceeds limit")
-            return replace(
-                result,
-                text=_scrub(result.text, self._secret),
-                model=_scrub(result.model, self._secret),
-            )
+            text, model = result.text, result.model
+            for value in self._known_values:
+                text = text.replace(value, "[REDACTED]")
+                model = model.replace(value, "[REDACTED]")
+            return replace(result, text=redact_text(text), model=redact_text(model))
         except ProbeModelError:
             raise
         except Exception:  # noqa: BLE001 — do not expose provider exception text
@@ -173,6 +181,7 @@ def bind_probe_model(
     *,
     max_calls: int = 4,
     budget: SharedBudget | DurableBudget | None = None,
+    sensitive_values: tuple[str, ...] = (),
 ) -> BoundProbeModel:
     """Bind freshly verified candidate prompts to a configured fixed model.
 
@@ -180,6 +189,17 @@ def bind_probe_model(
     calls may transmit reviewed data to that provider and incur cost. No model
     output, budget, pin or filename check establishes safety or improvement.
     """
+    if (
+        type(sensitive_values) is not tuple
+        or len(sensitive_values) > 31
+        or any(type(value) is not str or not 4 <= len(value) <= 256 for value in sensitive_values)
+    ):
+        raise HarnessError("invalid sensitive values")
+    try:
+        for value in sensitive_values:
+            value.encode("utf-8")
+    except UnicodeError:
+        raise HarnessError("invalid sensitive values") from None
     if budget is not None and type(budget) not in (SharedBudget, DurableBudget):
         raise HarnessError("invalid shared budget")
     if type(budget) is DurableBudget and budget.store is not store:
@@ -210,7 +230,12 @@ def bind_probe_model(
         _review_input(getattr(plan.prompts, field.name), secret)
     _review_input(plan.task, secret)
     _review_input(cfg.provider.model, secret)
+    for value in sensitive_values:
+        for field in fields(plan.prompts):
+            _review_input(getattr(plan.prompts, field.name), value)
+        _review_input(plan.task, value)
+        _review_input(cfg.provider.model, value)
     inner = build_llm_client(cfg, prompts=plan.prompts)
     if inner is None:
         raise HarnessError("probe provider is not configured or credential is unavailable")
-    return BoundProbeModel(plan, inner, secret, max_calls, budget)
+    return BoundProbeModel(plan, inner, secret, max_calls, budget, sensitive_values)
