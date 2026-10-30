@@ -61,3 +61,7 @@ ledger are not one atomic transaction: an error or crash during review recording
 can leave a pending review without a matching journal entry. Never infer that a
 missing entry means an external action did not occur. See
 `HARNESS-MANUAL-CAMPAIGN.md` and `HARNESS-BUDGET.md` for remaining limitations.
+
+The user reported the journaled manual campaign's opt-in real-Docker test
+passed on Omarchy at `4ecaf6e`; model responses and judge were mocked. See
+`docs/verify/README.md`.

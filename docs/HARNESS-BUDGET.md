@@ -59,4 +59,5 @@ still applies independently.
 Tests exercise real code with mocked provider and Docker boundaries, including
 concurrent reservations, failure consumption, stopping, expiry and propagation
 through composition. An additional opt-in budgeted paired test needs real
-Docker; it was not run in the assistant environment.
+Docker; it was not run in the assistant environment. The user reported the
+opt-in budgeted pair passed on Omarchy at `4ecaf6e` with mocked model and judge.

@@ -41,6 +41,7 @@ or persist a budget ID; automatic resume remains disabled, because an earlier
 external action may have completed before a crash. There is no scheduler,
 concurrency semaphore, in-flight cancellation, provider price guarantee, canary
 or adoption gate. The existing `SharedBudget` remains available as an
-in-process alternative. An opt-in real-Docker integration test exists but was
-not run in the assistant environment. See `HARNESS-CAMPAIGN-JOURNAL.md` and
+in-process alternative. The assistant environment could not run Docker; the
+user reported the opt-in real-Docker test passed on Omarchy at `4ecaf6e` with
+mocked model responses and judge. See `HARNESS-CAMPAIGN-JOURNAL.md` and
 `HARNESS-MANUAL-CAMPAIGN.md`.

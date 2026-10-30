@@ -515,9 +515,9 @@ passed, 8 skipped**. The installed wheel had 115 entries.
 HTTP mock provider, mocked Docker and a callback judge: one shared snapshot,
 three trials, six model calls, two judge invocations, and two pending review
 records. No candidate was selected or adopted. This is not real-Docker campaign
-verification. The new opt-in real-Docker manual campaign test was skipped locally
-and has not yet been run by the user; earlier unbudgeted trial and paired tests
-passed on Omarchy at `f34ea27`.
+verification. The opt-in real-Docker manual campaign test was skipped locally;
+the user later reported it passing on Omarchy at `4ecaf6e` as recorded below.
+Earlier unbudgeted trial and paired tests passed there at `f34ea27`.
 
 This Python-only path requires explicit review attestations and a shared
 in-process admission budget; it is not an authenticated gate, a USD/token cap,
@@ -536,7 +536,8 @@ metadata-only plan; no trial was run. `H-11c-real-journal-tests.png` captures
 the focused journal, manual campaign, CLI, review and budget tests: **72 passed,
 3 skipped**. The full suite reported **800 passed, 9 skipped**. The built and
 installed wheel contained 116 entries. The new journaled real-Docker campaign
-test was skipped locally and has not been run by the user.
+test was skipped locally; the user later reported it passing on Omarchy at
+`4ecaf6e` as recorded below.
 
 The optional journal records phases and review IDs and prevents a plan from
 being claimed twice. Stop is a stage-boundary request, not cancellation of
@@ -555,11 +556,29 @@ budget; its one trial and one model reservation were manual accounting calls,
 not real executions. `H-17b-real-durable-tests.png` captures focused durable,
 in-memory and journal tests: **47 passed, 3 skipped**. The full suite reported
 **816 passed, 10 skipped**. The installed wheel contained 117 entries. The new
-opt-in real-Docker durable-budget test was skipped locally and has not been run
-by the user.
+opt-in real-Docker durable-budget test was skipped locally; the user later
+reported it passing on Omarchy at `4ecaf6e` as recorded below.
 
 SQLite-backed counters and stop state can be shared by cooperating processes
 using the same ID, and clock rollback closes admission. This is still not a
 USD/token cap, hard runtime limit, in-flight kill, automatic resume or
 campaign-wide enforcement against other IDs or nonparticipating callers. The
 journal does not bind the budget ID. See `docs/HARNESS-DURABLE-BUDGET.md`.
+
+
+### User-reported real-Docker campaign and budget verification on Omarchy
+
+On commit `4ecaf6e`, the user ran:
+
+```sh
+ARCEN_TEST_DOCKER_ISOLATION=1 uv run --extra dev --extra sandbox \
+  python -m pytest tests/test_manual_campaign.py tests/test_campaign_journal.py \
+  tests/test_durable_budget.py tests/test_harness_budget.py -k real_docker -v
+```
+
+The supplied terminal output reported **4 passed, 58 deselected in 43.87s**,
+with no skips. This covers the manual campaign, journaled campaign, durable
+admission budget and in-process budgeted pair against real Docker. These tests
+use mocked model responses and a callback judge. They do not verify an external
+model provider, authenticated approval, automatic resume, token/USD budgets or
+adoption. This is user-reported terminal output, not a captured screenshot.
