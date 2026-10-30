@@ -894,3 +894,16 @@ adoption. This is user-reported terminal output, not a captured screenshot.
 - The repository-wide Ruff run still reports pre-existing findings on `main`;
   this change fixes the import-order issue introduced by the branch and leaves
   the unrelated script permission changes unstaged.
+
+### Sandbox-image workflow credential fix
+
+The GitHub Actions run for `6002af2` failed at checkout with a Git
+credential-prompt error. The workflow had preferred a repository PAT over the
+scoped job token. It now uses the default checkout token without persisting it
+and the job token for GHCR, retaining `contents: read` and `packages: write`.
+A missing repository/package association or restrictive GitHub settings can
+still prevent the image push; the actual Actions result must be checked.
+
+`SANDBOX-WORKFLOW-real-tests.png` is a fresh PTY/xterm.js/Chromium run:
+**29 passed**, covering static workflow configuration and sandbox tests. These
+are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
