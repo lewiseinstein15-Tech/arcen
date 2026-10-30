@@ -925,3 +925,15 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
 - This plaintext package covers only the existing seven-component v1 manifest.
   It does not authenticate the key, import or run the package, validate
   lineage, or permit adoption. Full H-04 remains incomplete.
+
+### H-04e — confirmed object import (partial)
+
+- `H-04e-real-import-prompt.png`: fresh installed `arcen harness package import`
+  in an actual PTY, displaying verification and the confirmation gate.
+- `H-04e-real-import-confirmed.png`: fresh installed-command PTY run with a
+  scripted test keystroke; the test-key package was imported successfully and
+  no ref was created. This is test evidence, not a real operator's approval.
+- `H-04e-real-installed-tests.png`: fresh installed-wheel PTY run of the seven
+  import tests, **7 passed**. The focused installed-wheel package/store suite
+  passed **37 tests**; the full source suite passed **1024**, with **12 skipped**.
+  Docker was unavailable here, and signature verification is not key trust.

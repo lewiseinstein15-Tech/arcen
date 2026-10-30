@@ -1,9 +1,8 @@
-"""Portable signed v1 harness packages; inspection only, never adoption.
+"""Portable signed v1 harness packages; importing never activates or adopts.
 
-Packages are canonical bounded JSON containing a canonical manifest, a detached
-attestation and the exact component blobs. They are verified in memory without
-extracting paths or writing into a store. The expected manifest ID and public
-key must be supplied independently by the caller.
+Packages contain a canonical manifest, detached attestation and exact blobs.
+Verification is in memory; optional import stores content-addressed objects
+without changing refs. Callers must supply an independently authenticated key.
 """
 
 from __future__ import annotations
@@ -78,8 +77,10 @@ class _MemoryStore:
         return manifest
 
 
-def verify_package(data: bytes, expected_manifest: str, public_key: bytes) -> VerifiedPackage:
-    """Verify an untrusted package without extraction, activation or writes."""
+def _verified_contents(
+    data: bytes, expected_manifest: str, public_key: bytes
+) -> tuple[VerifiedPackage, Manifest, dict[str, bytes]]:
+    """Verify and retain the same immutable bytes for a possible import."""
     if type(data) is not bytes or not data or len(data) > MAX_PACKAGE_BYTES:
         raise HarnessError("invalid or oversized package")
 
@@ -113,7 +114,38 @@ def verify_package(data: bytes, expected_manifest: str, public_key: bytes) -> Ve
     # The signed expected ID and explicit key are checked before the contents.
     attestation = verify_attestation(store, expected_manifest, signature, public_key)
     manifest = store.get_manifest(expected_manifest)
-    return VerifiedPackage(attestation, len(manifest.components), len(objects))
+    return VerifiedPackage(attestation, len(manifest.components), len(objects)), manifest, objects
+
+
+def verify_package(data: bytes, expected_manifest: str, public_key: bytes) -> VerifiedPackage:
+    """Verify an untrusted package without extraction, activation or writes."""
+    result, _, _ = _verified_contents(data, expected_manifest, public_key)
+    return result
+
+
+def import_package(
+    store: HarnessStore, data: bytes, expected_manifest: str, public_key: bytes
+) -> VerifiedPackage:
+    """Store verified objects only; never register lineage, change refs or run.
+
+    Verification and preflight precede writes. Publishing uses the existing
+    atomic per-object store API; a later failure can leave unreferenced objects.
+    The store and local filesystem writers must be trusted.
+    """
+    result, manifest, objects = _verified_contents(data, expected_manifest, public_key)
+    # Refuse corrupt pre-existing objects before inserting anything. This is
+    # not a lock against concurrent/hostile filesystem changes.
+    for digest in sorted({*objects, expected_manifest}):
+        path = store._path(digest)
+        if path.exists() or path.is_symlink():
+            store.get_blob(digest)
+    for digest, blob in sorted(objects.items()):
+        if store.put_blob(blob) != digest:
+            raise HarnessError("imported object hash mismatch")
+    if store.put_manifest(manifest) != expected_manifest:
+        raise HarnessError("imported manifest hash mismatch")
+    store.get_manifest(expected_manifest)
+    return result
 
 
 def export_package(

@@ -52,8 +52,10 @@ merely because a sub-scope is complete.
       immutable hash-verified default snapshot, including concurrent startup.
       This does not authenticate the package or implement all components.
 - [x] H-04d: signed v1 package export and offline verification with explicit key
-      and manifest ID; inspection only, no import, execution or adoption. The
-      full eight-component package and trusted runtime integration remain open.
+      and manifest ID; verification alone does not import, execute or adopt.
+      The full eight-component package and trusted runtime integration remain open.
+- [x] H-04e: TTY-confirmed verified v1 object import without refs, lineage or
+      adoption; no signer enrollment. Object writes are not transactional.
 - [x] H-11g: guided selection of one to five candidates for a single manually
       confirmed sequential campaign, with lower-bound admission checks. This
       completes only this sub-scope, not H-11, H-14 or the Governor.

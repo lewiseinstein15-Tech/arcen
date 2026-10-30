@@ -344,9 +344,9 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--manifest", required=True, help="expected stored manifest SHA-256")
     verify.add_argument("--file", required=True, help="canonical detached attestation file")
     verify.add_argument("--public-key", required=True, help="trusted raw Ed25519 public key as hex")
-    package = commands.add_parser("package", help="export or inspect a signed package; no adoption")
+    package = commands.add_parser("package", help="export, inspect or import objects; no adoption")
     package_commands = package.add_subparsers(dest="package_command", required=True)
-    for action in ("export", "verify"):
+    for action in ("export", "verify", "import"):
         command = package_commands.add_parser(action, help=f"{action} a detached signed package")
         command.add_argument("--manifest", required=True, help="expected manifest SHA-256")
         command.add_argument(
@@ -521,6 +521,7 @@ def main(argv: list[str] | None = None) -> int:
             from .package import (
                 MAX_PACKAGE_BYTES,
                 export_package,
+                import_package,
                 verify_package,
                 write_new_package,
             )
@@ -537,6 +538,10 @@ def main(argv: list[str] | None = None) -> int:
                 write_new_package(args.output, data)
                 print("Signed package written to new file; contents are plaintext.")
             else:
+                if args.package_command == "import" and (
+                    not sys.stdin.isatty() or not sys.stdout.isatty()
+                ):
+                    raise HarnessError("package import requires an interactive terminal")
                 data = _read_text(args.file, MAX_PACKAGE_BYTES).encode("utf-8")
             result = verify_package(data, args.manifest, public_key)
             print(f"Verified manifest: {result.attestation.manifest}")
@@ -544,7 +549,22 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Signed parent claim: {result.attestation.parent or 'none'}")
             print(f"Components: {result.component_count}; unique objects: {result.unique_objects}")
             print("Key trust, lineage, safety and authorization are not established.")
-            print("Package was not imported, activated or adopted.")
+            if args.package_command == "import":
+                store, _ = _existing(args.store)
+                print(
+                    "Import writes plaintext objects only; failures may leave unreferenced objects."
+                )
+                print("No refs, lineage, approval, execution or adoption will be changed.")
+                try:
+                    answer = input(f"Type IMPORT {args.manifest} to continue: ")
+                except (EOFError, KeyboardInterrupt):
+                    raise HarnessError("package import cancelled") from None
+                if answer != f"IMPORT {args.manifest}":
+                    raise HarnessError("package import cancelled")
+                import_package(store, data, args.manifest, public_key)
+                print("Verified objects stored; no ref was created or changed.")
+            else:
+                print("Package was not imported, activated or adopted.")
         elif args.command == "pin-baseline":
             from .manual_cli import pin_baseline
 
