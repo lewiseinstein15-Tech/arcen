@@ -51,6 +51,9 @@ merely because a sub-scope is complete.
 - [x] H-04c: packaged prompts, guardrails and registry metadata consume one
       immutable hash-verified default snapshot, including concurrent startup.
       This does not authenticate the package or implement all components.
+- [x] H-04d: signed v1 package export and offline verification with explicit key
+      and manifest ID; inspection only, no import, execution or adoption. The
+      full eight-component package and trusted runtime integration remain open.
 - [x] H-11g: guided selection of one to five candidates for a single manually
       confirmed sequential campaign, with lower-bound admission checks. This
       completes only this sub-scope, not H-11, H-14 or the Governor.

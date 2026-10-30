@@ -907,3 +907,21 @@ still prevent the image push; the actual Actions result must be checked.
 `SANDBOX-WORKFLOW-real-tests.png` is a fresh PTY/xterm.js/Chromium run:
 **29 passed**, covering static workflow configuration and sandbox tests. These
 are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
+
+### H-04d — portable signed v1 package (partial)
+
+- `H-04d-real-package-export.png`: fresh installed `arcen harness package
+  export` and offline `package verify` commands in a real PTY rendered by
+  xterm.js/Chromium. The signing key was freshly generated for this demo;
+  it is not a trusted production key. No Docker or model provider was used.
+- `H-04d-real-package-tests.png`: fresh installed-wheel PTY test run,
+  **9 passed**. Tests cover tampering, duplicate/invalid data, limits,
+  explicit-key verification, no overwrite, and competing exports.
+- Before recovery the complete source suite passed **1017 tests, 12 skipped**,
+  and the installed-wheel selected regression run passed **89, 1 skipped**.
+  The recovered code comes from that installed wheel and the package tests
+  passed again. Wheel contents check: **124 entries**. Some older helpers
+  explicitly exercise source-tree copies.
+- This plaintext package covers only the existing seven-component v1 manifest.
+  It does not authenticate the key, import or run the package, validate
+  lineage, or permit adoption. Full H-04 remains incomplete.

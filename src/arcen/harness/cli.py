@@ -344,6 +344,19 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--manifest", required=True, help="expected stored manifest SHA-256")
     verify.add_argument("--file", required=True, help="canonical detached attestation file")
     verify.add_argument("--public-key", required=True, help="trusted raw Ed25519 public key as hex")
+    package = commands.add_parser("package", help="export or inspect a signed package; no adoption")
+    package_commands = package.add_subparsers(dest="package_command", required=True)
+    for action in ("export", "verify"):
+        command = package_commands.add_parser(action, help=f"{action} a detached signed package")
+        command.add_argument("--manifest", required=True, help="expected manifest SHA-256")
+        command.add_argument(
+            "--public-key", required=True, help="trusted raw Ed25519 public key hex"
+        )
+        if action == "export":
+            command.add_argument("--attestation", required=True, help="detached signature file")
+            command.add_argument("--output", required=True, help="new output path; never overwrite")
+        else:
+            command.add_argument("--file", required=True, help="package file to inspect")
     baseline = commands.add_parser("pin-baseline", help="create an unadopted fixed-model baseline")
     baseline.add_argument("pin", help="fixed:provider:model")
     patch = commands.add_parser(
@@ -502,6 +515,36 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Signed parent claim: {verified.parent or 'none'}")
             print("Explicit key only; lineage, safety and authorization are not verified.")
             print("Ordinary candidate runtime selection and adoption remain disabled.")
+        elif args.command == "package":
+            from .attestation import MAX_ATTESTATION_BYTES
+            from .manual_cli import _read_text
+            from .package import (
+                MAX_PACKAGE_BYTES,
+                export_package,
+                verify_package,
+                write_new_package,
+            )
+
+            if len(args.public_key) != 64 or any(
+                c not in "0123456789abcdef" for c in args.public_key
+            ):
+                raise HarnessError("public key must be 64 lowercase hexadecimal characters")
+            public_key = bytes.fromhex(args.public_key)
+            if args.package_command == "export":
+                signature = _read_text(args.attestation, MAX_ATTESTATION_BYTES).encode("utf-8")
+                store, _ = _existing(args.store)
+                data = export_package(store, args.manifest, signature, public_key)
+                write_new_package(args.output, data)
+                print("Signed package written to new file; contents are plaintext.")
+            else:
+                data = _read_text(args.file, MAX_PACKAGE_BYTES).encode("utf-8")
+            result = verify_package(data, args.manifest, public_key)
+            print(f"Verified manifest: {result.attestation.manifest}")
+            print(f"Signer public-key SHA-256: {result.attestation.public_key_sha256}")
+            print(f"Signed parent claim: {result.attestation.parent or 'none'}")
+            print(f"Components: {result.component_count}; unique objects: {result.unique_objects}")
+            print("Key trust, lineage, safety and authorization are not established.")
+            print("Package was not imported, activated or adopted.")
         elif args.command == "pin-baseline":
             from .manual_cli import pin_baseline
 

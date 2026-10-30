@@ -69,3 +69,11 @@ authenticate the manifest or Python code, tool implementations, plugin code or
 configuration, nor protect against hostile filesystem races during capture.
 A signed, trusted full eight-component package and continuous runtime integrity
 monitoring are still absent. Restart the process to pick up package edits.
+
+### Portable signed packages (H-04d)
+
+An optional, plaintext v1 signed package can be exported and verified offline
+against an explicitly supplied public key and expected manifest ID. It contains
+only the seven currently allowlisted components; verification does not import,
+activate, adopt or establish trust in a signer. See
+[HARNESS-PACKAGE.md](HARNESS-PACKAGE.md) for limits and assumptions.
