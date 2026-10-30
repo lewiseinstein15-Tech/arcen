@@ -18,9 +18,9 @@ validated on real Docker or against a real external provider. See
 - Explicit interactive manual proposal generation or patch import; a
   reviewed sequential baseline/candidate campaign with local human A/B judging,
   unsigned pending reviews and no automatic adoption. A guided single-terminal
-  flow connects editor, optional manual syntactic composition, one
-  human-selected comparison and pending review. A separate command can compose
-  human-selected candidates from a completed campaign's local summaries.
+  flow connects editor, optional manual syntactic composition, up to five
+  human-selected sequential comparisons and pending reviews. A separate command
+  can compose human-selected candidates from a completed campaign's local summaries.
 - Durable journal and shared admission counts; optional stop at stage
   boundaries and budget binding for new CLI campaign plans.
 - Two experimental, public and gameable behavioral canaries, with exact file
@@ -42,7 +42,7 @@ validated on real Docker or against a real external provider. See
 2. **H-08–11: complete manual campaign.** The editor uses one model pinned to
    the baseline, not a separate multi-model panel. The probe only supports
    Docker-isolated `bash`, not the full tool set or spawned subagents. The
-   guided flow handles only one manually selected candidate and still requires
+   guided flow handles up to five manually selected candidates and still requires
    separate confirmations and review; it is not an autonomous or recursive
    campaign. Full event streams, persistent evidence and safe recovery/resume
    remain absent.

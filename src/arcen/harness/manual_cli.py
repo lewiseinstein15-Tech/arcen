@@ -230,7 +230,9 @@ def run_interactive(
     print(
         "The model can run commands in disposable Docker workspaces. Inspect the commit before running."
     )
-    print("A/B judgments will be requested interactively. No candidate is selected or adopted.")
+    print(
+        "A/B judgments will be requested interactively. No winner is selected for adoption, and no candidate is adopted."
+    )
     _confirm(f"Type RUN {record.id} to start: ", f"RUN {record.id}")
     reviews = ReviewLedger(store, create=True)
 
@@ -474,7 +476,7 @@ def guided_workflow(
         "Inputs have not been compared; a conflict-free merge does not prove safety or improvement."
     )
     try:
-        selection = input("Type SELECT ID, COMPOSE ID ID [ID ...], or CANCEL: ").strip()
+        selection = input("Type SELECT ID [ID ...], COMPOSE ID ID [ID ...], or CANCEL: ").strip()
     except (EOFError, KeyboardInterrupt):
         raise HarnessError(
             "workflow cancelled after editor; generated objects may remain"
@@ -482,8 +484,13 @@ def guided_workflow(
     if len(selection) > 1024:
         raise HarnessError("workflow cancelled after editor; generated objects may remain")
     words = selection.split()
-    if len(words) == 2 and words[0] == "SELECT" and words[1] in unique:
-        candidate = words[1]
+    if (
+        2 <= len(words) <= 6
+        and words[0] == "SELECT"
+        and len(set(words[1:])) == len(words) - 1
+        and all(identifier in unique for identifier in words[1:])
+    ):
+        chosen = tuple(words[1:])
     elif (
         3 <= len(words) <= 9
         and words[0] == "COMPOSE"
@@ -514,9 +521,29 @@ def guided_workflow(
         print(_diff_objects(store, baseline_id, candidate), end="")
         print("Composition can persist even if cancelled. It is not approval or adoption.")
         _confirm(f"Type USE {candidate} to plan its comparison: ", f"USE {candidate}")
+        chosen = (candidate,)
     else:
         raise HarnessError("workflow cancelled after editor; generated objects may remain")
-    record = create_plan(store, baseline_id, (candidate,), None, commit, budget_id, task_id=task_id)
+    # Check the current lower bound again for the chosen comparison count.
+    # This is only a snapshot, not a reservation or a completion guarantee.
+    budget.checkpoint()
+    usage = budget.snapshot()
+    count = len(chosen)
+    if (
+        usage.stopped
+        or usage.max_trials - usage.trials < count + 1
+        or usage.max_judge_calls - usage.judge_calls < count
+        or usage.max_model_calls - usage.model_calls < count + 1
+    ):
+        raise HarnessError(
+            "insufficient remaining admissions for selected candidates; no plan created"
+        )
+    print(
+        f"Selected {count} candidate(s); minimum remaining admissions: "
+        f"trials={count + 1}, judge callbacks={count}, model calls={count + 1}."
+    )
+    print("This check reserves nothing; trials can require more calls or stop early.")
+    record = create_plan(store, baseline_id, chosen, None, commit, budget_id, task_id=task_id)
     print(f"Created campaign plan: {record.id}; state={record.state}; budget={budget_id}")
     print(
         "If the next step is cancelled or fails, inspect campaign status and budget; do not auto-resume."

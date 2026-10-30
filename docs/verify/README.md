@@ -808,3 +808,22 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   coordinates only cooperating CLI processes, and the review/memory databases
   are not one atomic transaction. Notes are not used by any model or adoption
   gate. This is not autonomous reflection; see `docs/HARNESS-EXPERIENCE.md`.
+
+### H-11g — guided multi-candidate selection (partial)
+
+- `H-11g-real-multi-run-prompt.png`: fresh installed `arcen harness workflow
+  run` in a real PTY rendered by xterm.js/Chromium. The editor made two actual
+  loopback HTTP requests to a local mock provider; terminal input selected two
+  generated candidates. The screenshot shows both diffs and stops at the
+  separate RUN confirmation. No Docker trial or external provider was used.
+- `H-11g-real-multi-tests.png`: fresh installed-wheel PTY suite: 89 passed,
+  3 skipped. Tests exercise human-selected two-candidate judging with a shared
+  baseline, one-to-five selection, admission lower bounds and cancellation.
+  Provider and Docker are mocked for the execution tests; opt-in real-Docker
+  cases were skipped.
+- Full source suite: 963 passed, 12 skipped. Wheel: 122 entries. Scoped Ruff,
+  formatting, documentation links and diff checks passed.
+- This completes only the manual multi-candidate sub-scope, not H-11, H-14 or
+  H-17. Admissions are snapshots rather than reservations or USD/token caps;
+  no winner is automatically adopted, no auto-resume or autonomy was enabled.
+  The maintained ticket checklist is `docs/HARNESS-CHECKLIST.md`.
