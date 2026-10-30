@@ -252,6 +252,50 @@ def _task_command(args) -> None:
         print("Task texts are unencrypted; hashes do not authenticate origin or secrecy.")
 
 
+def _experience_command(args) -> None:
+    from .experience_cli_store import open_cli_experience
+    from .review import ReviewLedger
+
+    store, lineage = _existing(args.store)
+    path = store.root / "experience.sqlite3"
+    if args.experience_command == "record":
+        from .manual_cli import record_experience_interactive
+
+        record_experience_interactive(store, lineage, args.topic, args.review)
+        return
+    if not path.exists() and not path.is_symlink():
+        if args.experience_command == "list":
+            print("No stored experience notes.")
+            return
+        raise HarnessError("experience database is missing")
+    reviews = ReviewLedger(store)
+    with open_cli_experience(store, reviews) as library:
+        lessons = library.active()
+        if args.experience_command == "list":
+            if not lessons:
+                print("No active experience notes.")
+            for lesson in sorted(lessons, key=lambda item: item.topic):
+                print(
+                    f"{lesson.topic}  review={lesson.review_id}  expires_unix={lesson.expires_at:.0f}"
+                )
+            print(
+                "Local notes are untrusted, retained in plaintext, and never automatically used in prompts."
+            )
+        else:
+            from .experience import _validate_topic
+
+            _validate_topic(args.topic)
+            lesson = next((item for item in lessons if item.topic == args.topic), None)
+            if lesson is None:
+                raise HarnessError("active experience topic not found")
+            print(
+                f"Topic: {lesson.topic}; review: {lesson.review_id}; expires_unix: {lesson.expires_at:.0f}"
+            )
+            print("Untrusted note (sanitized display; may contain sensitive data):")
+            print(_safe(lesson.text))
+            print("Not automatically used in prompts, a policy, or proof of improvement.")
+
+
 def _budget_command(args) -> None:
     from .durable_budget import DurableBudget
 
@@ -308,6 +352,16 @@ def main(argv: list[str] | None = None) -> int:
     task_commands.add_parser("ls", help="list stored tasks")
     show_task = task_commands.add_parser("show", help="show one stored task")
     show_task.add_argument("id")
+    experience = commands.add_parser("experience", help="manage manually reviewed local notes")
+    experience_commands = experience.add_subparsers(dest="experience_command", required=True)
+    record = experience_commands.add_parser(
+        "record", help="interactively record a single-line note"
+    )
+    record.add_argument("topic")
+    record.add_argument("--review", required=True, help="approved paired review ID")
+    experience_commands.add_parser("list", help="list non-expired notes")
+    show_experience = experience_commands.add_parser("show", help="show one non-expired note")
+    show_experience.add_argument("topic")
     canary = commands.add_parser("canary", help="inspect or run fixed manual behavioral canaries")
     canary_commands = canary.add_subparsers(dest="canary_command", required=True)
     canary_commands.add_parser("list", help="show public fixed canary tasks")
@@ -436,6 +490,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Unadopted candidate: {identifier}")
         elif args.command == "task":
             _task_command(args)
+        elif args.command == "experience":
+            _experience_command(args)
         elif args.command == "canary":
             if args.canary_command == "list":
                 from .canary import CASES

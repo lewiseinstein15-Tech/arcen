@@ -785,3 +785,26 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   an operator-selected syntactic merge, not authenticated evidence, automatic
   behavioral selection, a safety gate or autonomous recursion. See
   `docs/HARNESS-RECORDED-COMPOSITION.md`.
+
+### H-13b — operator-authored experience CLI (partial)
+
+- `H-13b-real-note-prompt.png`: fresh installed `arcen harness experience
+  record` in a real PTY rendered by xterm.js/Chromium. The example review is
+  **fabricated local test metadata**, not a real provider or Docker comparison.
+  The screenshot stops before the exact SAVE confirmation; no note was saved.
+- `H-13b-real-note-saved.png`: separate fresh installed-command PTY run with
+  the same type of fabricated local review. Terminal input confirmed one manual
+  note; the actual commands then listed and showed it. No model, Docker trial,
+  automatic prompting, ref change or adoption occurred.
+- `H-13b-real-note-tests.png`: installed-wheel PTY suite: 95 passed, 1 skipped.
+  Tests cover terminal confirmation, invalid notes, plaintext retention,
+  supersession, expiry, review rechecks, schema/symlink failures and a
+  separate-process CLI lock. Paired evidence in these tests is mocked or
+  fabricated; real Docker was not used for this new note workflow.
+- Full source suite: 953 passed, 12 skipped. Wheel: 122 entries. Scoped Ruff,
+  formatting, docs-link and diff checks passed.
+- Notes remain untrusted plaintext; secret detection is incomplete, expiry
+  hides but does not delete, and superseded data remains in history. The lock
+  coordinates only cooperating CLI processes, and the review/memory databases
+  are not one atomic transaction. Notes are not used by any model or adoption
+  gate. This is not autonomous reflection; see `docs/HARNESS-EXPERIENCE.md`.

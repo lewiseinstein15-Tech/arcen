@@ -534,6 +534,43 @@ def guided_workflow(
     return result
 
 
+def record_experience_interactive(store: HarnessStore, lineage, topic: str, review_id: str) -> None:
+    """Confirm a human-authored observation; never send it to a model."""
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        raise HarnessError("experience recording requires an interactive terminal")
+    from .cli import _safe, _show_review
+    from .experience import _approved, _validate_text, _validate_topic
+    from .experience_cli_store import open_cli_experience
+
+    _validate_topic(topic)
+    reviews = ReviewLedger(store)
+    record = _approved(reviews, review_id)
+    _show_review(store, record, lineage)
+    print(
+        "Write one line of your own observation; it is retained in plaintext, not sent to a model."
+    )
+    print(
+        "Secret detection is incomplete. Same-topic notes can be superseded but remain in history."
+    )
+    try:
+        text = input("Observation: ")
+    except (EOFError, KeyboardInterrupt):
+        raise HarnessError("experience recording cancelled") from None
+    _validate_text(text)
+    print(f"Topic: {topic}; observation (sanitized): {_safe(text)}")
+    print("This local note is untrusted, not a safety rule, proof of improvement or authorization.")
+    _confirm(f"Type SAVE {topic} {review_id} to record: ", f"SAVE {topic} {review_id}")
+    if reviews.get(review_id) != record:
+        raise HarnessError("review changed since display")
+    with open_cli_experience(store, reviews, create=True) as library:
+        # No lock is held while waiting for the operator. Recheck after locking.
+        if reviews.get(review_id) != record:
+            raise HarnessError("review changed since display")
+        result = library.record(topic, text, review_id, reviewed=True)
+    print(f"Recorded experience: topic={topic} operation={result['op']}")
+    print("No model call, prompt change, selection or adoption occurred.")
+
+
 def compose_recorded_interactive(
     store: HarnessStore, campaign_id: str, task_id: str, review_ids: tuple[str, ...]
 ) -> int:

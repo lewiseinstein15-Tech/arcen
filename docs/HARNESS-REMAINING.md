@@ -27,8 +27,9 @@ validated on real Docker or against a real external provider. See
   checks, not an adoption gate or security proof.
 - A local, plaintext content-addressed task bank usable by manual editor and
   campaign commands; it does not schedule tasks or provide recursion.
-- Locally reviewed experience notes in a memory graph; they are not
-  automatically learned or placed into model prompts.
+- Locally reviewed experience notes in a dedicated plaintext memory graph,
+  with an interactive CLI. They are not automatically learned or placed into
+  model prompts.
 
 ## What remains
 
