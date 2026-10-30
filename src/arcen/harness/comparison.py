@@ -13,6 +13,7 @@ from pathlib import Path
 from arcen.config import ArcenConfig
 
 from .budget import SharedBudget
+from .durable_budget import DurableBudget
 from .judge import Judgment, Trajectory, compare
 from .probe import ProbeUnavailable
 from .probe_execution import ReviewedProbeResult, _reviewed_config, _run_bound_probe
@@ -43,7 +44,7 @@ def run_reviewed_comparison(
     reviewed_judge_inputs: bool = False,
     max_model_calls_per_trial: int = 4,
     sensitive_values: tuple[str, ...] = (),
-    budget: SharedBudget | None = None,
+    budget: SharedBudget | DurableBudget | None = None,
 ) -> ReviewedComparison:
     """Run two fresh trials over one snapshot, then judge reduced evidence.
 
@@ -55,7 +56,7 @@ def run_reviewed_comparison(
         raise HarnessError("explicit review of probe and judge inputs is required")
     if type(baseline_id) is not str or type(candidate_id) is not str or baseline_id == candidate_id:
         raise HarnessError("comparison requires distinct baseline and candidate manifests")
-    if budget is not None and type(budget) is not SharedBudget:
+    if budget is not None and type(budget) not in (SharedBudget, DurableBudget):
         raise HarnessError("invalid shared budget")
     if not callable(judge):
         raise HarnessError("invalid judge callback")

@@ -544,3 +544,22 @@ in-flight work. Crashed runs remain ambiguous and cannot automatically resume;
 review and journal databases are not jointly transactional. There is no
 campaign-start CLI, durable budget, authenticated approval or adoption. See
 `docs/HARNESS-CAMPAIGN-JOURNAL.md` for limitations.
+
+## H-17 durable shared admission accounting (experimental; partial)
+
+`H-17b-real-live-tui.png` is a fresh PTY/xterm/Chromium capture of the installed
+wheel and managed server answering through a local mock provider. It is not a
+budget display; Docker was unavailable and tools were blocked.
+`H-17b-real-durable-cli.png` shows the installed CLI inspecting a local demo
+budget; its one trial and one model reservation were manual accounting calls,
+not real executions. `H-17b-real-durable-tests.png` captures focused durable,
+in-memory and journal tests: **47 passed, 3 skipped**. The full suite reported
+**816 passed, 10 skipped**. The installed wheel contained 117 entries. The new
+opt-in real-Docker durable-budget test was skipped locally and has not been run
+by the user.
+
+SQLite-backed counters and stop state can be shared by cooperating processes
+using the same ID, and clock rollback closes admission. This is still not a
+USD/token cap, hard runtime limit, in-flight kill, automatic resume or
+campaign-wide enforcement against other IDs or nonparticipating callers. The
+journal does not bind the budget ID. See `docs/HARNESS-DURABLE-BUDGET.md`.

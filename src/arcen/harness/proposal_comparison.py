@@ -11,6 +11,7 @@ from arcen.config import ArcenConfig
 from .budget import SharedBudget
 from .comparison import ReviewedComparison, run_reviewed_comparison
 from .composer import Composition, compose_proposals
+from .durable_budget import DurableBudget
 from .editor import Proposal
 from .resolver import HarnessError
 from .store import HarnessStore
@@ -36,7 +37,7 @@ def compare_reviewed_proposals(
     reviewed_judge_inputs: bool = False,
     max_model_calls_per_trial: int = 4,
     sensitive_values: tuple[str, ...] = (),
-    budget: SharedBudget | None = None,
+    budget: SharedBudget | DurableBudget | None = None,
 ) -> ProposalComparison:
     """Compose, trial twice, and judge; conflicts stop before any probe.
 
@@ -46,7 +47,7 @@ def compare_reviewed_proposals(
     """
     if reviewed_inputs is not True or reviewed_judge_inputs is not True:
         raise HarnessError("explicit review of proposals, probe and judge inputs is required")
-    if budget is not None and type(budget) is not SharedBudget:
+    if budget is not None and type(budget) not in (SharedBudget, DurableBudget):
         raise HarnessError("invalid shared budget")
     if not callable(judge):
         raise HarnessError("invalid judge callback")

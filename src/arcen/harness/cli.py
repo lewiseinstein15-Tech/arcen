@@ -167,6 +167,21 @@ def _campaign_command(args) -> None:
     print("Metadata only; no adoption or safe automatic resume. In-flight work may continue.")
 
 
+def _budget_command(args) -> None:
+    from .durable_budget import DurableBudget
+
+    store, _ = _existing(args.store)
+    budget = DurableBudget(store, args.id)
+    if args.budget_command == "stop":
+        budget.stop()
+    state = budget.snapshot()
+    print(f"Budget: {budget.id}  stopped={state.stopped}  reason={state.reason or 'open'}")
+    print(
+        f"Admitted: trials={state.trials}  model calls={state.model_calls}  judge callbacks={state.judge_calls}"
+    )
+    print("Admission accounting only; no token/USD cap or in-flight cancellation.")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="arcen harness")
     parser.add_argument("--store", default="~/.arcen/harness", help="trusted local store directory")
@@ -205,6 +220,11 @@ def main(argv: list[str] | None = None) -> int:
     for action in ("status", "stop"):
         command = campaign_commands.add_parser(action)
         command.add_argument("id")
+    budget = commands.add_parser("budget", help="inspect or stop a durable admission budget")
+    budget_commands = budget.add_subparsers(dest="budget_command", required=True)
+    for action in ("status", "stop"):
+        command = budget_commands.add_parser(action)
+        command.add_argument("id")
     args = parser.parse_args(argv)
     try:
         if args.command == "init":
@@ -222,6 +242,8 @@ def main(argv: list[str] | None = None) -> int:
             _review_command(args)
         elif args.command == "campaign":
             _campaign_command(args)
+        elif args.command == "budget":
+            _budget_command(args)
         else:
             raise HarnessError(
                 "rollback unavailable: no adoption/approval safety gate is implemented"

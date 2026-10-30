@@ -18,6 +18,7 @@ from arcen.llm.client import LLMResponse, ProviderError, identity_block
 from arcen.plugins.redact_secrets import redact_text
 
 from .budget import BudgetExhausted, SharedBudget
+from .durable_budget import DurableBudget
 from .probe import ProbePlan, prepare_probe
 from .resolver import HarnessError
 from .store import HarnessStore
@@ -63,7 +64,7 @@ class BoundProbeModel:
         inner,
         secret: str,
         max_calls: int,
-        budget: SharedBudget | None = None,
+        budget: SharedBudget | DurableBudget | None = None,
     ):
         self._plan = plan
         self._inner = inner
@@ -73,7 +74,7 @@ class BoundProbeModel:
         self._lock = threading.Lock()
 
     @property
-    def budget(self) -> SharedBudget | None:
+    def budget(self) -> SharedBudget | DurableBudget | None:
         return self._budget
 
     @property
@@ -171,7 +172,7 @@ def bind_probe_model(
     config: ArcenConfig,
     *,
     max_calls: int = 4,
-    budget: SharedBudget | None = None,
+    budget: SharedBudget | DurableBudget | None = None,
 ) -> BoundProbeModel:
     """Bind freshly verified candidate prompts to a configured fixed model.
 
@@ -179,8 +180,10 @@ def bind_probe_model(
     calls may transmit reviewed data to that provider and incur cost. No model
     output, budget, pin or filename check establishes safety or improvement.
     """
-    if budget is not None and type(budget) is not SharedBudget:
+    if budget is not None and type(budget) not in (SharedBudget, DurableBudget):
         raise HarnessError("invalid shared budget")
+    if type(budget) is DurableBudget and budget.store is not store:
+        raise HarnessError("durable budget must use the same store")
     if type(max_calls) is not int or not 1 <= max_calls <= MAX_CALLS:
         raise HarnessError("probe model call budget must be between 1 and 8")
     # Resolve once into a private config copy; a caller mutating config/env

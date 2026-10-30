@@ -18,8 +18,8 @@ completed comparisons and records. It never selects a winner, approves a
 review, moves a ref, enables candidate selection or adopts. A baseline need not
 be the currently adopted one; later gates must independently verify freshness.
 
-A shared in-process `SharedBudget` and a `ReviewLedger` for the same store are
-mandatory. The budget reserves a trial per container, a call per bound probe
+A `SharedBudget` or SQLite-backed `DurableBudget` and a `ReviewLedger` for the
+same store are mandatory. See `HARNESS-DURABLE-BUDGET.md` for the durable option. The budget reserves a trial per container, a call per bound probe
 model invocation and a callback admission per judge invocation; the baseline is
 one trial, and each candidate is another. The ledger must already be open. For
 example, with existing, explicitly reviewed `store`, `baseline`, `candidates`,
@@ -47,8 +47,8 @@ and **does not authorize adoption**; see `HARNESS-REVIEW.md`.
 
 On a recognized reference, candidate, judge, budget or ledger failure, the
 function stops without running further candidates. Unexpected exceptions may
-propagate; callers must still inspect any earlier pending records. It returns already-completed items and a
-generic `stop_reason`, avoiding callback/provider exception text. Prior pending
+propagate; callers must still inspect any earlier pending records. It returns
+already-completed items and a generic `stop_reason`, avoiding callback/provider exception text. Prior pending
 records remain. An existing pending review for a pair can cause a ledger failure
 *after* trials have run; no automatic retry occurs. An error during or after a
 database write can leave a record that must be inspected manually. Preflight
@@ -57,8 +57,9 @@ termination can leave partial records or a Docker container requiring manual
 inspection; optional durable metadata checkpoints are available, but there is no
 safe automatic resume. See `HARNESS-CAMPAIGN-JOURNAL.md`.
 
-The admission budget is not a token or USD cap, a hard wall-clock timeout, a
-cross-process limit, or an in-flight cancellation mechanism. The judge callback
+Neither admission budget is a token or USD cap, a hard wall-clock timeout, or
+an in-flight cancellation mechanism. Only `DurableBudget` shares counters with
+cooperating processes that use the same ID. The judge callback
 may make additional unmetered requests. Existing output filtering and blinding
 are best effort: the judge sees the same reference evidence repeatedly and may
 infer ordering or provenance. Git snapshots and outputs can contain undetected

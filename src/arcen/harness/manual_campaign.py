@@ -15,6 +15,7 @@ from arcen.config import ArcenConfig
 from .budget import BudgetExhausted, SharedBudget
 from .campaign_journal import CampaignJournal, CampaignStopped
 from .comparison import ReviewedComparison
+from .durable_budget import DurableBudget
 from .judge import Trajectory, compare
 from .policy import review_candidate
 from .probe import ProbeUnavailable
@@ -54,7 +55,7 @@ def run_manual_campaign(
     repo: str | Path,
     commit: str,
     reviews: ReviewLedger,
-    budget: SharedBudget,
+    budget: SharedBudget | DurableBudget,
     reviewed_inputs: bool = False,
     reviewed_judge_inputs: bool = False,
     max_model_calls_per_trial: int = 4,
@@ -76,8 +77,10 @@ def run_manual_campaign(
         or reviews.store is not store
     ):
         raise HarnessError("campaign requires a review ledger for the same store")
-    if type(budget) is not SharedBudget:
+    if type(budget) not in (SharedBudget, DurableBudget):
         raise HarnessError("campaign requires a shared budget")
+    if type(budget) is DurableBudget and budget.store is not store:
+        raise HarnessError("durable budget must use the same store")
     if (journal is None) != (campaign_id is None) or (
         journal is not None and (type(journal) is not CampaignJournal or journal.store is not store)
     ):

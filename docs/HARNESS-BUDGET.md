@@ -1,7 +1,9 @@
 # Shared admission budget (experimental)
 
 `SharedBudget` is a small **in-process, opt-in admission counter** for the
-experimental reviewed trial and comparison APIs. It is not a campaign runner or
+experimental reviewed trial and comparison APIs. A separate `DurableBudget`
+can persist cooperating admission counters across processes; see
+`HARNESS-DURABLE-BUDGET.md`. It is not a campaign runner or
 the complete H-17 governor. No adoption or autonomy is enabled.
 
 A trusted caller can pass the same instance to multiple reviewed operations:

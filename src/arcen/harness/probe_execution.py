@@ -28,6 +28,7 @@ from arcen.llm.client import ProviderError
 from arcen.stream.events import Answer, RunDone, RunError, RunStart, to_dict
 
 from .budget import BudgetExhausted, SharedBudget
+from .durable_budget import DurableBudget
 from .probe import ProbeUnavailable
 from .probe_container import open_probe_container, redact_probe_value
 from .probe_model import BoundProbeModel, bind_probe_model
@@ -71,7 +72,7 @@ class _BoundedGateway:
 
     supports_host_diff = False
 
-    def __init__(self, inner, budget: SharedBudget | None = None):
+    def __init__(self, inner, budget: SharedBudget | DurableBudget | None = None):
         self._inner = inner
         self._budget = budget
 
@@ -133,7 +134,7 @@ def run_reviewed_probe(
     commit: str,
     reviewed_inputs: bool = False,
     max_model_calls: int = 4,
-    budget: SharedBudget | None = None,
+    budget: SharedBudget | DurableBudget | None = None,
 ) -> ReviewedProbeResult:
     """Run one explicitly reviewed trial in a disposable Docker workspace.
 

@@ -36,7 +36,7 @@ plan cannot be claimed again. A crash leaves the last phase as `running`: the
 record is **ambiguous**, not proof of whether a provider, judge or Docker action
 finished. Do not automatically rerun it. The user must inspect pending review
 records and any potentially orphaned containers. There is currently no lease,
-process-liveness proof, durable budget or automatic recovery/resume.
+process-liveness proof, journal-bound durable budget or automatic recovery/resume.
 
 An initialized harness store can inspect or request stop from another terminal:
 
@@ -53,9 +53,10 @@ request on a crashed worker may remain pending indefinitely because no worker is
 available to acknowledge it. Neither command starts, resumes or adopts a run.
 
 Journal use is optional for backward compatibility with the manual Python API;
-unjournaled runs have none of these persistence or stop properties. The shared
-budget is still in-process admission accounting, not a persistent token/USD cap
-or a hard runtime limit. Separate SQLite databases for the journal and review
+unjournaled runs have none of these persistence or stop properties. The run can
+use an in-process or durable admission budget, but the journal does not bind a
+durable budget ID. Neither option is a token/USD cap or a hard runtime
+limit. Separate SQLite databases for the journal and review
 ledger are not one atomic transaction: an error or crash during review recording
 can leave a pending review without a matching journal entry. Never infer that a
 missing entry means an external action did not occur. See
