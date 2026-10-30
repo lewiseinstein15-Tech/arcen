@@ -639,3 +639,21 @@ adoption. This is user-reported terminal output, not a captured screenshot.
   caps. Candidates are independent, untrusted, unapproved and unadopted; this is
   neither a model panel, automatic campaign, autonomous selection nor completion
   of H-08/Harness². Candidate selection and adoption remain disabled.
+
+### H-16a — manual fixed behavioral canaries (partial)
+
+- `H-16a-real-canary-prompt.png`: installed `arcen harness canary run` in a
+  fresh real PTY, rendered by xterm.js/Chromium. A local sample patch, Git
+  repository, durable budget and fake provider config were displayed. The
+  screenshot was taken before confirmation; no trial, provider request or
+  container was started.
+- `H-16a-real-canary-tests.png`: fresh PTY test run against the installed wheel:
+  16 passed, 1 skipped. Verifier logic was exercised against temporary files;
+  trial orchestration used mocked Docker and provider responses. The new
+  opt-in real-Docker test was skipped because Docker is unavailable here.
+- Full source suite: 865 passed, 12 skipped. Wheel check: 119 entries. Scoped
+  Ruff, formatting, documentation links and diff checks passed.
+- These are two public, simple artifact tasks, not adversarial safety tests.
+  Results are ephemeral and unsigned; a pass is not an adoption gate, policy
+  proof, authenticated approval, or authorization. No auto-rollback or
+  autonomy was implemented. See `docs/HARNESS-CANARIES.md`.

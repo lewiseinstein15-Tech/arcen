@@ -44,7 +44,7 @@ immediately; they reserve nothing. A binding is neither authentication nor an
 atomic transaction across the journal and budget databases. Automatic resume
 remains disabled because an earlier external action may have completed before a crash. There is no scheduler,
 concurrency semaphore, in-flight cancellation, provider price guarantee, canary
-or adoption gate. The existing `SharedBudget` remains available as an
+safety gate or adoption gate. The existing `SharedBudget` remains available as an
 in-process alternative. The assistant environment could not run Docker; the
 user reported the opt-in real-Docker test passed on Omarchy at `4ecaf6e` with
 mocked model responses and judge. See `HARNESS-CAMPAIGN-JOURNAL.md` and

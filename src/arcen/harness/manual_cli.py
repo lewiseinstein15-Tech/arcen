@@ -348,3 +348,96 @@ def editor_interactive(
         print(_diff_objects(store, baseline_id, result.candidate_id), end="")
     print("\nCandidates are untrusted; inspect them before planning trials. No refs moved.")
     return 0
+
+
+def canary_interactive(
+    store: HarnessStore,
+    baseline_id: str,
+    candidate_id: str,
+    config_file: str,
+    repo: str,
+    commit: str,
+    budget_id: str,
+) -> int:
+    """Explicitly review and run fixed canaries; never authorize adoption."""
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        raise HarnessError("canary run requires an interactive terminal")
+    from .canary import CASES, run_manual_canaries
+    from .cli import _diff_objects, _safe
+
+    if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit):
+        raise HarnessError("commit must be a full lowercase Git object ID")
+    baseline = store.get_manifest(baseline_id)
+    packaged = default_manifest()
+    if (
+        baseline.schema_version != packaged.schema_version
+        or baseline.components != packaged.components
+    ):
+        raise HarnessError("canaries require the unchanged packaged baseline")
+    review_candidate(store, baseline_id, candidate_id)
+    config = _config(config_file)
+    budget = DurableBudget(store, budget_id)
+    budget.checkpoint()
+    try:
+        for case in CASES:
+            bind_probe_model(store, baseline_id, baseline_id, case.task, config, budget=budget)
+            bind_probe_model(store, baseline_id, candidate_id, case.task, config, budget=budget)
+    except ProbeModelError:
+        raise HarnessError("canary preflight rejected sensitive or invalid input") from None
+    usage = budget.snapshot()
+    if usage.stopped:
+        raise HarnessError("durable budget closed")
+    try:
+        endpoint = urlsplit(config.provider.base_url).hostname or "provider default"
+    except ValueError:
+        raise HarnessError("invalid provider endpoint") from None
+
+    def display(value: str) -> str:
+        value = redact_text(value)
+        if config.provider.api_key:
+            value = value.replace(config.provider.api_key, "[REDACTED]")
+        return _safe(value)
+
+    print("Manual behavioral canaries")
+    print(f"Baseline:  {baseline_id}")
+    print(f"Candidate: {candidate_id}")
+    print(f"Repository: {_safe(str(Path(repo).expanduser().absolute()))}; commit: {commit}")
+    print(
+        f"Provider: {display(config.provider.name)}; model: {display(config.provider.model)}; host: {display(endpoint)}"
+    )
+    print(
+        f"Budget: {budget.id}; trials {usage.trials}/{usage.max_trials}; model calls {usage.model_calls}/{usage.max_model_calls}; cutoff in {usage.admission_seconds_remaining:.1f}s"
+    )
+    print(
+        f"Up to {2 * len(CASES)} trials and {8 * len(CASES)} model-call admissions; may stop earlier."
+    )
+    print("Candidate sanitized diff:\n" + _diff_objects(store, baseline_id, candidate_id), end="")
+    print("\nPublic fixed tasks and expected output:")
+    for case in CASES:
+        print(f"- {case.id}: {_safe(case.task)}")
+        print(f"  Expected bytes: {case.expected!r}")
+    print(
+        "Review the commit, config and full endpoint separately. Provider calls may expose data and cost money."
+    )
+    print(
+        "Docker required, no host fallback. Admission limits are not USD/token caps or runtime cancellation."
+    )
+    print(
+        "These simple public tests are gameable and are NOT a security proof, approval or adoption gate."
+    )
+    _confirm(f"Type CANARY {candidate_id} to start: ", f"CANARY {candidate_id}")
+    report = run_manual_canaries(
+        store,
+        baseline_id,
+        candidate_id,
+        config,
+        repo=repo,
+        commit=commit,
+        budget=budget,
+        reviewed_inputs=True,
+    )
+    for item in report.findings:
+        print(f"{item.case_id}: baseline={item.reference}; candidate={item.candidate}")
+    print(f"Canary result: {report.outcome}; workspace sha256: {report.workspace_sha256}")
+    print("Result is unsigned and is not an adoption authorization. No refs moved.")
+    return 0 if report.outcome == "passed" else 1

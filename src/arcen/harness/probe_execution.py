@@ -50,6 +50,15 @@ class ReviewedProbeResult:
     workspace_sha256: str
     status: str
     events: tuple[dict, ...] = field(repr=False)
+    canary_passed: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _CanaryCommands:
+    """Trusted, code-defined commands; not a public verifier authority."""
+
+    prepare: str
+    verify: str
 
 
 class _Collector:
@@ -152,7 +161,11 @@ def run_reviewed_probe(
 
 
 def _run_bound_probe(
-    snapshot: GitSnapshot, cfg: ArcenConfig, model: BoundProbeModel
+    snapshot: GitSnapshot,
+    cfg: ArcenConfig,
+    model: BoundProbeModel,
+    *,
+    canary: _CanaryCommands | None = None,
 ) -> ReviewedProbeResult:
     """Run already-validated model and snapshot; never accept either from a CLI."""
     if model.budget is not None:
@@ -167,9 +180,14 @@ def _run_bound_probe(
     start = time.monotonic()
     status = "error"
     executed = 0
+    canary_passed = None
     try:
         with open_probe_container(snapshot, cfg) as inner:
             gateway = _BoundedGateway(inner, model.budget)
+            if canary is not None:
+                prepared = gateway.dispatch("bash", {"cmd": canary.prepare, "timeout_s": 10})
+                if prepared.get("ok") is not True:
+                    raise ProbeUnavailable("canary preparation failed")
             collector.emit(
                 RunStart(
                     seq=0,
@@ -222,6 +240,18 @@ def _run_bound_probe(
                 status = "error"
             except Exception:  # noqa: BLE001 — do not expose untrusted inputs/errors
                 status = "error"
+            if canary is not None and status in {"ok", "failed"}:
+                checked = gateway.dispatch("bash", {"cmd": canary.verify, "timeout_s": 10})
+                result = checked.get("result")
+                if (
+                    type(result) is not dict
+                    or type(result.get("exit")) is not int
+                    or result["exit"] not in (0, 1)
+                    or type(checked.get("ok")) is not bool
+                    or checked["ok"] != (result["exit"] == 0)
+                ):
+                    raise ProbeUnavailable("canary verification failed")
+                canary_passed = result["exit"] == 0
         # Emit the terminal event only after strict container teardown succeeded.
         if status == "error":
             collector.emit(
@@ -241,5 +271,11 @@ def _run_bound_probe(
             "reviewed probe isolation or cleanup failed; no result accepted"
         ) from None
     return ReviewedProbeResult(
-        baseline_id, candidate_id, snapshot.commit, snapshot.sha256, status, tuple(collector.events)
+        baseline_id,
+        candidate_id,
+        snapshot.commit,
+        snapshot.sha256,
+        status,
+        tuple(collector.events),
+        canary_passed,
     )

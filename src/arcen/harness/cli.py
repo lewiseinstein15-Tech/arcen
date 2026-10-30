@@ -236,6 +236,18 @@ def main(argv: list[str] | None = None) -> int:
     patch.add_argument("baseline")
     patch.add_argument("path", help="allowlisted component path")
     patch.add_argument("patch_file")
+    canary = commands.add_parser("canary", help="inspect or run fixed manual behavioral canaries")
+    canary_commands = canary.add_subparsers(dest="canary_command", required=True)
+    canary_commands.add_parser("list", help="show public fixed canary tasks")
+    canary_run = canary_commands.add_parser(
+        "run", help="interactive baseline/candidate canary comparison"
+    )
+    canary_run.add_argument("--baseline", required=True)
+    canary_run.add_argument("--candidate", required=True)
+    canary_run.add_argument("--config", required=True)
+    canary_run.add_argument("--repo", required=True)
+    canary_run.add_argument("--commit", required=True)
+    canary_run.add_argument("--budget", required=True)
     editor = commands.add_parser("editor", help="generate unadopted proposals interactively")
     editor_commands = editor.add_subparsers(dest="editor_command", required=True)
     propose = editor_commands.add_parser("propose", help="request reviewed model-generated patches")
@@ -321,6 +333,26 @@ def main(argv: list[str] | None = None) -> int:
             store, _ = _existing(args.store)
             identifier = import_patch(store, args.baseline, args.path, args.patch_file)
             print(f"Unadopted candidate: {identifier}")
+        elif args.command == "canary":
+            if args.canary_command == "list":
+                from .canary import CASES
+
+                for case in CASES:
+                    print(f"{case.id}: {_safe(case.task)}")
+                print("Public, gameable tests; not a safety or adoption gate.")
+                return 0
+            from .manual_cli import canary_interactive
+
+            store, _ = _existing(args.store)
+            return canary_interactive(
+                store,
+                args.baseline,
+                args.candidate,
+                args.config,
+                args.repo,
+                args.commit,
+                args.budget,
+            )
         elif args.command == "editor":
             from .manual_cli import editor_interactive
 
