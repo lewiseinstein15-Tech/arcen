@@ -31,7 +31,10 @@ validated on real Docker or against a real external provider. See
   A separate command can compose human-selected candidates from a completed
   campaign's local summaries.
 - Durable journal and shared admission counts; optional stop at stage
-  boundaries and budget binding for new CLI campaign plans.
+  boundaries and budget binding for new CLI campaign plans. Shared and durable
+  budgets can check a momentary minimum without reserving capacity; the
+  portability API rejects an obvious shortfall before checking images or
+  starting trials. A later stop, expiry or competing consumer may still interrupt.
 - Reviewed trial archives reject exact occurrences of the configured provider
   key before Docker or provider calls. Paired/manual campaigns also check
   explicitly supplied sensitive values. Paired/campaign model inputs and

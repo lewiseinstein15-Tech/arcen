@@ -97,6 +97,10 @@ merely because a sub-scope is complete.
 - [x] H-21d: fail-closed availability checks for both local Docker image IDs
       before portability trials; mock-tested only. This is not a reservation,
       image trust verification, safety proof or complete portability validation.
+- [x] H-17c / H-21e: a non-reserving admission-minimum check for shared and
+      durable budgets; the portability API rejects obvious shortfalls before
+      image checks or trials. Capacity can be consumed after the check; H-17
+      and H-21 remain open, with no spending or runtime guarantee.
 
 ## Verification still required
 

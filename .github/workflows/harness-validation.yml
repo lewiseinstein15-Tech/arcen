@@ -46,6 +46,7 @@ jobs:
             "$GITHUB_WORKSPACE/tests/test_harness_tui_demo.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_fusion.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_portability.py" \
+            "$GITHUB_WORKSPACE/tests/test_budget_preflight.py" \
             "$GITHUB_WORKSPACE/tests/test_portability_cli.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_task_screen.py" \
             "$GITHUB_WORKSPACE/tests/test_probe_known_values.py" \

@@ -29,6 +29,11 @@ class BudgetSnapshot:
     elapsed_seconds: float
 
 
+def _validate_minimums(trials: int, model_calls: int, judge_calls: int) -> None:
+    if any(type(x) is not int or not 0 <= x <= 100000 for x in (trials, model_calls, judge_calls)):
+        raise HarnessError("invalid minimum admissions")
+
+
 class SharedBudget:
     """Atomic, conservative reservations shared by explicitly bound trials.
 
@@ -77,6 +82,15 @@ class SharedBudget:
     def checkpoint(self) -> None:
         with self._lock:
             self._check()
+
+    def require_available(self, *, trials: int, model_calls: int, judge_calls: int) -> None:
+        """Check a momentary minimum without reserving or closing on shortfall."""
+        _validate_minimums(trials, model_calls, judge_calls)
+        with self._lock:
+            self._check()
+            required = {"trials": trials, "model_calls": model_calls, "judge_calls": judge_calls}
+            if any(self._limits[k] - self._used[k] < value for k, value in required.items()):
+                raise BudgetExhausted("insufficient available admissions for minimum")
 
     def _reserve(self, category: str) -> None:
         with self._lock:

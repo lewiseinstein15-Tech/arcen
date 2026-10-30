@@ -20,6 +20,8 @@ budget = SharedBudget(
 # Pass budget=budget to run_reviewed_probe, run_reviewed_comparison,
 # or compare_reviewed_proposals, alongside their existing required arguments.
 print(budget.snapshot())
+# Check a momentary minimum without consuming/reserving admissions:
+budget.require_available(trials=2, model_calls=2, judge_calls=1)
 # To refuse future admissions:
 budget.stop()
 ```
@@ -32,6 +34,13 @@ called, the instance latches closed. Tool dispatch checks the same latch before
 starting. A paired comparison uses two trial admissions; it uses one judge
 admission only if it reaches the callback. The existing per-trial model-call cap
 still applies independently.
+
+`require_available` checks all three categories against one locked snapshot
+(or one SQLite transaction for `DurableBudget`). A shortfall raises
+`BudgetExhausted` without latching a still-open budget or consuming admissions.
+It is not a reservation: cooperating work can spend capacity immediately after
+this check. A stop or expired deadline still closes the budget. A durable
+snapshot also updates its existing clock/last-seen bookkeeping.
 
 **Important limitations:**
 

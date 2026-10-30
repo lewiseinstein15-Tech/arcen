@@ -110,7 +110,9 @@ def run_portability_comparison(
     cfg = _reviewed_config(config, True)
     if cfg.sandbox.network != "none" or cfg.sandbox.backend not in ("auto", "docker"):
         raise HarnessError("portability comparison requires Docker with networking disabled")
-    budget.checkpoint()
+    # A momentary lower bound only: it does not reserve admissions or ensure
+    # the deadline will survive preflight or the four complete trials.
+    budget.require_available(trials=4, model_calls=4, judge_calls=2)
     _require_local_images(image_ids)
     first_config = cfg.model_copy(deep=True)
     second_config = cfg.model_copy(deep=True)

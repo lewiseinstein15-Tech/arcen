@@ -1039,3 +1039,19 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
   This check has not been validated against a real Docker daemon. It does not
   reserve images, attest their provenance, establish safety or prevent a later
   disappearance; H-21 and the adoption/automation gates remain open.
+
+### H-17c / H-21e — momentary admission-minimum checks (partial)
+
+- `H-17c-real-budget-preflight-tests.png`: fresh installed-wheel tests in a
+  real PTY rendered by xterm.js/Chromium; 25 passed. Both in-memory and durable
+  budgets are exercised, including validation, shortfall, stop, and spending
+  after a check. This is a minimum snapshot, not an admission reservation.
+- `H-21e-real-budget-guard-tests.png`: fresh installed-wheel portability tests
+  in the same real-terminal capture method; 5 passed, 22 deselected. Docker and
+  providers are mocked. They cover rejection before image/trial/provider work
+  and a competing consumer interrupting a run after the check.
+- Full source suite: 1,208 passed, 13 skipped. Selected installed-wheel suite:
+  95 passed, 3 skipped. Changed-file Ruff, format, wheel and docs checks passed.
+  The CI change has not run remotely, and real Docker and providers remain
+  unvalidated. These partial increments do not complete H-17 or H-21, enforce
+  a spending/runtime limit, authorize adoption or permit safe auto-resume.

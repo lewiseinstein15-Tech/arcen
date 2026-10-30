@@ -209,17 +209,48 @@ def test_real_two_image_portability_when_explicitly_enabled(tmp_path, monkeypatc
     assert len(calls) == 8 and cap.snapshot().trials == 4
 
 
-def test_shared_budget_stops_before_second_profile_trial(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    "limits",
+    [
+        {"max_trials": 3},
+        {"max_model_calls": 3},
+        {"max_judge_calls": 1},
+    ],
+)
+def test_insufficient_budget_rejected_before_docker_or_provider(tmp_path, monkeypatch, limits):
+    from arcen.harness.budget import BudgetExhausted
+
+    args = fixture(tmp_path)
+    monkeypatch.setattr(
+        portability_module, "_require_local_images", lambda _: pytest.fail("docker")
+    )
+    monkeypatch.setattr(comparison_module, "snapshot_git_commit", lambda *a: pytest.fail("git"))
+    calls = provider(monkeypatch)
+    cap = budget(**limits)
+    with pytest.raises(BudgetExhausted, match="insufficient available"):
+        run(args, verdict, budget=cap)
+    state = cap.snapshot()
+    assert not state.stopped and state.trials == state.model_calls == state.judge_calls == 0
+    assert calls == []
+
+
+def test_budget_preflight_is_not_a_reservation(tmp_path, monkeypatch):
     from arcen.harness.budget import BudgetExhausted
 
     args = fixture(tmp_path)
     monkeypatch.setattr(probe_container, "DockerTurnRegistry", Boundary)
     calls = provider(monkeypatch)
-    cap = budget(max_trials=2)
+    cap = budget()
+
+    def another_consumer(_):
+        cap.reserve_trial()
+        cap.reserve_trial()
+        return verdict(_)
+
     with pytest.raises(BudgetExhausted):
-        run(args, verdict, budget=cap)
+        run(args, another_consumer, budget=cap)
     state = cap.snapshot()
-    assert state.stopped and state.trials == 2 and state.model_calls == 4 and len(calls) == 4
+    assert state.stopped and state.trials == 4 and state.model_calls == 4 and len(calls) == 4
 
 
 def test_missing_second_image_fails_without_returning_complete_report(tmp_path, monkeypatch):
@@ -302,3 +333,22 @@ def test_image_preflight_refuses_daemon_errors_before_any_trial(tmp_path, monkey
     assert closed == ([] if failure == "daemon" else [True])
     if failure == "missing_second":
         assert seen == list(IMAGES)
+
+
+def test_durable_preflight_observes_prior_usage_before_images(tmp_path, monkeypatch):
+    from arcen.harness.budget import BudgetExhausted
+    from arcen.harness.durable_budget import DurableBudget
+
+    args = fixture(tmp_path)
+    cap = DurableBudget.create(
+        args[0], max_trials=4, max_model_calls=4, max_judge_calls=2, admission_seconds=60
+    )
+    cap.reserve_trial()
+    monkeypatch.setattr(
+        portability_module, "_require_local_images", lambda _: pytest.fail("docker")
+    )
+    monkeypatch.setattr(comparison_module, "snapshot_git_commit", lambda *a: pytest.fail("git"))
+    with pytest.raises(BudgetExhausted, match="insufficient"):
+        run(args, verdict, budget=cap)
+    state = cap.snapshot()
+    assert not state.stopped and state.trials == 1 and state.model_calls == state.judge_calls == 0

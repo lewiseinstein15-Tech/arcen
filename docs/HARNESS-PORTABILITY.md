@@ -38,9 +38,12 @@ The two profiles use the same task, provider configuration and Git commit. Each
 profile re-archives the commit once; the second archive must match the first
 archive's SHA-256 before its first trial. This hash is an equality check, not
 an authenticated binding to the repository. Four fresh containers/trials and
-up to 16 model calls share one durable admission budget. The displayed minimum
-is not a reservation; other processes can spend it, and a stop or exhaustion
-can interrupt between profiles. Neither trial nor callback is cancelled in
+up to 16 model calls share one admission budget. Both the API and CLI check a
+momentary minimum of four trial, four model-call and two judge admissions before
+trials; the CLI requires a durable budget while the API also accepts an
+in-process budget. This lower bound is not the full worst-case model-call count
+and is not a reservation: other work can spend it, and stop, expiry or
+exhaustion can interrupt between profiles. Neither trial nor callback is cancelled in
 flight, and no token, USD or hard-runtime cap is enforced. Failed or uncertain
 runs can consume admissions and incur charges. Inspect usage and external side
 effects; there is no automatic resume.

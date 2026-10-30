@@ -16,7 +16,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from .budget import BudgetExhausted, BudgetSnapshot
+from .budget import BudgetExhausted, BudgetSnapshot, _validate_minimums
 from .resolver import HarnessError
 from .store import HarnessStore
 
@@ -276,6 +276,19 @@ class DurableBudget:
 
     def checkpoint(self) -> None:
         self._update("checkpoint")
+
+    def require_available(self, *, trials: int, model_calls: int, judge_calls: int) -> None:
+        """Check an atomic snapshot without reserving or closing on shortfall."""
+        _validate_minimums(trials, model_calls, judge_calls)
+        state = self.snapshot()
+        if state.stopped:
+            raise BudgetExhausted("durable budget closed: " + str(state.reason))
+        if (
+            state.max_trials - state.trials < trials
+            or state.max_model_calls - state.model_calls < model_calls
+            or state.max_judge_calls - state.judge_calls < judge_calls
+        ):
+            raise BudgetExhausted("insufficient available admissions for minimum")
 
     def reserve_trial(self) -> None:
         self._update("trials")
