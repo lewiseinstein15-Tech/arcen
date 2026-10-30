@@ -85,6 +85,11 @@ merely because a sub-scope is complete.
 - [x] H-07a: doctor checks integrity and expected schema of present auxiliary
       SQLite files without creating absent databases. This is not full record,
       cross-database or authorization verification; rollback remains disabled.
+- [x] H-20a / H-22a: a clearly simulated offline harness TUI demo and read-only
+      renderer for local progress metadata. No live stream, approval or adoption.
+- [x] H-21b: CI configuration checks installed import origin and runs selected
+      installed-wheel harness/TUI tests outside the checkout; wheel contents
+      include the new modules. Remote execution has not been verified.
 
 ## Verification still required
 

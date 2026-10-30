@@ -90,10 +90,11 @@ validated on real Docker or against a real external provider. See
    Model/provider output, repository content and local metadata are untrusted
    for purposes of future automation. Model pin names do not authenticate model
    weights, and local hashes/review labels are not signatures.
-7. **H-20–22: surface, portability and release.** There is no integrated
-   Harness² campaign TUI. Cross-platform/install checks, CI/release packaging,
-   a reproducible end-to-end demo and complete operator documentation still
-   need work. New real-Docker paths and any paid-provider integration require
+7. **H-20–22: surface, portability and release.** A clearly labelled offline
+   simulated Harness² TUI demo renders example progress, but there is no live
+   integrated campaign TUI or approval surface. Cross-platform/install checks,
+   a remotely verified CI run, a real end-to-end demo and complete operator
+   documentation still need work. New real-Docker paths and any paid-provider integration require
    validation on suitable systems; mock tests are not that validation.
 
 Check local and remote Git refs for the current merge state. A local checkout or

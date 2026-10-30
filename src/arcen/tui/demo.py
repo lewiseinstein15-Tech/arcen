@@ -340,7 +340,10 @@ def run_demo(argv: list[str] | None = None,
     """
     if headless is None:
         headless = not sys.stdout.isatty()
-    if argv and "--replay" in argv:
+    if argv and "--harness" in argv:
+        from arcen.tui.harness_demo import HarnessDemo
+        app = HarnessDemo(headless_mode=headless)
+    elif argv and "--replay" in argv:
         from arcen.tui.replay_demo import ReplayDemo
         app = ReplayDemo(headless_mode=headless)
     else:

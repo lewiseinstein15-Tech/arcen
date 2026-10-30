@@ -88,14 +88,21 @@ lines, ignores transport heartbeats, and resumes on disconnect using
 `Last-Event-ID`. The adapter de-duplicates replayed sequence numbers and shows
 an event-gap notice. HTTP 409 compaction triggers a replay from zero. The
 server's `run.done` or `run.error` ends the stream for that turn. The client
-also reports offline and degraded-sandbox states; the sandbox modal shows the
-selected backend and reason. A degraded process backend is not the same as a
-Docker container and should be assessed against your security requirements.
+also reports offline and blocked-sandbox states; the sandbox modal shows the
+selected backend and reason. A process backend is not an isolation boundary;
+tool execution remains blocked unless Docker isolation is available.
 
 Interrupt sends `DELETE /api/run/{run_id}` **only after confirmation**. The
 server cooperatively stops between steps, so an in-progress step may finish
 first. Errors are shown without pretending the run stopped. No credentials are
 needed for `--demo` or the fixture screenshots.
+
+## Simulated Harness² demo
+
+Run `arcen-tui --demo --harness` for a clearly labelled, offline simulation of
+manual campaign progress. It uses fabricated data, does not run a campaign or
+open a review, and cannot approve or adopt anything. It is not connected to the
+live server stream. See [Harness² TUI demo](HARNESS-TUI-DEMO.md).
 
 ## Code and verification
 

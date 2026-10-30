@@ -36,6 +36,18 @@ jobs:
         run: |
           python scripts/check_tui_wheel.py /tmp/arcen-wheel/arcen-0.1.0-py3-none-any.whl
           python scripts/check_tui_docs.py
+      - name: Assert package imports from installed wheel
+        run: |
+          python -c 'import pathlib, arcen, arcen.harness.fusion, arcen.tui.harness_demo; p = pathlib.Path(arcen.__file__).resolve(); root = pathlib.Path("src").resolve(); print("Imported:", p); assert not p.is_relative_to(root), "source checkout shadowed installed wheel"'
+      - name: Run selected installed-wheel harness and TUI tests from outside checkout
+        run: |
+          cd /tmp
+          PYTHONPATH="$GITHUB_WORKSPACE/tests" python -m pytest --import-mode=importlib -o addopts='' -q \
+            "$GITHUB_WORKSPACE/tests/test_harness_tui_demo.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_fusion.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_task_screen.py" \
+            "$GITHUB_WORKSPACE/tests/test_probe_known_values.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_doctor_aux.py"
       - name: Run test suite without live providers or Docker opt-in
         run: python -m pytest
 

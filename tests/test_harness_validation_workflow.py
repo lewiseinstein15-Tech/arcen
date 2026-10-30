@@ -29,6 +29,13 @@ def test_validation_workflow_has_matrix_wheel_and_explicit_docker_opt_in():
     assert (
         "python -m pytest" in steps["Run test suite without live providers or Docker opt-in"]["run"]
     )
+    imported = steps["Assert package imports from installed wheel"]["run"]
+    assert "arcen.__file__" in imported and "is_relative_to(root)" in imported
+    selected = steps["Run selected installed-wheel harness and TUI tests from outside checkout"][
+        "run"
+    ]
+    assert "cd /tmp" in selected and "--import-mode=importlib" in selected
+    assert "test_harness_tui_demo.py" in selected and "test_harness_doctor_aux.py" in selected
     docker = data["jobs"]["docker-isolation"]
     steps = {step["name"]: step for step in docker["steps"]}
     assert "docker build" in steps["Build local sandbox image"]["run"]

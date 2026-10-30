@@ -998,3 +998,17 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
   143 passed, 3 skipped. Ruff for changed Python files and wheel/docs checks
   passed. Real Docker and external-provider tests remain outstanding; H-07 and
   H-19 are still open and adoption/rollback remain disabled.
+
+### H-20a / H-21b / H-22a — simulated Harness² surface and wheel CI checks
+
+- `H-20a-real-harness-demo.png`: fresh installed `arcen-tui --demo --harness`
+  in a real PTY rendered by xterm.js/Chromium. All data is explicitly simulated;
+  no server, Docker, provider, campaign, review or adoption occurred. The
+  simulated footer is labelled `SIMULATED`, not `LIVE`.
+- `H-21b-real-wheel-tests.png`: fresh real-terminal installed-wheel test run
+  from outside the checkout, 76 passed. Docker/provider are mocked. The CI
+  workflow configuration is statically checked; it has not run remotely.
+- The installed offline demo also exited zero headlessly. Final full source
+  suite: 1,153 passed, 12 skipped; selected installed-wheel tests: 76 passed.
+  The demo is not live campaign integration, an approval interface, a real
+  end-to-end campaign, or a safety proof. H-20, H-21 and H-22 remain open.
