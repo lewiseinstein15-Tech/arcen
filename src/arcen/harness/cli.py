@@ -503,6 +503,12 @@ def main(argv: list[str] | None = None) -> int:
     propose.add_argument("--config", required=True)
     propose.add_argument("--budget", required=True)
     propose.add_argument("--k", type=int, default=1)
+    propose.add_argument(
+        "--experience-topic",
+        action="append",
+        default=[],
+        help="explicitly review and include an active local experience topic (up to three)",
+    )
     workflow = commands.add_parser("workflow", help="guided manual editor-to-review workflow")
     workflow_commands = workflow.add_subparsers(dest="workflow_command", required=True)
     guided = workflow_commands.add_parser(
@@ -738,6 +744,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.budget,
                 args.k,
                 task_id=args.task_id,
+                experience_topics=tuple(args.experience_topic),
             )
         elif args.command == "workflow":
             from .manual_cli import guided_workflow

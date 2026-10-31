@@ -5,7 +5,8 @@ completed improvement library**. A trusted Python caller can store a manually
 written observation in the existing `MemoryStore` graph, associated with an
 approved local paired-review record. The library itself does not call a model;
 the separate optional CLI reflection workflow described below does. Neither
-selects a candidate, changes the adopted ref or feeds notes into an editor prompt.
+selects a candidate or changes the adopted ref. A separate editor option can
+include selected notes after explicit human review; no note is injected automatically.
 
 ```python
 from arcen.harness.experience import ExperienceLibrary
@@ -101,7 +102,7 @@ local notes into trustworthy model input.
 an approved paired review, asks a pinned provider for one tentative hypothesis,
 then separately asks the operator whether to save it. It does not reconstruct
 or send full trajectories, conduct independent research, select a winner, or
-feed a lesson into the editor. The model cannot verify the observation and may
+automatically feed a lesson into the editor. The model cannot verify the observation and may
 hallucinate. The provider sees the observation, topic, recorded winner and
 confidence, and the baseline planner identity; it does **not** see the displayed
 review diff. Review and trust the full provider config and observation before
@@ -128,3 +129,34 @@ an atomic or authenticated evidence system. The observation and exact baseline
 are inspected before exposure, and the review and file are reread after the
 first confirmation. No automatic editor injection, adoption, recursion or safe
 resume is enabled. Paid-provider integration is not yet validated.
+
+## Operator-selected editor context (H-13b, partial)
+
+The ordinary editor remains unchanged when no topics are specified. To opt in,
+repeat `--experience-topic` for up to three distinct active local topics:
+
+```sh
+arcen harness --store "$STORE" editor propose --baseline "$BASELINE" \
+  --task-file ./task.txt --config ./arcen.yaml --budget "$BUDGET" \
+  --experience-topic careful-check
+```
+
+Each selected note must still be active, linked to an approved paired review and
+match the exact editor baseline. The CLI displays its sanitized text, review ID
+and expiry, warns about prompt injection and data exposure, and requires both
+`USE-EXPERIENCE BASELINE` and the ordinary `EDIT BASELINE` confirmations. It
+rechecks selected note identity, content and linked review after each prompt.
+The reviewed snapshot is then sent with every editor request; a concurrent change
+or expiry after the final check cannot recall information already sent. Locking
+coordinates only cooperating CLI processes; local metadata is unsigned and is
+not an authenticity or safety proof. Notes may contain malicious instructions,
+false claims, or hidden secrets; screening is incomplete. Review all notes and
+the actual provider endpoint before consenting. These are untrusted context,
+not policy. Model behavior is not guaranteed to respect that distinction.
+
+Generated proposals remain untrusted and unadopted and require separate manual
+review and trial. With no topics the request payload is unchanged. The Python
+editor API also requires an explicit `reviewed_experience=True` acknowledgment
+for nonempty context, but that flag is not authenticated and callbacks can
+transmit data. The single baseline model remains pinned; there is no autonomous
+reflection, authenticated approval, safe resume, or automatic selection/adoption.

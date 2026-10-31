@@ -1180,3 +1180,17 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   Explicit `REFLECT` and `SAVE` are required, and no editor injection, adoption,
   automatic reflection, safe resume or full H-13 completion is claimed. No live
   external provider was used to validate this change.
+
+### H-13b — explicitly reviewed editor experience (partial)
+
+- `H-13b-real-experience-review-cli.png` shows the installed CLI in a real PTY,
+  rendered by xterm.js/Chromium with a fabricated local review/note. Capture stops
+  at the first confirmation; no provider call, candidate, trial or adoption.
+- `H-13b-real-experience-editor-tests.png` is a fresh installed-wheel terminal
+  run: 11 passed with provider mocked. Full source suite: 1,289 passed, 18 skipped;
+  selected installed-wheel suite: 67 passed. Changed-file Ruff/format, wheel,
+  docs and diff checks passed. Remote CI has not been run for this revision.
+- Explicit selections are untrusted and may contain prompt injection, falsehoods
+  or undiscovered secrets. The selected snapshot is checked after each human
+  confirmation but cannot be recalled after provider exposure. No live provider,
+  autonomous learning, authenticated approval, adoption or full H-13 is claimed.

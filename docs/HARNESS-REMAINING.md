@@ -93,8 +93,11 @@ the exact evidence and revisions.
    perform behavioral-contrast selection.
    An optional model-drafted tentative lesson from an operator-supplied
    observation requires separate provider and save confirmations; it has no full
-   trajectory and no automatic editor use. The task bank is a manual storage
-   foundation only. There is no autonomous reflector, experience-guided editor, parallel candidate scheduling or
+   trajectory and no automatic editor use. The editor can send up to three
+   explicitly selected, reviewed notes as untrusted context, but this is not
+   authenticated or safe against all prompt injections. The task bank is a
+   manual storage foundation only. There is no autonomous reflector, full safe
+   experience-guidance, parallel candidate scheduling or
    sequential carry-forward recursion.
 4. **H-15–16: adoption safety and canaries.** Static protected-file checks
    exist, but no authoritative policy gate or authenticated approval exists.

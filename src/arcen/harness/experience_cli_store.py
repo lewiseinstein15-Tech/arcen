@@ -1,7 +1,7 @@
 """Dedicated CLI experience database with cooperating-process file locking.
 
 This does not lock direct Python MemoryStore callers or defend against hostile
-local filesystem mutation. The separate database is never included in prompts.
+local filesystem mutation. Notes are never automatically included in prompts.
 """
 
 from __future__ import annotations

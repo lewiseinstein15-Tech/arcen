@@ -1,6 +1,7 @@
 """Manually curated, review-linked lessons in the existing memory graph.
 
-This is not an autonomous reflector and does not feed lessons into prompts.
+This is not an autonomous reflector. The separate editor can explicitly
+include selected notes only after human review.
 The memory database and Python caller are trusted; review records are unsigned.
 """
 

@@ -336,6 +336,7 @@ def _editor_candidates_interactive(
     k: int,
     *,
     task_id: str | None = None,
+    experience_topics: tuple[str, ...] = (),
 ) -> tuple[tuple[str, Proposal], ...]:
     """Generate and retain exact, unadopted independent proposals for this process."""
     if not sys.stdin.isatty() or not sys.stdout.isatty():
@@ -344,6 +345,16 @@ def _editor_candidates_interactive(
         raise HarnessError("editor k must be between 1 and 4")
     from .cli import _diff_objects, _safe
     from .editor import propose
+
+    if type(experience_topics) is not tuple or len(experience_topics) > 3:
+        raise HarnessError("select at most three distinct experience topics")
+    if experience_topics:
+        from .experience import _validate_topic
+
+        for topic in experience_topics:
+            _validate_topic(topic)
+        if len(set(experience_topics)) != len(experience_topics):
+            raise HarnessError("select at most three distinct experience topics")
 
     baseline = store.get_manifest(baseline_id)
     packaged = default_manifest()
@@ -371,6 +382,44 @@ def _editor_candidates_interactive(
             )
     except Exception:  # noqa: BLE001 — never disclose detected secrets
         raise HarnessError("editor input contains invalid or sensitive component data") from None
+
+    def selected_experience():
+        # Lock is held only while reading, never while waiting for the operator.
+        from .experience_cli_store import open_cli_experience
+
+        ledger = ReviewLedger(store)
+        with open_cli_experience(store, ledger) as library:
+            by_topic = {lesson.topic: lesson for lesson in library.active()}
+            selected = []
+            for topic in experience_topics:
+                lesson = by_topic.get(topic)
+                if lesson is None:
+                    raise HarnessError("selected experience is missing or expired")
+                if lesson.baseline_id != baseline_id:
+                    raise HarnessError(
+                        "selected experience baseline does not match editor baseline"
+                    )
+                # Score decays with wall time; identity and content must stay fixed.
+                selected.append(
+                    (
+                        lesson.fact_id,
+                        lesson.topic,
+                        lesson.text,
+                        lesson.review_id,
+                        lesson.baseline_id,
+                        lesson.candidate_id,
+                        lesson.created_at,
+                        lesson.expires_at,
+                    )
+                )
+            return tuple(selected)
+
+    selected = selected_experience() if experience_topics else ()
+    try:
+        for item in selected:
+            _review_input(item[2], config.provider.api_key)
+    except ProbeModelError:
+        raise HarnessError("selected experience contains sensitive or invalid data") from None
     usage = budget.snapshot()
     if usage.stopped or usage.max_model_calls - usage.model_calls < 2 * k:
         raise HarnessError("editor requires sufficient open model-call admissions")
@@ -399,14 +448,37 @@ def _editor_candidates_interactive(
         "Provider calls may transmit sensitive data and cost money; no USD/token cap is enforced."
     )
     print("Generated diffs are untrusted, untested and unapproved. Nothing is executed or adopted.")
+    if selected:
+        print("Selected notes will be sent to the provider as untrusted data, not policy.")
+        print("They may contain prompt injection, sensitive data or mistakes; review every note.")
+        for item in selected:
+            print(f"Topic: {item[1]}; review: {item[3]}; expires_unix: {item[7]:.0f}")
+            print("Untrusted note (sanitized): " + display(item[2]))
+        print("Local reviews and notes are unsigned; screening and redaction are incomplete.")
+        _confirm(
+            f"Type USE-EXPERIENCE {baseline_id} to approve exposure: ",
+            f"USE-EXPERIENCE {baseline_id}",
+        )
+        if selected_experience() != selected:
+            raise HarnessError("selected experience changed since display")
     _confirm(f"Type EDIT {baseline_id} to start: ", f"EDIT {baseline_id}")
+    if selected and selected_experience() != selected:
+        raise HarnessError("selected experience changed since display")
 
     def request_editor(request: dict) -> str:
         message = json.dumps(request, ensure_ascii=False, separators=(",", ":"))
         return model.complete("planner", [{"role": "user", "content": message}]).text
 
     try:
-        proposals = propose(store, baseline_id, task, (request_editor,), k=k)
+        proposals = propose(
+            store,
+            baseline_id,
+            task,
+            (request_editor,),
+            k=k,
+            experience=tuple(item[2] for item in selected),
+            reviewed_experience=bool(selected),
+        )
     except Exception:  # noqa: BLE001 — untrusted provider/model details may contain secrets
         raise HarnessError(
             "editor generation failed; inspect budget usage before retrying"
@@ -433,9 +505,17 @@ def editor_interactive(
     k: int,
     *,
     task_id: str | None = None,
+    experience_topics: tuple[str, ...] = (),
 ) -> int:
     _editor_candidates_interactive(
-        store, baseline_id, task_file, config_file, budget_id, k, task_id=task_id
+        store,
+        baseline_id,
+        task_file,
+        config_file,
+        budget_id,
+        k,
+        task_id=task_id,
+        experience_topics=experience_topics,
     )
     return 0
 
