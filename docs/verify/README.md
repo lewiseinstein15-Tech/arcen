@@ -1141,3 +1141,17 @@ in a real PTY rendered by xterm.js/Chromium: two mocked-boundary cases passed,
 and both real-Docker cases were deliberately skipped because Docker is absent
 here. This is preparation, not a Docker pass. The opt-in laptop instructions
 and exact scope are in `docs/HARNESS-H12C-LAPTOP-TEST.md`.
+
+### H-12d — workspace-bound composite plans (partial)
+
+`H-12d-real-bound-workspace-tests.png` shows a fresh installed-wheel test run in
+a real PTY rendered by xterm.js/Chromium: 6 passed, 25 deselected. Docker and
+provider are mocked. The selected cases cover schema migration, required hash
+matching and the later-manual-run path after `RUN` cancellation. Full source
+suite: 1,264 passed, 16 skipped; selected installed-wheel suite: 65 passed,
+5 skipped. Changed-file Ruff/format, wheel, docs and diff checks passed.
+
+The laptop real-Docker pass at `db75d86` preceded this change and does not
+validate schema v3. Hashes and the journal are unsigned, older plans remain
+unbound, and interrupted campaigns cannot be safely resumed automatically.
+No adoption or automatic selection is enabled; full H-12 remains open.

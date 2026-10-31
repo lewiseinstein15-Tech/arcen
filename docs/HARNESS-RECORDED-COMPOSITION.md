@@ -110,12 +110,15 @@ Git archive SHA-256 against the workspace hash in the selected records before
 the first trial. A mismatch stops the new journal without admitting a trial.
 
 The hash and local reviews are **unsigned and unauthenticated**; their equality
-is not proof of provenance, safety, improvement or authorization. The expected
-hash is supplied only to this invocation and **is not persisted in the new
-plan**. Cancelling at `RUN` leaves a ready plan, and a later ordinary `campaign
-run` will not perform this recorded-hash check. Inspect or stop that plan and
-start a newly reviewed flow rather than assuming safe resume. A created
-composite may remain after cancellation, and a plan may remain after later
-failures. Admission checks are snapshots, not reservations, and model calls
-can disclose data and cost money. There are no token/USD or hard-runtime caps.
-No step selects a winner for adoption or moves refs.
+is not proof of provenance, safety, improvement or authorization. New composite
+plans store the recorded hash in journal schema v3. If `RUN` is cancelled and
+the plan remains ready, a later ordinary manual run still checks the saved hash
+before any trial. **Older plans made before schema v3 remain unbound**; migration
+does not reconstruct their hash. Inspect or stop those plans and create a new
+reviewed flow. An interrupted running campaign cannot be automatically resumed.
+The database and code are trusted local state, not tamper-resistant evidence.
+
+A created composite may remain after cancellation, and a plan may remain after
+later failures. Admission checks are snapshots, not reservations, and model
+calls can disclose data and cost money. There are no token/USD or hard-runtime
+caps. No step selects a winner for adoption or moves refs.

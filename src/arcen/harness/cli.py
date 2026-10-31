@@ -249,6 +249,7 @@ def _campaign_command(args) -> int:
         f"Baseline: {record.baseline}\nCommit: {record.commit}\nTask SHA-256: {record.task_sha256}"
     )
     print(f"Budget: {record.budget_id or 'unbound legacy plan'}")
+    print(f"Workspace SHA-256: {record.workspace_sha256 or 'unbound (no recorded-hash check)'}")
     for candidate, review_id in zip(record.candidates, record.reviews):
         print(f"Review: {review_id}  candidate: {candidate}")
     print("Metadata only; no adoption or safe automatic resume. In-flight work may continue.")

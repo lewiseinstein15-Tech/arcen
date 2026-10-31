@@ -75,5 +75,8 @@ or adoption/rollback here. The standard `run_probe` remains blocked. See
 An optional Python `expected_workspace_sha256` argument checks the archived
 workspace against a caller-supplied 64-character lowercase SHA-256 before the
 reference trial. A mismatch returns `workspace_changed`; a claimed journal is
-marked failed and no trial is admitted. The value is not stored in the journal,
-is not authenticated and cannot authorize adoption or safe resume.
+marked failed and no trial is admitted. An invocation-only value is not stored
+unless explicitly bound at plan creation. New composite plans bind the unsigned
+recorded hash in schema v3 and the Python and CLI runners enforce it; legacy
+plans remain unbound. Local journal state is not tamper resistant and the hash
+cannot authorize adoption or safe resume.

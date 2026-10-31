@@ -60,7 +60,7 @@ def test_compose_then_separately_confirm_test_on_recorded_snapshot(tmp_path, mon
     assert main([*cli, *options]) == 0
     out = capsys.readouterr().out
     assert "No plan, trial, approval or adoption occurred" in out
-    assert "not stored in the plan" in out and "Required workspace SHA-256" in out
+    assert "bound to the plan" in out and "Required workspace SHA-256" in out
     assert "Campaign completed" in out and "No adoption occurred" in out
     plan_id = next(
         line.split()[4].rstrip(";")
@@ -131,11 +131,9 @@ def test_resolved_conflict_can_be_tested_after_all_confirmations(tmp_path, monke
     assert budget.snapshot().trials == 2
 
 
-def test_cancelling_run_leaves_ready_plan_without_persisted_workspace_guard(
-    tmp_path, monkeypatch, capsys
-):
+def test_cancelling_run_retains_workspace_guard_for_later_manual_run(tmp_path, monkeypatch, capsys):
     data = completed(tmp_path, monkeypatch)
-    _, _, _, _, journal, _, _, calls, cli = data
+    _, _, _, task_id, journal, _, record, calls, cli = data
     budget, options = _test_options(tmp_path, data)
     tty(monkeypatch)
 
@@ -147,14 +145,44 @@ def test_cancelling_run_leaves_ready_plan_without_persisted_workspace_guard(
     monkeypatch.setattr("builtins.input", respond)
     assert main([*cli, *options]) == 1
     output = capsys.readouterr()
-    assert "cancelled" in output.err and "not stored in the plan" in output.out
+    assert "cancelled" in output.err and "bound to the plan" in output.out
     plan_id = next(
         line.split()[4].rstrip(";")
         for line in output.out.splitlines()
         if line.startswith("Created composite test plan:")
     )
-    assert journal.get(plan_id).state == "ready" and budget.snapshot().trials == 0
+    plan = journal.get(plan_id)
+    assert plan.state == "ready" and budget.snapshot().trials == 0
+    assert plan.workspace_sha256 == data[5].get(record.reviews[0]).workspace_sha256
+    assert main(["--store", str(data[0].root), "campaign", "status", plan_id]) == 0
+    assert f"Workspace SHA-256: {plan.workspace_sha256}" in capsys.readouterr().out
     assert len(calls) == 6
+    original = manual_campaign.snapshot_git_commit
+    monkeypatch.setattr(
+        manual_campaign,
+        "snapshot_git_commit",
+        lambda *args: replace(original(*args), sha256="0" * 64),
+    )
+    monkeypatch.setattr("builtins.input", answer)
+    run_args = [
+        "--store",
+        str(data[0].root),
+        "campaign",
+        "run",
+        plan_id,
+        "--task-id",
+        task_id,
+        "--config",
+        str(tmp_path / "test-config.yaml"),
+        "--repo",
+        str(tmp_path / "repo"),
+        "--budget",
+        budget.id,
+    ]
+    assert main(run_args) == 1
+    assert "workspace_changed" in capsys.readouterr().out
+    assert journal.get(plan_id).state == "failed"
+    assert budget.snapshot().trials == 0 and len(calls) == 6
 
 
 def test_partial_flags_or_insufficient_budget_fail_before_composition(

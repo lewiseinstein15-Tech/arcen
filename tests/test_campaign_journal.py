@@ -266,6 +266,7 @@ def test_v1_read_only_compatibility_migration_and_old_instance_safety(tmp_path):
     journal, legacy = plan(args)
     with sqlite3.connect(journal.path) as db:
         db.execute("DROP TRIGGER campaign_budget_guard")
+        db.execute("ALTER TABLE campaigns DROP COLUMN workspace_sha256")
         db.execute("ALTER TABLE campaigns DROP COLUMN budget_id")
         db.execute("PRAGMA user_version=1")
     old = CampaignJournal(args[0])
@@ -275,7 +276,7 @@ def test_v1_read_only_compatibility_migration_and_old_instance_safety(tmp_path):
     upgraded = CampaignJournal(args[0], create=True)
     assert upgraded.get(legacy.id).budget_id is None
     with sqlite3.connect(journal.path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 3
     cap = durable(args[0])
     new = upgraded.plan(args[1], args[2], "inspect project", args[5], budget=cap)
     assert old.get(new.id).budget_id == cap.id
@@ -351,3 +352,102 @@ def test_guard_schema_tampering_rejected(tmp_path):
         )
     with pytest.raises(HarnessError, match="schema"):
         CampaignJournal(args[0])
+
+
+def test_v2_migration_keeps_legacy_plans_unbound(tmp_path):
+    args = setup(tmp_path)
+    journal, rec = plan(args)
+    with sqlite3.connect(journal.path) as db:
+        db.execute("ALTER TABLE campaigns DROP COLUMN workspace_sha256")
+        db.execute("PRAGMA user_version=2")
+    old = CampaignJournal(args[0])
+    assert old.get(rec.id).workspace_sha256 is None
+    upgraded = CampaignJournal(args[0], create=True)
+    assert upgraded.get(rec.id).workspace_sha256 is None
+    with sqlite3.connect(journal.path) as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 3
+
+
+def test_bound_workspace_cannot_be_omitted_or_replaced_on_claim(tmp_path):
+    args = setup(tmp_path)
+    journal = CampaignJournal(args[0], create=True)
+    cap = durable(args[0])
+    rec = journal.plan(
+        args[1], args[2], "inspect project", args[5], budget=cap, workspace_sha256="a" * 64
+    )
+    assert CampaignJournal(args[0]).get(rec.id).workspace_sha256 == "a" * 64
+    for expected in (None, "b" * 64):
+        with pytest.raises(HarnessError, match="mismatch"):
+            journal.claim(
+                rec.id,
+                args[1],
+                args[2],
+                "inspect project",
+                args[5],
+                budget=cap,
+                expected_workspace_sha256=expected,
+            )
+    assert journal.get(rec.id).state == "ready"
+    journal.claim(
+        rec.id,
+        args[1],
+        args[2],
+        "inspect project",
+        args[5],
+        budget=cap,
+        expected_workspace_sha256="a" * 64,
+    )
+    assert journal.get(rec.id).state == "running"
+
+
+def test_bad_workspace_hashes_fail_closed(tmp_path):
+    args = setup(tmp_path)
+    journal = CampaignJournal(args[0], create=True)
+    for bad in ("wrong", "A" * 64, 123):
+        with pytest.raises(HarnessError, match="workspace hash"):
+            journal.plan(args[1], args[2], "inspect project", args[5], workspace_sha256=bad)
+    rec = journal.plan(args[1], args[2], "inspect project", args[5], workspace_sha256="a" * 64)
+    with sqlite3.connect(journal.path) as db:
+        db.execute("UPDATE campaigns SET workspace_sha256='bad' WHERE id=?", (rec.id,))
+    with pytest.raises(HarnessError, match="invalid campaign record"):
+        journal.get(rec.id)
+
+
+def test_bound_workspace_is_enforced_by_python_campaign_api(tmp_path, monkeypatch):
+    args = setup(tmp_path)
+    journal = CampaignJournal(args[0], create=True)
+    cap = durable(args[0])
+    rec = journal.plan(
+        args[1], args[2], "inspect project", args[5], budget=cap, workspace_sha256="a" * 64
+    )
+    monkeypatch.setattr(
+        probe_container, "DockerTurnRegistry", lambda *a, **kw: pytest.fail("unexpected Docker")
+    )
+    calls = provider(monkeypatch)
+    result = run(args, budget=cap, journal=journal, campaign_id=rec.id)
+    assert result.stop_reason == "workspace_changed"
+    assert journal.get(rec.id).state == "failed"
+    assert cap.snapshot().trials == 0 and calls == []
+
+
+def test_bound_workspace_cannot_be_overridden_by_python_campaign_api(tmp_path, monkeypatch):
+    args = setup(tmp_path)
+    journal = CampaignJournal(args[0], create=True)
+    cap = durable(args[0])
+    rec = journal.plan(
+        args[1], args[2], "inspect project", args[5], budget=cap, workspace_sha256="a" * 64
+    )
+    monkeypatch.setattr(
+        probe_container, "DockerTurnRegistry", lambda *a, **kw: pytest.fail("unexpected Docker")
+    )
+    calls = provider(monkeypatch)
+    with pytest.raises(HarnessError, match="workspace does not match"):
+        run(
+            args,
+            budget=cap,
+            journal=journal,
+            campaign_id=rec.id,
+            expected_workspace_sha256="b" * 64,
+        )
+    assert journal.get(rec.id).state == "ready"
+    assert cap.snapshot().trials == 0 and calls == []

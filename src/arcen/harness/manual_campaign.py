@@ -117,6 +117,15 @@ def run_manual_campaign(
         or any(type(x) is not str or len(x) < 4 or len(x) > 256 for x in sensitive_values)
     ):
         raise HarnessError("invalid sensitive values")
+    if journal is not None:
+        bound_workspace = journal.get(campaign_id).workspace_sha256
+        if bound_workspace is not None:
+            if (
+                expected_workspace_sha256 is not None
+                and expected_workspace_sha256 != bound_workspace
+            ):
+                raise HarnessError("campaign workspace does not match the plan")
+            expected_workspace_sha256 = bound_workspace
     budget.checkpoint()
     cfg = _reviewed_config(config, True)
     key = cfg.provider.api_key
@@ -159,6 +168,7 @@ def run_manual_campaign(
             task,
             commit,
             budget=budget if type(budget) is DurableBudget else None,
+            expected_workspace_sha256=expected_workspace_sha256,
         )
     completed: list[CampaignItem] = []
     reference: ReviewedProbeResult | None = None

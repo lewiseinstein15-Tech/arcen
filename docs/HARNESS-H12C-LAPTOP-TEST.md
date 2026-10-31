@@ -50,8 +50,10 @@ The test does not push or modify your original checkout. Container operations
 can be interrupted; if cleanup cannot be confirmed, inspect containers labelled
 `arcen.turn` with `docker ps -a --filter label=arcen.turn`. Do not automatically
 remove unrelated containers. This smoke does not prove full H-12, authenticated
-provenance or isolation against every attack. A workspace hash is unsigned and
-is not saved in the created plan; a later ordinary run lacks this guard.
+provenance or isolation against every attack. At the tested `db75d86` revision,
+the unsigned workspace hash was not saved in the plan and later runs lacked the
+guard. Schema v3 binds it for newly created composite plans only; plans made by
+this test or other older versions do not acquire it retroactively.
 
 ## User-reported laptop result
 

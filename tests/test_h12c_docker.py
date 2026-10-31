@@ -80,7 +80,7 @@ def exercise(tmp_path, monkeypatch, capsys, *, real_docker, mismatch=False):
     )
     plan = journal.get(plan_id)
     assert confirmations[:3] == ["COMPOSE", "PLAN", "RUN"]
-    assert "Required workspace SHA-256" in output and "not stored in the plan" in output
+    assert "Required workspace SHA-256" in output and "bound to the plan" in output
     assert len(previous_calls) == 6
     usage = budget.snapshot()
     if mismatch:

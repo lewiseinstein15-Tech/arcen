@@ -87,9 +87,9 @@ the exact evidence and revisions.
    callback can discard unrelated edits and has no network, cost, or safety
    guarantee. A separate recorded-campaign CLI can accept manually authored
    local replacement patches after explicit review. It can optionally create
-   and run a separately confirmed, budget-bound composite test with an
-   invocation-only recorded-workspace hash check; that hash is unsigned and is
-   not stored in the plan. It does not automatically resolve conflicts or
+   and run a separately confirmed, budget-bound composite test. New plans bind
+   the unsigned recorded-workspace hash; older unbound plans are not upgraded
+   retroactively and do not have the guard. It does not automatically resolve conflicts or
    perform behavioral-contrast selection.
    The task bank is a manual storage foundation only. There is no model-backed
    reflector, experience-guided editor, parallel candidate scheduling or

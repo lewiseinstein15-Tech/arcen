@@ -129,11 +129,12 @@ def create_plan(
     budget_id: str,
     *,
     task_id: str | None = None,
+    workspace_sha256: str | None = None,
 ):
     task = _task_input(store, task_file, task_id)
     budget = DurableBudget(store, budget_id)
     return CampaignJournal(store, create=True).plan(
-        baseline, candidates, task, commit, budget=budget
+        baseline, candidates, task, commit, budget=budget, workspace_sha256=workspace_sha256
     )
 
 
@@ -162,6 +163,13 @@ def run_interactive(
 
     journal = CampaignJournal(store)
     record = journal.get(identifier)
+    if record.workspace_sha256 is not None:
+        if (
+            expected_workspace_sha256 is not None
+            and expected_workspace_sha256 != record.workspace_sha256
+        ):
+            raise HarnessError("campaign workspace does not match the plan")
+        expected_workspace_sha256 = record.workspace_sha256
     if record.state != "ready":
         raise HarnessError("campaign is not ready; automatic resume is unavailable")
     if record.budget_id is None:
@@ -211,10 +219,12 @@ def run_interactive(
     )
     print("The plan is bound to this budget ID; verify the repository commit separately.")
     if expected_workspace_sha256 is not None:
-        print(f"Required workspace SHA-256 for this invocation: {expected_workspace_sha256}")
-        print(
-            "This local hash is unsigned and is not persisted in the plan or an authenticity proof."
-        )
+        print(f"Required workspace SHA-256: {expected_workspace_sha256}")
+        print("This local hash is unsigned and is not an authenticity or safety proof.")
+        if record.workspace_sha256 is None:
+            print("This hash is invocation-only and is not persisted in the plan.")
+        else:
+            print("This hash is bound to the plan; interrupted runs are not automatically resumed.")
 
     def display_config(value: str) -> str:
         value = redact_text(value)
@@ -788,12 +798,8 @@ def compose_recorded_interactive(
     if not testing:
         return 0
     print("The candidate already exists; cancellation may leave it in the store.")
-    print(
-        "The expected workspace hash is checked during this invocation, but not stored in the plan."
-    )
-    print(
-        "If a run is cancelled or interrupted, inspect the plan; later manual runs lack this hash check."
-    )
+    print("The recorded workspace hash will be bound to the plan; it is unsigned and untrusted.")
+    print("Cancellation can leave a ready plan. Interrupted runs cannot be automatically resumed.")
     _confirm(
         f"Type PLAN {result.candidate_id} to create a test plan: ", f"PLAN {result.candidate_id}"
     )
@@ -808,6 +814,7 @@ def compose_recorded_interactive(
         campaign.commit,
         test_budget,
         task_id=task_id,
+        workspace_sha256=inputs.reviews[0].workspace_sha256,
     )
     print(f"Created composite test plan: {plan.id}; budget={test_budget}.")
     from .lineage import HarnessLineage

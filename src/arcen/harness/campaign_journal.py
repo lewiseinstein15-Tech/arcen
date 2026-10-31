@@ -53,6 +53,7 @@ class CampaignRecord:
     updated_at: int
     reviews: tuple[str, ...]
     budget_id: str | None = None
+    workspace_sha256: str | None = None
 
 
 class CampaignJournal:
@@ -82,7 +83,7 @@ class CampaignJournal:
             raise HarnessError("campaign database is missing or invalid")
         with self._connect(read_only=not create) as db:
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in ((0, 1, 2) if create else (1, 2)):
+            if version not in ((0, 1, 2, 3) if create else (1, 2, 3)):
                 raise HarnessError("unsupported campaign database schema")
             if version == 0:
                 if (
@@ -110,9 +111,8 @@ class CampaignJournal:
             if version == 0:
                 version = 1
             self._validate_schema(db, version)
-            if create and version == 1:
-                # Serialize migrations and recheck under the write lock. Legacy
-                # unbound plans survive, but do not acquire a budget implicitly.
+            if create and version in (1, 2):
+                # Upgrade under a write lock; legacy plans remain unbound.
                 db.execute("BEGIN IMMEDIATE")
                 current = db.execute("PRAGMA user_version").fetchone()[0]
                 self._validate_schema(db, current)
@@ -120,13 +120,18 @@ class CampaignJournal:
                     db.execute("ALTER TABLE campaigns ADD COLUMN budget_id TEXT")
                     db.execute(_BUDGET_GUARD)
                     db.execute("PRAGMA user_version=2")
-                elif current != 2:
+                    current = 2
+                if current == 2:
+                    db.execute("ALTER TABLE campaigns ADD COLUMN workspace_sha256 TEXT")
+                    db.execute("PRAGMA user_version=3")
+                    current = 3
+                if current != 3:
                     raise HarnessError("unsupported campaign database schema")
-                self._validate_schema(db, 2)
+                self._validate_schema(db, 3)
 
     @staticmethod
     def _validate_schema(db: sqlite3.Connection, version: int) -> None:
-        if version not in (1, 2):
+        if version not in (1, 2, 3):
             raise HarnessError("unsupported campaign database schema")
         objects = set(
             db.execute(
@@ -154,15 +159,24 @@ class CampaignJournal:
                 ("review_id", "TEXT", 0),
             ],
         }
-        if version == 2:
+        if version >= 2:
             expected["campaigns"].append(("budget_id", "TEXT", 0))
+        if version >= 3:
+            expected["campaigns"].append(("workspace_sha256", "TEXT", 0))
         columns = {}
         indexes = {}
         for name in expected:
             rows = db.execute(f"PRAGMA table_info({name})").fetchall()
             columns[name] = [(r[1], r[2], r[5]) for r in rows]
             if any(
-                (r[3] != (0 if name == "campaigns" and r[1] == "budget_id" else 1))
+                (
+                    r[3]
+                    != (
+                        0
+                        if name == "campaigns" and r[1] in {"budget_id", "workspace_sha256"}
+                        else 1
+                    )
+                )
                 or r[4] is not None
                 for r in rows
             ):
@@ -173,7 +187,7 @@ class CampaignJournal:
                 if r[2] == 1 and r[4] == 0
             }
         expected_objects = {("table", "campaigns"), ("table", "campaign_reviews")}
-        if version == 2:
+        if version >= 2:
             expected_objects.add(("trigger", "campaign_budget_guard"))
             guard = db.execute(
                 "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='campaign_budget_guard'"
@@ -246,7 +260,12 @@ class CampaignJournal:
         commit: str,
         *,
         budget: DurableBudget | None = None,
+        workspace_sha256: str | None = None,
     ) -> CampaignRecord:
+        if workspace_sha256 is not None and (
+            type(workspace_sha256) is not str or not _HASH.fullmatch(workspace_sha256)
+        ):
+            raise HarnessError("invalid expected workspace hash")
         encoded, digest = self._inputs(baseline, candidates, task, commit)
         if budget is not None:
             if type(budget) is not DurableBudget or budget.store is not self.store:
@@ -261,6 +280,8 @@ class CampaignJournal:
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             version = db.execute("PRAGMA user_version").fetchone()[0]
+            if version < 3 and workspace_sha256 is not None:
+                raise HarnessError("campaign journal must be upgraded before binding a workspace")
             if version == 1:
                 if budget is not None:
                     raise HarnessError("campaign journal must be upgraded before binding a budget")
@@ -282,6 +303,21 @@ class CampaignJournal:
                         budget.id if budget else None,
                     ),
                 )
+            elif version == 3:
+                db.execute(
+                    "INSERT INTO campaigns VALUES (?,?,?,?,?,'ready','ready',0,0,?,?,?,?)",
+                    (
+                        identifier,
+                        baseline,
+                        encoded,
+                        digest,
+                        commit,
+                        now,
+                        now,
+                        budget.id if budget else None,
+                        workspace_sha256,
+                    ),
+                )
             else:
                 raise HarnessError("unsupported campaign database schema")
         return self.get(identifier)
@@ -292,12 +328,15 @@ class CampaignJournal:
         with self._connect(read_only=True) as db:
             db.execute("BEGIN")
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (1, 2):
+            if version not in (1, 2, 3):
                 raise HarnessError("unsupported campaign database schema")
-            budget_column = "budget_id" if version == 2 else "NULL"
+            budget_column = "budget_id" if version >= 2 else "NULL"
+            workspace_column = "workspace_sha256" if version >= 3 else "NULL"
             row = db.execute(
                 "SELECT id,baseline,candidates,task_sha256,commit_id,state,phase,cursor,stop_requested,created_at,updated_at,"
                 + budget_column
+                + ","
+                + workspace_column
                 + " FROM campaigns WHERE id=?",
                 (identifier,),
             ).fetchone()
@@ -333,6 +372,7 @@ class CampaignJournal:
             or row[9] < 0
             or row[10] < row[9]
             or (row[11] is not None and (type(row[11]) is not str or not _ID.fullmatch(row[11])))
+            or (row[12] is not None and (type(row[12]) is not str or not _HASH.fullmatch(row[12])))
             or len(reviews) != row[7]
             or any(
                 n != i
@@ -360,6 +400,7 @@ class CampaignJournal:
             row[10],
             tuple(x[2] for x in reviews),
             row[11],
+            row[12],
         )
 
     def claim(
@@ -371,7 +412,13 @@ class CampaignJournal:
         commit: str,
         *,
         budget: DurableBudget | None = None,
+        expected_workspace_sha256: str | None = None,
     ) -> None:
+        if expected_workspace_sha256 is not None and (
+            type(expected_workspace_sha256) is not str
+            or not _HASH.fullmatch(expected_workspace_sha256)
+        ):
+            raise HarnessError("invalid expected workspace hash")
         if budget is not None and (
             type(budget) is not DurableBudget or budget.store is not self.store
         ):
@@ -386,6 +433,10 @@ class CampaignJournal:
             or record.task_sha256 != digest
             or record.commit != commit
             or (record.budget_id is not None and record.budget_id != budget_id)
+            or (
+                record.workspace_sha256 is not None
+                and record.workspace_sha256 != expected_workspace_sha256
+            )
         ):
             raise HarnessError("campaign plan mismatch or already started")
         with self._connect() as db:
@@ -394,12 +445,15 @@ class CampaignJournal:
             )
             db.execute("BEGIN IMMEDIATE")
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (1, 2):
+            if version not in (1, 2, 3):
                 raise HarnessError("unsupported campaign database schema")
-            condition = " AND budget_id IS ?" if version == 2 else ""
+            condition = " AND budget_id IS ?" if version >= 2 else ""
             params = (int(time.time()), identifier, baseline, encoded, digest, commit)
-            if version == 2:
+            if version >= 2:
                 params += (record.budget_id,)
+            if version >= 3:
+                condition += " AND workspace_sha256 IS ?"
+                params += (record.workspace_sha256,)
             changed = db.execute(
                 "UPDATE campaigns SET state='running',phase='reference',updated_at=MAX(updated_at,?) WHERE id=? AND state='ready' AND baseline=? AND candidates=? AND task_sha256=? AND commit_id=? AND stop_requested=0"
                 + condition,

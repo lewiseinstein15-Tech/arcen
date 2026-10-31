@@ -109,8 +109,11 @@ merely because a sub-scope is complete.
       campaigns, with local patch-file input, review and separate confirmation.
       No model call, trial, approval or adoption; full H-12 remains open.
 - [x] H-12c: optional separately confirmed test plan and manual paired campaign
-      for a selected composite, with an invocation-only recorded workspace hash
-      check. Evidence is unsigned and the hash is not persisted in the plan.
+      for a selected composite. Historical H-12c plans used an invocation-only
+      check; they do not acquire a hash retroactively.
+- [x] H-12d: new composite plans bind the unsigned recorded workspace hash in
+      journal schema v3 and enforce it on later manual starts. Older unbound
+      plans remain unbound; no automatic resume, provenance or adoption.
       Automatic behavioral selection, recursion and H-12 remain open.
 - [x] H-17d: optional per-instance, in-process trial slots for SharedBudget;
       full slots fail without spending, and errors stop the budget. No durable
