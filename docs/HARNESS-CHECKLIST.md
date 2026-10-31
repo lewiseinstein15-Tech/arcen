@@ -101,6 +101,13 @@ merely because a sub-scope is complete.
       durable budgets; the portability API rejects obvious shortfalls before
       image checks or trials. Capacity can be consumed after the check; H-17
       and H-21 remain open, with no spending or runtime guarantee.
+- [x] H-12a: Python-only, explicitly reviewed conflict-editor handoff and
+      read-only composition preview. Returned drafts require independent human
+      inspection and testing; callbacks and local evidence are untrusted. Full
+      behavioral selection and H-12 remain open.
+- [x] H-12b: opt-in interactive conflict patch resolution for recorded manual
+      campaigns, with local patch-file input, review and separate confirmation.
+      No model call, trial, approval or adoption; full H-12 remains open.
 - [x] H-17d: optional per-instance, in-process trial slots for SharedBudget;
       full slots fail without spending, and errors stop the budget. No durable
       concurrency, waiting, kill switch, hard runtime or spending enforcement.

@@ -25,7 +25,7 @@ reviewed proposal-comparison API can compose and then run experimental paired
 trials; candidate runtime selection and adoption still fail closed. Guided
 composition happens before comparison of its inputs and is not evidence-based.
 H-12 remains incomplete until behavioral-contrast selection, iterative campaign
-integration and conflict resolution are implemented.
+integration and a reviewed conflict-resolution workflow are implemented.
 
 A separate interactive `campaign compose` command can reconstruct and combine
 operator-selected candidates from one completed campaign's locally recorded
@@ -33,3 +33,34 @@ comparison summaries. The local summaries are unsigned, full trajectories
 are not retained, and the newly combined candidate must be tested separately.
 See `HARNESS-RECORDED-COMPOSITION.md`; this is not automatic behavioral
 selection, authenticated evidence or adoption.
+
+## Python-only conflict handoff (experimental)
+
+`preview_proposals(store, baseline_id, proposals)` validates and analyzes the
+exact proposals without writing blobs or a manifest. For conflicts,
+`draft_conflict_resolutions(store, baseline_id, proposals, editor,
+reviewed_callback_inputs=True)` sends one request per conflicting path to a
+caller-provided callback. It returns an **unpersisted draft**, not a candidate,
+approval, or decision; the caller must inspect every replacement and then
+separately choose whether to call `compose_proposals` and test the result.
+
+The callback sees the entire baseline component and all supplied proposal
+diffs for that path, as well as zero-based conflicting indices. It may transmit
+data, call a model and incur cost; this module does not provide provider
+isolation, authentication, secret redaction, billing limits or runtime caps.
+Review all content and trust the callback before explicitly opting in. The
+response must be JSON with exactly `path` and `diff`: one non-empty exact
+base-relative unified diff for the same editable path. Invalid or unsafe
+responses and callback failures are rejected; callback errors are sanitized.
+
+A replacement **supersedes every proposal for that path**, including edits
+that were not themselves in conflict. The callback may discard or alter any
+such edit, and a structurally valid patch is not necessarily safe, useful or
+faithful to the inputs. Other paths' proposals are retained. Recheck the full
+diff manually; there is no automatic approval, adoption, probing, persistence,
+network restriction for the callback, or durable audit. Concurrent hostile
+local writers and side effects performed by the callback are outside this
+module's guarantees. Multiple callback calls may occur before a later failure.
+The guided editor workflow still aborts on conflicts. The separate recorded
+campaign CLI supports manually supplied local replacement patches as described
+in `HARNESS-RECORDED-COMPOSITION.md`; it does not call a model or run a probe.

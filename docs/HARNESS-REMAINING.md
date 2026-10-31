@@ -82,7 +82,12 @@ the exact evidence and revisions.
    chosen editor proposals before a guided comparison, or manually combine
    selected candidates from one completed campaign's unsigned summaries.
    Both merges are syntactic, and the composite needs its own separate trial.
-   There is no automatic iterative behavioral-contrast selection.
+   A Python-only callback can draft replacements for conflicting paths without
+   writing them; human review and separate composition remain required. The
+   callback can discard unrelated edits and has no network, cost, or safety
+   guarantee. A separate recorded-campaign CLI can accept manually authored
+   local replacement patches after explicit review; it does not automatically
+   resolve conflicts, call a model or perform behavioral-contrast selection.
    The task bank is a manual storage foundation only. There is no model-backed
    reflector, experience-guided editor, parallel candidate scheduling or
    sequential carry-forward recursion.

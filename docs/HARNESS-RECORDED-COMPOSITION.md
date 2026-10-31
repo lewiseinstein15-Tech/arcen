@@ -37,8 +37,9 @@ After exact `COMPOSE CAMPAIGN_ID` confirmation, the command re-reads and
 revalidates the local data, reconstructs exact base-relative unified diffs from
 the verified component bytes, and invokes the conservative syntactic composer.
 The reconstructed diffs do not preserve the original proposal scope or hunk
-boundaries. Overlapping/touching edits are refused without a composite object;
-no more than ten component-level proposals can be combined. Rechecks are not
+boundaries. By default overlapping/touching edits are refused without a composite object.
+An opt-in manual patch workflow is described below; no more than ten
+component-level proposals can be combined. Rechecks are not
 an atomic transaction across databases and the filesystem, and do not defend
 against a hostile local writer. A storage failure can leave unreferenced objects.
 No durable provenance record for the composite is created.
@@ -62,3 +63,29 @@ A later test result still cannot authorize adoption. Docker-only fail-closed
 isolation, incomplete secret detection, provider exposure and cost warnings,
 admission-only budgets, and no automatic resume continue to apply. SHA-256
 hashes detect changes, not provenance, and may reveal predictable task text.
+
+## Opt-in local conflict patch workflow
+
+For a conflicting completed campaign, add `--resolve-conflicts` to the command.
+After the initial `COMPOSE` confirmation, the CLI lists conflicts and asks for
+a local UTF-8 unified-diff file for each conflicting editable path. Patches
+must apply exactly to the **campaign baseline**, with the same single-path
+headers accepted by the editor. The CLI does not generate the files or run an
+editor, model, Docker or shell command. The patch file must be a bounded regular
+file, not a final-component symlink or FIFO. Enter `CANCEL` to stop.
+
+Each replacement patch **supersedes all selected proposals for that path**,
+including non-conflicting edits. The CLI prints a control-sanitized and
+best-effort redacted patch; redaction is incomplete and may hide details.
+Inspect the complete file and all retained edits separately. The final `RESOLVE
+CAMPAIGN_ID` confirmation is required before creating a candidate. Cancelling
+or an invalid patch leaves no composite candidate. The CLI rechecks campaign
+metadata after confirmation, but local stores/filesystem are trusted and the
+checks are not one atomic transaction. A created candidate remains untested
+and unadopted and needs a separate reviewed trial; no approval or ref moves.
+
+```sh
+arcen harness --store "$STORE" campaign compose "$CAMPAIGN" \
+  --task-id "$TASK_ID" --review "$REVIEW_A" --review "$REVIEW_B" \
+  --resolve-conflicts
+```

@@ -199,7 +199,13 @@ def _campaign_command(args) -> int:
     if args.campaign_command == "compose":
         from .manual_cli import compose_recorded_interactive
 
-        return compose_recorded_interactive(store, args.id, args.task_id, tuple(args.review))
+        return compose_recorded_interactive(
+            store,
+            args.id,
+            args.task_id,
+            tuple(args.review),
+            resolve_conflicts=args.resolve_conflicts,
+        )
     if args.campaign_command == "plan":
         from .manual_cli import create_plan
 
@@ -522,6 +528,11 @@ def main(argv: list[str] | None = None) -> int:
         required=True,
         action="append",
         help="linked paired review ID; repeat 2 to 5 times",
+    )
+    compose.add_argument(
+        "--resolve-conflicts",
+        action="store_true",
+        help="interactively supply and review local replacement diff files for conflicts",
     )
     plan = campaign_commands.add_parser(
         "plan", help="record a manual comparison plan; no execution"

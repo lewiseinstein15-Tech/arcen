@@ -1096,3 +1096,22 @@ with real Docker and one with a mocked Docker boundary. Double-quiet pytest
 suppressed the numerical summary. The provider and judge were mocked. This
 was the user's report, not a daemon run in this workspace; no laptop screenshot
 was supplied. The full H-12 ticket remains open.
+
+### H-12a/b — reviewed conflict drafts and local patch workflow (partial)
+
+- `H-12a-real-conflict-draft-tests.png`: fresh installed-wheel test run in a
+  real PTY rendered by xterm.js/Chromium; 15 passed. Callback responses are
+  mocked; no provider, Docker, trial or adoption occurred. The API returns
+  unpersisted proposals requiring separate inspection and testing.
+- `H-12b-real-conflict-cli.png`: fresh installed `arcen harness` command in a
+  real PTY with a disposable locally created recorded-campaign fixture. The
+  fixture's earlier provider and Docker work was mocked. The screenshot stops
+  at the replacement-file prompt, after the initial confirmation; no patch was
+  supplied and no candidate was created. The image is not a safety proof.
+- Final source suite: 1,246 passed, 14 skipped; selected installed-wheel tests:
+  47 passed, 1 skipped. Changed-file Ruff/format, wheel and docs checks passed.
+  Remote CI did not run. The earlier user-reported real-Docker smoke was at
+  `cbb4ac8`, before this composer refactor; real Docker was not rerun for this
+  newer code. Callbacks may expose data and cost money; local patch resolution
+  is syntactic, untrusted and may discard other edits for the same path.
+  Full H-12, behavioral selection and automatic recursion remain open.

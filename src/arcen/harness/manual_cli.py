@@ -624,7 +624,12 @@ def record_experience_interactive(store: HarnessStore, lineage, topic: str, revi
 
 
 def compose_recorded_interactive(
-    store: HarnessStore, campaign_id: str, task_id: str, review_ids: tuple[str, ...]
+    store: HarnessStore,
+    campaign_id: str,
+    task_id: str,
+    review_ids: tuple[str, ...],
+    *,
+    resolve_conflicts: bool = False,
 ) -> int:
     """Inspect local comparison metadata, then explicitly compose; never adopt."""
     if not sys.stdin.isatty() or not sys.stdout.isatty():
@@ -651,9 +656,11 @@ def compose_recorded_interactive(
         )
         print(_diff_objects(store, campaign.baseline, record.candidate_id), end="")
     print("\nThe human chooses inputs, including ties or losses; no automatic winner is selected.")
-    print(
-        "Exact reconstructed diffs merge syntactically; conflicts abort. No provider or Docker is used."
-    )
+    if resolve_conflicts:
+        print("Conflicts require local replacement diff files and a second confirmation.")
+    else:
+        print("Exact reconstructed diffs merge syntactically; conflicts abort.")
+    print("No provider or Docker is used by composition.")
     print(
         "A combined candidate is untested and unadopted and may persist even after later failures."
     )
@@ -664,13 +671,70 @@ def compose_recorded_interactive(
     # revalidate all linked records and content after the operator's review.
     if prepare_recorded_composition(store, campaign_id, task_id, review_ids) != inputs:
         raise HarnessError("campaign, task or reviews changed since display")
-    result = compose_proposals(store, campaign.baseline, inputs.proposals)
-    if result.conflicts:
-        for conflict in result.conflicts:
+    from .composer import preview_proposals
+
+    preview = preview_proposals(store, campaign.baseline, inputs.proposals)
+    selected_proposals = inputs.proposals
+    if preview.conflicts:
+        for conflict in preview.conflicts:
             print(
                 f"Conflict: {conflict.path} between review {inputs.proposal_reviews[conflict.first]} "
                 f"and review {inputs.proposal_reviews[conflict.second]}"
             )
+        if not resolve_conflicts:
+            raise HarnessError("composition conflicts; no composite candidate created")
+        from .conflict_resolution import draft_conflict_resolutions
+
+        print(
+            "Each local patch replaces ALL selected edits for its path, including non-conflicting edits."
+        )
+        print(
+            "Supply an exact base-relative unified diff. Review full files separately; redaction is incomplete."
+        )
+
+        cancelled = False
+
+        def local_patch(request: dict) -> str:
+            nonlocal cancelled
+            try:
+                filename = input(
+                    f"Replacement patch file for {request['path']} (or CANCEL): "
+                ).strip()
+            except (EOFError, KeyboardInterrupt):
+                cancelled = True
+                raise HarnessError("campaign cancelled") from None
+            if not filename or filename.upper() == "CANCEL":
+                cancelled = True
+                raise HarnessError("campaign cancelled")
+            return json.dumps(
+                {"path": request["path"], "diff": _read_text(filename, MAX_PATCH_BYTES)}
+            )
+
+        try:
+            draft = draft_conflict_resolutions(
+                store,
+                campaign.baseline,
+                inputs.proposals,
+                local_patch,
+                reviewed_callback_inputs=True,
+            )
+        except HarnessError:
+            if cancelled:
+                raise HarnessError("campaign cancelled") from None
+            raise
+        for proposal in draft.proposals:
+            if proposal.path in draft.replaced_paths:
+                print(
+                    f"\nReplacement diff for {proposal.path} (redacted display; inspect full file too):"
+                )
+                print(_safe(redact_text(proposal.diff)), end="")
+        print("These patches are untrusted and untested. Review all retained and replaced edits.")
+        _confirm(f"Type RESOLVE {campaign.id} to create the candidate: ", f"RESOLVE {campaign.id}")
+        if prepare_recorded_composition(store, campaign_id, task_id, review_ids) != inputs:
+            raise HarnessError("campaign, task or reviews changed since display")
+        selected_proposals = draft.proposals
+    result = compose_proposals(store, campaign.baseline, selected_proposals)
+    if result.conflicts:
         raise HarnessError("composition conflicts; no composite candidate created")
     if result.candidate_id is None:
         raise HarnessError("composition did not produce a candidate")

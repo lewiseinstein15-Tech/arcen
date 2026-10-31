@@ -102,15 +102,10 @@ def _overlap(a: _Edit, b: _Edit) -> bool:
     return a.start <= b.end and b.start <= a.end
 
 
-def compose_proposals(
+def _analyze(
     store: HarnessStore, baseline_id: str, proposals: tuple[Proposal, ...]
-) -> Composition:
-    """Persist a validated successor or return conflicts without writing.
-
-    All proposals must independently apply exactly to the same base. Indices in
-    conflicts refer to the input tuple. No refs or lineage are moved. Even an
-    unconflicted composition is unapproved and must not be selected at runtime.
-    """
+) -> tuple[Manifest, dict[str, bytes] | None, tuple[str, ...], tuple[Conflict, ...]]:
+    """Validate and merge entirely in memory, never writing objects."""
     if type(proposals) is not tuple or not 1 <= len(proposals) <= MAX_PROPOSALS:
         raise HarnessError("expected 1 to 10 proposals")
     baseline = store.get_manifest(baseline_id)
@@ -153,8 +148,8 @@ def compose_proposals(
                     conflicts.add(Conflict(proposal.path, previous_index, index))
         previous.extend((index, edit) for edit in fresh)
     if conflicts:
-        return Composition(
-            baseline_id,
+        return (
+            baseline,
             None,
             (),
             tuple(sorted(conflicts, key=lambda c: (c.path, c.first, c.second))),
@@ -166,6 +161,39 @@ def compose_proposals(
     changed = tuple(sorted(path for path in EDITABLE if combined[path] != base[path]))
     if not changed:
         raise HarnessError("composition makes no changes")
+    return baseline, combined, changed, ()
+
+
+@dataclass(frozen=True, slots=True)
+class CompositionPreview:
+    """Read-only syntactic analysis; never a candidate or approval."""
+
+    baseline_id: str
+    changed_paths: tuple[str, ...]
+    conflicts: tuple[Conflict, ...]
+
+
+def preview_proposals(
+    store: HarnessStore, baseline_id: str, proposals: tuple[Proposal, ...]
+) -> CompositionPreview:
+    """Validate and inspect proposals without creating blobs or a manifest."""
+    _, _, changed, conflicts = _analyze(store, baseline_id, proposals)
+    return CompositionPreview(baseline_id, changed, conflicts)
+
+
+def compose_proposals(
+    store: HarnessStore, baseline_id: str, proposals: tuple[Proposal, ...]
+) -> Composition:
+    """Persist a validated successor or return conflicts without writing.
+
+    All proposals must independently apply exactly to the same base. Indices in
+    conflicts refer to the input tuple. No refs or lineage are moved. Even an
+    unconflicted composition is unapproved and must not be selected at runtime.
+    """
+    baseline, combined, changed, conflicts = _analyze(store, baseline_id, proposals)
+    if conflicts:
+        return Composition(baseline_id, None, (), conflicts)
+    assert combined is not None
     components = dict(baseline.components)
     for path in changed:
         components[path] = store.put_blob(combined[path])
