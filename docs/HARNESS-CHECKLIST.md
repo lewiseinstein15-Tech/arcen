@@ -110,9 +110,9 @@ merely because a sub-scope is complete.
 
 ## Verification still required
 
-- [ ] H-12 Docker smoke: an opt-in composed-candidate comparison is prepared
-      in `tests/test_h12_docker.py`; the real-daemon case has not yet run.
-      A pass would validate this narrow path, not the full H-12 ticket.
+- [x] H-12 Docker smoke: user reported the mocked and real-daemon cases
+      passing on their laptop at `cbb4ac8`. This validates only the prepared
+      composed-candidate comparison path, not the full H-12 ticket.
 
 - [ ] Real-Docker validation of the newer editor/CLI/canary, cleanup and guided
       paths on an appropriate machine. Earlier Docker tests covered older APIs.

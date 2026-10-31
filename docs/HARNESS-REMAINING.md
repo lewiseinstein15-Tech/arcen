@@ -1,11 +1,13 @@
 # Harness²: remaining work and safety status
 
-Status as of 30 October 2026. This is a work-in-progress implementation, not a claim
+Status as of 31 October 2026. This is a work-in-progress implementation, not a claim
 that the Harness² roadmap is complete. The earlier Omarchy Docker runs covered
 the then-current isolation and manual-campaign foundations, using mocked models
 and judges. Newer editor, CLI, canary and cleanup paths have not all been
-validated on real Docker or against a real external provider. See
-`docs/verify/README.md` for the exact evidence and revisions.
+validated on real Docker or against a real external provider. The user later
+reported the prepared H-12 composite comparison smoke test passing with real
+Docker at `cbb4ac8` (mocked model and judge). See `docs/verify/README.md` for
+the exact evidence and revisions.
 
 ## What works now
 

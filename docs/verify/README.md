@@ -1078,10 +1078,21 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
   PTY rendered by xterm.js/Chromium; 11 passed, 1 skipped. The composed-candidate
   flow uses a mocked Docker boundary here. The opt-in real-Docker case was
   skipped because this environment has no daemon; the screenshot is not a
-  Docker-validation result.
+  Docker-validation result. The user subsequently ran it on their laptop, as
+  reported below.
 - Full source suite: 1,224 passed, 14 skipped. Selected installed-wheel suite:
   25 passed, 1 skipped. Changed-file Ruff and wheel/docs checks passed. The
   prepared real-Docker test creates two disposable containers with a mocked
-  model and judge; it has not yet been run on the laptop. See
+  model and judge; it had not yet run on the laptop when this was captured. See
   `docs/HARNESS-H12-LAPTOP-TEST.md`. H-12 remains open regardless of this
   narrow test, and no adoption or autonomous composition is enabled.
+
+### User-reported H-12 real-Docker laptop result
+
+On 31 October 2026 the user reported building `arcen-h12-test:local` and
+running `tests/test_h12_docker.py` with `ARCEN_TEST_DOCKER_ISOLATION=1` at
+`cbb4ac8`. Their terminal showed `.. [100%]`: both test cases passed, one
+with real Docker and one with a mocked Docker boundary. Double-quiet pytest
+suppressed the numerical summary. The provider and judge were mocked. This
+was the user's report, not a daemon run in this workspace; no laptop screenshot
+was supplied. The full H-12 ticket remains open.

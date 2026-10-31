@@ -45,3 +45,12 @@ The test does not modify your original ARCEN checkout or push anything. It uses
 only fabricated prompt edits, a temporary test repository, and mocked model and
 judge responses. An interrupted daemon/container operation can still require
 manual inspection of Docker resources; do not assume cleanup after a crash.
+
+## User-reported laptop result
+
+On 31 October 2026 the user reported running the command above at commit
+`cbb4ac8` on their laptop. The image built successfully, and pytest displayed
+`.. [100%]`, indicating that both the mocked-boundary and opt-in real-Docker
+cases passed. Pytest's double-quiet configuration did not print a numerical
+summary. This is a user-reported result, not a test run in the agent workspace;
+the model and judge were mocked. It does not complete the H-12 parent ticket.
