@@ -121,6 +121,9 @@ merely because a sub-scope is complete.
 
 ## Verification still required
 
+- [x] H-12c Docker smoke: user reported 4 passed at `db75d86`; see
+      `docs/HARNESS-H12C-LAPTOP-TEST.md`. Provider and judgment were mocked;
+      H-12 and safe resume remain open.
 - [x] H-12 Docker smoke: user reported the mocked and real-daemon cases
       passing on their laptop at `cbb4ac8`. This validates only the prepared
       composed-candidate comparison path, not the full H-12 ticket.
