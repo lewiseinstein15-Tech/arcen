@@ -1133,3 +1133,11 @@ was supplied. The full H-12 ticket remains open.
   workspace hash is unsigned and checked only during this invocation; it is not
   persisted in the new plan. This does not authorize adoption or safe resume.
   Full H-12, behavioral selection and autonomous recursion remain open.
+
+### H-12c laptop Docker smoke-test preparation
+
+`H-12c-real-docker-test-preflight.png` is a fresh installed-package test run
+in a real PTY rendered by xterm.js/Chromium: two mocked-boundary cases passed,
+and both real-Docker cases were deliberately skipped because Docker is absent
+here. This is preparation, not a Docker pass. The opt-in laptop instructions
+and exact scope are in `docs/HARNESS-H12C-LAPTOP-TEST.md`.
