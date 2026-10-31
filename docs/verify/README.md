@@ -1071,3 +1071,17 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
   129 passed, 5 skipped. Changed-file Ruff, format, wheel and docs checks pass.
   No Docker daemon was available, the workflow has not run remotely, and
   H-17 and H-21 remain incomplete; no adoption or automatic resume enabled.
+
+### H-12 Docker laptop smoke-test preparation (not H-12 completion)
+
+- `H-12-real-laptop-test-preparation.png`: fresh installed-wheel tests in a real
+  PTY rendered by xterm.js/Chromium; 11 passed, 1 skipped. The composed-candidate
+  flow uses a mocked Docker boundary here. The opt-in real-Docker case was
+  skipped because this environment has no daemon; the screenshot is not a
+  Docker-validation result.
+- Full source suite: 1,224 passed, 14 skipped. Selected installed-wheel suite:
+  25 passed, 1 skipped. Changed-file Ruff and wheel/docs checks passed. The
+  prepared real-Docker test creates two disposable containers with a mocked
+  model and judge; it has not yet been run on the laptop. See
+  `docs/HARNESS-H12-LAPTOP-TEST.md`. H-12 remains open regardless of this
+  narrow test, and no adoption or autonomous composition is enabled.
