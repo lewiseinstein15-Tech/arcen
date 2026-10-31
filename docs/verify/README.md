@@ -1155,3 +1155,11 @@ The laptop real-Docker pass at `db75d86` preceded this change and does not
 validate schema v3. Hashes and the journal are unsigned, older plans remain
 unbound, and interrupted campaigns cannot be safely resumed automatically.
 No adoption or automatic selection is enabled; full H-12 remains open.
+
+### H-12d laptop Docker smoke-test preparation
+
+`H-12d-real-docker-test-preflight.png` is a fresh installed-wheel run in a real
+PTY rendered by xterm.js/Chromium. Four mock-boundary cases passed; four
+real-Docker cases were deliberately skipped because Docker is absent here. This
+is preparation, **not** a Docker pass. Exact opt-in instructions and limitations
+are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
