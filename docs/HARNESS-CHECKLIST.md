@@ -124,6 +124,9 @@ merely because a sub-scope is complete.
 
 ## Verification still required
 
+- [x] H-12d Docker smoke: user reported 8 passed at `2ff50ba`; see
+      `docs/HARNESS-H12D-LAPTOP-TEST.md`. Provider and judgment were mocked;
+      H-12 and safe resume remain open.
 - [x] H-12c Docker smoke: user reported 4 passed at `db75d86`; see
       `docs/HARNESS-H12C-LAPTOP-TEST.md`. Provider and judgment were mocked;
       H-12 and safe resume remain open.

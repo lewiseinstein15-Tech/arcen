@@ -52,3 +52,15 @@ private information. Do not paste credentials. If a test is interrupted,
 inspect `docker ps -a --filter label=arcen.turn` and do not automatically remove
 unrelated containers. The bundle requires base commit
 `779853b3cc7a81abf64190ff531c1e8961103462` in the previous checkout.
+
+## User-reported laptop result
+
+On 31 October 2026 the user reported running the above tests at commit
+`2ff50ba0311f2cd6eab8881bbe3b5b2a021b328b`, using Python 3.12.14 and the
+`arcen-h12-test:local` image. The image built successfully; pytest reported
+**8 passed in 41.59s**, with no skips. This is the user's terminal report, not
+an independent execution in the agent workspace. The successful opt-in cases
+used real Docker; the mismatch cases intentionally admitted no containers.
+Previous campaigns, model responses, operator confirmations and A/B judgment
+were mocked. This is a narrow smoke pass, not proof of full H-12, authenticated
+provenance, safe resume or security against every attack.
