@@ -118,3 +118,19 @@ def test_stop_does_not_cancel_an_already_acquired_slot():
         cap.stop()
         assert cap.active_trials == 1
     assert cap.active_trials == 0 and cap.snapshot().stopped
+
+
+def test_manual_campaign_reports_full_slot_without_claiming_budget_closed(tmp_path, monkeypatch):
+    from test_manual_campaign import run, setup
+
+    args = setup(tmp_path)
+    cap = make_budget()
+    events = []
+    monkeypatch.setattr(
+        probe_container, "DockerTurnRegistry", lambda *a, **kw: pytest.fail("docker")
+    )
+    with cap._trial_slot():
+        result = run(args, budget=cap, on_progress=events.append)
+    assert result.stop_reason == "concurrency_full" and result.reference is None
+    assert events[-1]["reason"] == "concurrency_full" and events[-1]["status"] == "stopped"
+    assert cap.snapshot().trials == 0 and not cap.snapshot().stopped

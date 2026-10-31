@@ -1059,7 +1059,7 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
 ### H-17d / H-21f — local concurrency and native executor (partial)
 
 - `H-17d-real-concurrency-tests.png`: fresh installed-wheel tests in a real PTY
-  rendered by xterm.js/Chromium; 9 passed. Docker/provider are mocked. A single
+  rendered by xterm.js/Chromium; 10 passed. Docker/provider are mocked. A single
   cooperating `SharedBudget` instance can reject concurrent probes without
   spending; uncertain cleanup stops it. This does not coordinate processes or
   terminate work already running.
@@ -1067,7 +1067,7 @@ are local tests, not proof that GitHub checkout or GHCR publishing succeeded.
   using the same real-terminal capture method; 5 passed. Docker/provider are
   mocked. A Python protocol is not evidence that an adapter is safe, and only
   ARCEN's native executor is wired into paired comparison.
-- Full source suite: 1,222 passed, 13 skipped. Selected installed-wheel suite:
-  111 passed, 4 skipped. Changed-file Ruff, format, wheel and docs checks pass.
+- Final source suite: 1,223 passed, 13 skipped. Selected installed-wheel suite:
+  129 passed, 5 skipped. Changed-file Ruff, format, wheel and docs checks pass.
   No Docker daemon was available, the workflow has not run remotely, and
   H-17 and H-21 remain incomplete; no adoption or automatic resume enabled.

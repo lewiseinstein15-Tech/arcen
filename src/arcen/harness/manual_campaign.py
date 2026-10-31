@@ -12,7 +12,7 @@ from pathlib import Path
 
 from arcen.config import ArcenConfig
 
-from .budget import BudgetExhausted, SharedBudget
+from .budget import BudgetExhausted, SharedBudget, TrialConcurrencyFull
 from .campaign_journal import CampaignJournal, CampaignStopped
 from .comparison import ReviewedComparison
 from .durable_budget import DurableBudget
@@ -194,6 +194,8 @@ def run_manual_campaign(
     progress.emit("harness.probe.start", candidate_id=baseline_id, role="reference")
     try:
         reference = _run_bound_probe(snapshot, cfg, reference_model)
+    except TrialConcurrencyFull:
+        return result("concurrency_full")
     except BudgetExhausted:
         return result("budget_closed")
     except ProbeUnavailable:
@@ -223,6 +225,8 @@ def run_manual_campaign(
             trial = _run_bound_probe(snapshot, cfg, model)
         except CampaignStopped:
             return result("stopped", candidate)
+        except TrialConcurrencyFull:
+            return result("concurrency_full", candidate)
         except BudgetExhausted:
             return result("budget_closed", candidate)
         except ProbeUnavailable:

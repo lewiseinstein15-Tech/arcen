@@ -20,6 +20,10 @@ class BudgetExhausted(HarnessError):
     """No new budgeted work may start."""
 
 
+class TrialConcurrencyFull(BudgetExhausted):
+    """This instance has no free trial slot; the budget remains open."""
+
+
 @dataclass(frozen=True, slots=True)
 class BudgetSnapshot:
     trials: int
@@ -113,7 +117,7 @@ class SharedBudget:
         with self._lock:
             self._check()
             if self._active_trials >= self._max_concurrent_trials:
-                raise BudgetExhausted("shared budget trial concurrency full")
+                raise TrialConcurrencyFull("shared budget trial concurrency full")
             self._active_trials += 1
         try:
             yield

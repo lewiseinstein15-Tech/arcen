@@ -19,6 +19,7 @@ _STOP_REASONS = frozenset(
     {
         "stopped",
         "budget_closed",
+        "concurrency_full",
         "reference_isolation_failed",
         "reference_failed",
         "candidate_isolation_failed",

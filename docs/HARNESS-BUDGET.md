@@ -45,8 +45,9 @@ snapshot also updates its existing clock/last-seen bookkeeping.
 
 An optional `max_concurrent_trials` limits **cooperating reviewed probes**
 that use the same `SharedBudget` instance in one process. A full slot raises
-`BudgetExhausted` without consuming an admission or latching the budget closed;
-there is no queue. The slot remains held until the reviewed probe returns after
+`TrialConcurrencyFull` (a `BudgetExhausted` subtype) without consuming an
+admission or latching the budget closed; the manual campaign reports
+`concurrency_full`, not `budget_closed`. There is no queue. The slot remains held until the reviewed probe returns after
 strict container cleanup. If the probe raises (including uncertain cleanup),
 the budget is stopped conservatively before the slot is released. Other work
 already admitted is not cancelled. `budget.active_trials` reports tracked
