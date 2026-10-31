@@ -86,8 +86,11 @@ the exact evidence and revisions.
    writing them; human review and separate composition remain required. The
    callback can discard unrelated edits and has no network, cost, or safety
    guarantee. A separate recorded-campaign CLI can accept manually authored
-   local replacement patches after explicit review; it does not automatically
-   resolve conflicts, call a model or perform behavioral-contrast selection.
+   local replacement patches after explicit review. It can optionally create
+   and run a separately confirmed, budget-bound composite test with an
+   invocation-only recorded-workspace hash check; that hash is unsigned and is
+   not stored in the plan. It does not automatically resolve conflicts or
+   perform behavioral-contrast selection.
    The task bank is a manual storage foundation only. There is no model-backed
    reflector, experience-guided editor, parallel candidate scheduling or
    sequential carry-forward recursion.

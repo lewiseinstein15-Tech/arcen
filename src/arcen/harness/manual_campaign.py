@@ -6,6 +6,7 @@ invoking this trusted Python API. It runs no editor and selects no winner.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -69,6 +70,7 @@ def run_manual_campaign(
     journal: CampaignJournal | None = None,
     campaign_id: str | None = None,
     on_progress: Callable[[dict], None] | None = None,
+    expected_workspace_sha256: str | None = None,
 ) -> ManualCampaignResult:
     """Compare reviewed candidates with one reference trial, sequentially.
 
@@ -104,6 +106,11 @@ def run_manual_campaign(
         raise HarnessError("campaign requires distinct candidate manifests")
     if not callable(judge):
         raise HarnessError("invalid judge callback")
+    if expected_workspace_sha256 is not None and (
+        type(expected_workspace_sha256) is not str
+        or not re.fullmatch(r"[0-9a-f]{64}", expected_workspace_sha256)
+    ):
+        raise HarnessError("invalid expected workspace hash")
     if (
         type(sensitive_values) is not tuple
         or len(sensitive_values) > 31
@@ -179,6 +186,8 @@ def run_manual_campaign(
         if journal is not None:
             journal.checkpoint(campaign_id, "reference", 0)
         snapshot = snapshot_git_commit(repo, commit)
+        if expected_workspace_sha256 is not None and snapshot.sha256 != expected_workspace_sha256:
+            return result("workspace_changed")
         _reject_snapshot_secrets(snapshot, hidden)
         if journal is not None:
             journal.checkpoint(campaign_id, "reference", 0)

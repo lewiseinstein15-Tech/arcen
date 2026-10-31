@@ -108,6 +108,10 @@ merely because a sub-scope is complete.
 - [x] H-12b: opt-in interactive conflict patch resolution for recorded manual
       campaigns, with local patch-file input, review and separate confirmation.
       No model call, trial, approval or adoption; full H-12 remains open.
+- [x] H-12c: optional separately confirmed test plan and manual paired campaign
+      for a selected composite, with an invocation-only recorded workspace hash
+      check. Evidence is unsigned and the hash is not persisted in the plan.
+      Automatic behavioral selection, recursion and H-12 remain open.
 - [x] H-17d: optional per-instance, in-process trial slots for SharedBudget;
       full slots fail without spending, and errors stop the budget. No durable
       concurrency, waiting, kill switch, hard runtime or spending enforcement.

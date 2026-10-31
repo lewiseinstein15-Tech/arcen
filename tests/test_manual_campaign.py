@@ -324,3 +324,15 @@ def test_each_judge_request_is_reduced_and_blinded(tmp_path, monkeypatch):
         reviewed_judge_inputs=True,
     )
     assert result.stop_reason is None and len(seen) == 2
+
+
+@pytest.mark.parametrize("expected", ["bad", "A" * 64, "0" * 63, [], True])
+def test_invalid_expected_workspace_hash_rejected_before_journal_or_snapshot(
+    tmp_path, monkeypatch, expected
+):
+    args = setup(tmp_path)
+    monkeypatch.setattr(module, "snapshot_git_commit", lambda *a: pytest.fail("snapshot"))
+    cap = budget()
+    with pytest.raises(HarnessError, match="invalid expected workspace"):
+        run(args, budget=cap, expected_workspace_sha256=expected)
+    assert cap.snapshot().trials == 0

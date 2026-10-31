@@ -147,10 +147,16 @@ def run_interactive(
     budget_id: str,
     *,
     task_id: str | None = None,
+    expected_workspace_sha256: str | None = None,
 ) -> int:
     """Review all inputs interactively, then run with a human A/B judge."""
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise HarnessError("campaign run requires an interactive terminal")
+    if expected_workspace_sha256 is not None and (
+        type(expected_workspace_sha256) is not str
+        or not re.fullmatch(r"[0-9a-f]{64}", expected_workspace_sha256)
+    ):
+        raise HarnessError("invalid expected workspace hash")
     from .cli import _diff_objects, _safe
     from .manual_campaign import run_manual_campaign
 
@@ -204,6 +210,11 @@ def run_interactive(
         f"Time until admission cutoff: {usage.admission_seconds_remaining:.1f}s (not a runtime limit)."
     )
     print("The plan is bound to this budget ID; verify the repository commit separately.")
+    if expected_workspace_sha256 is not None:
+        print(f"Required workspace SHA-256 for this invocation: {expected_workspace_sha256}")
+        print(
+            "This local hash is unsigned and is not persisted in the plan or an authenticity proof."
+        )
 
     def display_config(value: str) -> str:
         value = redact_text(value)
@@ -291,6 +302,7 @@ def run_interactive(
         journal=journal,
         campaign_id=record.id,
         on_progress=show_progress,
+        expected_workspace_sha256=expected_workspace_sha256,
     )
     for item in result.completed:
         print(f"Pending review: {item.review.id}  candidate: {item.candidate_id}")
@@ -630,15 +642,38 @@ def compose_recorded_interactive(
     review_ids: tuple[str, ...],
     *,
     resolve_conflicts: bool = False,
+    test_budget: str | None = None,
+    test_config: str | None = None,
+    test_repo: str | None = None,
 ) -> int:
-    """Inspect local comparison metadata, then explicitly compose; never adopt."""
+    """Inspect, compose and optionally plan/test with separate confirmations."""
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise HarnessError("recorded composition requires an interactive terminal")
     from .cli import _diff_objects, _safe
     from .evidence_composition import prepare_recorded_composition
 
+    options = (test_budget, test_config, test_repo)
+    testing = any(value is not None for value in options)
+    if testing and any(type(value) is not str or not value for value in options):
+        raise HarnessError(
+            "composite testing requires --test-budget, --test-config and --test-repo"
+        )
     inputs = prepare_recorded_composition(store, campaign_id, task_id, review_ids)
     campaign = inputs.campaign
+    if testing:
+        if not Path(test_repo).expanduser().is_dir():
+            raise HarnessError("composite test repository directory is missing")
+        cap = DurableBudget(store, test_budget)
+        cap.require_available(trials=2, model_calls=2, judge_calls=1)
+        config = _config(test_config)
+        try:
+            bind_probe_model(
+                store, campaign.baseline, campaign.baseline, inputs.task, config, budget=cap
+            )
+        except ProbeModelError:
+            raise HarnessError(
+                "composite test preflight rejected invalid or sensitive inputs"
+            ) from None
     print(f"Completed campaign: {campaign.id}; baseline: {campaign.baseline}")
     print(f"Commit: {campaign.commit}; task SHA-256: {campaign.task_sha256}")
     print(f"Recorded workspace SHA-256: {inputs.reviews[0].workspace_sha256}")
@@ -664,6 +699,11 @@ def compose_recorded_interactive(
     print(
         "A combined candidate is untested and unadopted and may persist even after later failures."
     )
+    if testing:
+        print(
+            "An optional composite test requires separate PLAN and RUN confirmations and may cost money."
+        )
+        print("The recorded workspace hash is unsigned; admission minima are not reservations.")
     _confirm(
         f"Type COMPOSE {campaign.id} to create an unadopted candidate: ", f"COMPOSE {campaign.id}"
     )
@@ -745,7 +785,45 @@ def compose_recorded_interactive(
     print(
         "No plan, trial, approval or adoption occurred. A separate reviewed comparison is required."
     )
-    return 0
+    if not testing:
+        return 0
+    print("The candidate already exists; cancellation may leave it in the store.")
+    print(
+        "The expected workspace hash is checked during this invocation, but not stored in the plan."
+    )
+    print(
+        "If a run is cancelled or interrupted, inspect the plan; later manual runs lack this hash check."
+    )
+    _confirm(
+        f"Type PLAN {result.candidate_id} to create a test plan: ", f"PLAN {result.candidate_id}"
+    )
+    if prepare_recorded_composition(store, campaign_id, task_id, review_ids) != inputs:
+        raise HarnessError("campaign, task or reviews changed since display")
+    cap.require_available(trials=2, model_calls=2, judge_calls=1)
+    plan = create_plan(
+        store,
+        campaign.baseline,
+        (result.candidate_id,),
+        None,
+        campaign.commit,
+        test_budget,
+        task_id=task_id,
+    )
+    print(f"Created composite test plan: {plan.id}; budget={test_budget}.")
+    from .lineage import HarnessLineage
+
+    adopted_id = HarnessLineage(store, read_only=True).resolve("refs/heads/adopted")
+    return run_interactive(
+        store,
+        adopted_id,
+        plan.id,
+        None,
+        test_config,
+        test_repo,
+        test_budget,
+        task_id=task_id,
+        expected_workspace_sha256=inputs.reviews[0].workspace_sha256,
+    )
 
 
 def canary_interactive(

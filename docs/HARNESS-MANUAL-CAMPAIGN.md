@@ -71,3 +71,9 @@ for journaled runs, but cannot resume them. There is no parallel/sequential recu
 resume, canary gate, authenticated approval, verifier fusion, spending governor,
 or adoption/rollback here. The standard `run_probe` remains blocked. See
 `HARNESS-BUDGET.md`, `HARNESS-PROBE.md`, and `HARNESS-COMPARISON.md`.
+
+An optional Python `expected_workspace_sha256` argument checks the archived
+workspace against a caller-supplied 64-character lowercase SHA-256 before the
+reference trial. A mismatch returns `workspace_changed`; a claimed journal is
+marked failed and no trial is admitted. The value is not stored in the journal,
+is not authenticated and cannot authorize adoption or safe resume.

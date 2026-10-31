@@ -1115,3 +1115,21 @@ was supplied. The full H-12 ticket remains open.
   newer code. Callbacks may expose data and cost money; local patch resolution
   is syntactic, untrusted and may discard other edits for the same path.
   Full H-12, behavioral selection and automatic recursion remain open.
+
+### H-12c — separately confirmed composite test continuation (partial)
+
+- `H-12c-real-composite-test-cases.png`: fresh installed-wheel tests in a real
+  PTY rendered by xterm.js/Chromium; 6 passed. Provider and Docker are mocked.
+  Tests cover separate confirmations, mismatch before trial, conflict-patch
+  continuation, cancellation, and changed local evidence.
+- `H-12c-real-composite-plan-cli.png`: fresh installed `arcen harness` command
+  in a real PTY using a disposable recorded-campaign fixture; its earlier model
+  and Docker work was mocked. The displayed composite was created locally, and
+  the screenshot stops before the `PLAN` confirmation: no new plan, provider
+  call, trial or adoption occurred during the captured command.
+- Final source suite: 1,257 passed, 14 skipped; selected installed-wheel suite:
+  68 passed, 2 skipped. Changed-file Ruff/format, wheel and docs checks passed.
+  The current change has not run with real Docker or remote CI. The recorded
+  workspace hash is unsigned and checked only during this invocation; it is not
+  persisted in the new plan. This does not authorize adoption or safe resume.
+  Full H-12, behavioral selection and autonomous recursion remain open.

@@ -89,3 +89,33 @@ arcen harness --store "$STORE" campaign compose "$CAMPAIGN" \
   --task-id "$TASK_ID" --review "$REVIEW_A" --review "$REVIEW_B" \
   --resolve-conflicts
 ```
+
+## Optional separately confirmed composite test
+
+The same command can continue into a manually confirmed paired test by adding
+all three options below. `--resolve-conflicts` may also be supplied if needed.
+
+```sh
+arcen harness --store "$STORE" campaign compose "$CAMPAIGN" \
+  --task-id "$TASK_ID" --review "$REVIEW_A" --review "$REVIEW_B" \
+  --test-budget "$BUDGET" --test-config ./arcen.yaml --test-repo .
+```
+
+The command requires the usual explicit `COMPOSE` confirmation, an additional
+`RESOLVE` confirmation if replacement patches are supplied, a `PLAN`
+confirmation to create a new budget-bound plan, and the existing `RUN`
+confirmation before any composite trial. Human A/B judgment remains required.
+It rechecks the linked local records before planning, then compares the actual
+Git archive SHA-256 against the workspace hash in the selected records before
+the first trial. A mismatch stops the new journal without admitting a trial.
+
+The hash and local reviews are **unsigned and unauthenticated**; their equality
+is not proof of provenance, safety, improvement or authorization. The expected
+hash is supplied only to this invocation and **is not persisted in the new
+plan**. Cancelling at `RUN` leaves a ready plan, and a later ordinary `campaign
+run` will not perform this recorded-hash check. Inspect or stop that plan and
+start a newly reviewed flow rather than assuming safe resume. A created
+composite may remain after cancellation, and a plan may remain after later
+failures. Admission checks are snapshots, not reservations, and model calls
+can disclose data and cost money. There are no token/USD or hard-runtime caps.
+No step selects a winner for adoption or moves refs.

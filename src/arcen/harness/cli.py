@@ -205,6 +205,9 @@ def _campaign_command(args) -> int:
             args.task_id,
             tuple(args.review),
             resolve_conflicts=args.resolve_conflicts,
+            test_budget=args.test_budget,
+            test_config=args.test_config,
+            test_repo=args.test_repo,
         )
     if args.campaign_command == "plan":
         from .manual_cli import create_plan
@@ -534,6 +537,9 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="interactively supply and review local replacement diff files for conflicts",
     )
+    compose.add_argument("--test-budget", help="durable budget for an optional composite test")
+    compose.add_argument("--test-config", help="reviewed provider configuration for the test")
+    compose.add_argument("--test-repo", help="reviewed repository containing the recorded commit")
     plan = campaign_commands.add_parser(
         "plan", help="record a manual comparison plan; no execution"
     )

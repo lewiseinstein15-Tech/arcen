@@ -27,6 +27,7 @@ _STOP_REASONS = frozenset(
         "judge_failed",
         "review_record_failed",
         "workspace_sensitive",
+        "workspace_changed",
     }
 )
 
