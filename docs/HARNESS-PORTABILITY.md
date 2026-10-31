@@ -63,3 +63,16 @@ and judge in that test are mocked. The corresponding CI configuration has not
 yet run remotely. Real Docker, independent environment profiles, an executor
 adapter contract, authenticated evidence, live-provider validation and the full
 H-21 acceptance criteria remain outstanding.
+
+## Native executor interface
+
+`arcen.harness.executor.ProbeExecutor` describes the Python shape of a trusted
+executor operating on an already bound model, reviewed config and Git snapshot.
+`NativeDockerProbeExecutor` delegates to the existing Docker-only reviewed probe;
+paired comparisons (and thus both portability profiles) use this implementation.
+It refuses non-Docker backends and non-disabled tool-container networking. External
+executors cannot currently be selected in the comparison or CLI, and no OpenCode
+or Codex adapter is implemented. A Python protocol or passing these contract tests
+does **not** verify an implementation's sandbox, identity, provenance, security
+or output. The native implementation still requires a trusted daemon and image;
+real Docker and independent profiles have not been validated here.

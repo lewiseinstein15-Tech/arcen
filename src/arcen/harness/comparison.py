@@ -15,12 +15,12 @@ from arcen.config import ArcenConfig
 
 from .budget import SharedBudget
 from .durable_budget import DurableBudget
+from .executor import NativeDockerProbeExecutor
 from .judge import Judgment, Trajectory, compare
 from .probe import ProbeUnavailable
 from .probe_execution import (
     ReviewedProbeResult,
     _reviewed_config,
-    _run_bound_probe,
 )
 from .probe_hygiene import _reject_snapshot_secrets
 from .probe_model import bind_probe_model
@@ -113,10 +113,11 @@ def run_reviewed_comparison(
     if expected_workspace_sha256 is not None and snapshot.sha256 != expected_workspace_sha256:
         raise HarnessError("reviewed workspace snapshot does not match expected hash")
     _reject_snapshot_secrets(snapshot, hidden)
-    reference = _run_bound_probe(snapshot, cfg, reference_model)
+    executor = NativeDockerProbeExecutor()
+    reference = executor.execute(snapshot, cfg, reference_model)
     if reference.status == "error":
         return ReviewedComparison(reference, None, None)
-    candidate = _run_bound_probe(snapshot, cfg, candidate_model)
+    candidate = executor.execute(snapshot, cfg, candidate_model)
     if candidate.status == "error":
         return ReviewedComparison(reference, candidate, None)
 

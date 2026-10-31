@@ -34,7 +34,9 @@ validated on real Docker or against a real external provider. See
   boundaries and budget binding for new CLI campaign plans. Shared and durable
   budgets can check a momentary minimum without reserving capacity; the
   portability API rejects an obvious shortfall before checking images or
-  starting trials. A later stop, expiry or competing consumer may still interrupt.
+  starting trials. An optional in-process SharedBudget cap limits cooperating
+  trial concurrency; durable/cross-process concurrency remains absent. A later
+  stop, expiry or competing consumer may still interrupt.
 - Reviewed trial archives reject exact occurrences of the configured provider
   key before Docker or provider calls. Paired/manual campaigns also check
   explicitly supplied sensitive values. Paired/campaign model inputs and
@@ -89,7 +91,7 @@ validated on real Docker or against a real external provider. See
    block based on canaries, live monitoring or automatic rollback.
 5. **H-17: full Governor.** Durable limits count cooperating admissions and
    have an admission cutoff. They do not enforce a USD/token budget, hard
-   runtime deadline, concurrency ceiling, provider billing guarantee,
+   runtime deadline, durable/cross-process concurrency ceiling, provider billing guarantee,
    in-flight kill switch, early elimination, convergence stopping or caching.
 6. **H-18–19: judging and probe hardening.** Reduced/blinded evidence and
    manual judgments do not constitute verifier fusion or a confidence gate.

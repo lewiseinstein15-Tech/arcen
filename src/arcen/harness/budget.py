@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from .resolver import HarnessError
@@ -49,6 +50,7 @@ class SharedBudget:
         max_model_calls: int,
         max_judge_calls: int,
         admission_seconds: float,
+        max_concurrent_trials: int | None = None,
     ):
         if any(
             type(x) is not int or not 0 <= x <= 100000
@@ -62,6 +64,12 @@ class SharedBudget:
             or not 0.1 <= admission_seconds <= 86400
         ):
             raise HarnessError("invalid shared budget limits")
+        if max_concurrent_trials is not None and (
+            type(max_concurrent_trials) is not int or not 1 <= max_concurrent_trials <= 100000
+        ):
+            raise HarnessError("invalid shared budget concurrency limit")
+        self._max_concurrent_trials = max_concurrent_trials
+        self._active_trials = 0
         self._limits = {
             "trials": max_trials,
             "model_calls": max_model_calls,
@@ -91,6 +99,36 @@ class SharedBudget:
             required = {"trials": trials, "model_calls": model_calls, "judge_calls": judge_calls}
             if any(self._limits[k] - self._used[k] < value for k, value in required.items()):
                 raise BudgetExhausted("insufficient available admissions for minimum")
+
+    @contextmanager
+    def _trial_slot(self):
+        """Limit cooperating trials in this process; no waiting or cancellation.
+
+        If execution/cleanup raises, close the budget conservatively before
+        releasing the slot; already admitted work may still be running.
+        """
+        if self._max_concurrent_trials is None:
+            yield
+            return
+        with self._lock:
+            self._check()
+            if self._active_trials >= self._max_concurrent_trials:
+                raise BudgetExhausted("shared budget trial concurrency full")
+            self._active_trials += 1
+        try:
+            yield
+        except BaseException:
+            self.stop()
+            raise
+        finally:
+            with self._lock:
+                self._active_trials -= 1
+
+    @property
+    def active_trials(self) -> int:
+        """Number of tracked in-process trials when the optional cap is set."""
+        with self._lock:
+            return self._active_trials
 
     def _reserve(self, category: str) -> None:
         with self._lock:

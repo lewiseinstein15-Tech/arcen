@@ -16,6 +16,7 @@ budget = SharedBudget(
     max_model_calls=8,
     max_judge_calls=2,
     admission_seconds=120,
+    max_concurrent_trials=1,  # optional, this instance/process only
 )
 # Pass budget=budget to run_reviewed_probe, run_reviewed_comparison,
 # or compare_reviewed_proposals, alongside their existing required arguments.
@@ -42,6 +43,18 @@ It is not a reservation: cooperating work can spend capacity immediately after
 this check. A stop or expired deadline still closes the budget. A durable
 snapshot also updates its existing clock/last-seen bookkeeping.
 
+An optional `max_concurrent_trials` limits **cooperating reviewed probes**
+that use the same `SharedBudget` instance in one process. A full slot raises
+`BudgetExhausted` without consuming an admission or latching the budget closed;
+there is no queue. The slot remains held until the reviewed probe returns after
+strict container cleanup. If the probe raises (including uncertain cleanup),
+the budget is stopped conservatively before the slot is released. Other work
+already admitted is not cancelled. `budget.active_trials` reports tracked
+slots only when this optional cap is configured; with no cap it remains zero.
+This is not durable or cross-process, does not police other budget objects or
+unbudgeted operations, and does not guarantee termination or orphan cleanup.
+`DurableBudget` and the CLI do not offer this concurrency cap.
+
 **Important limitations:**
 
 - The argument is optional for compatibility with existing experimental APIs.
@@ -58,7 +71,7 @@ snapshot also updates its existing clock/last-seen bookkeeping.
 - A judge admission counts one callback invocation, not its internal network
   requests. Provider SDK retries, billing, tokens, cached tokens, and USD are
   not metered or capped. Never describe these limits as a spending guarantee.
-- No concurrency semaphore, scheduler, kill of in-flight work, task/candidate
+- No cross-process concurrency semaphore, scheduler, kill of in-flight work, task/candidate
   `k` policy, pricing data, durable resume, budget events, convergence or
   canaries exist here. Limits apply only to the named admissions.
 - The trial, paired comparison and review records remain experimental. Human

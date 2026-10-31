@@ -183,6 +183,20 @@ def _run_bound_probe(
     *,
     canary: _CanaryCommands | None = None,
 ) -> ReviewedProbeResult:
+    """Run a reviewed probe within any configured in-process trial limit."""
+    if type(model.budget) is SharedBudget:
+        with model.budget._trial_slot():
+            return _run_bound_probe_inner(snapshot, cfg, model, canary=canary)
+    return _run_bound_probe_inner(snapshot, cfg, model, canary=canary)
+
+
+def _run_bound_probe_inner(
+    snapshot: GitSnapshot,
+    cfg: ArcenConfig,
+    model: BoundProbeModel,
+    *,
+    canary: _CanaryCommands | None = None,
+) -> ReviewedProbeResult:
     """Run already-validated model and snapshot; never accept either from a CLI."""
     _reject_snapshot_secrets(snapshot, model._known_values)
     if model.budget is not None:

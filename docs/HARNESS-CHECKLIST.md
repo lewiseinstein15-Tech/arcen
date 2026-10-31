@@ -101,6 +101,12 @@ merely because a sub-scope is complete.
       durable budgets; the portability API rejects obvious shortfalls before
       image checks or trials. Capacity can be consumed after the check; H-17
       and H-21 remain open, with no spending or runtime guarantee.
+- [x] H-17d: optional per-instance, in-process trial slots for SharedBudget;
+      full slots fail without spending, and errors stop the budget. No durable
+      concurrency, waiting, kill switch, hard runtime or spending enforcement.
+- [x] H-21f: trusted native Docker executor protocol/seam used by paired
+      comparisons, with mock contract tests. No selectable external adapter,
+      no real-Docker or remote-CI validation, and H-21 remains open.
 
 ## Verification still required
 
