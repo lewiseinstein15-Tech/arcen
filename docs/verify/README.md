@@ -1194,3 +1194,17 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   or undiscovered secrets. The selected snapshot is checked after each human
   confirmation but cannot be recalled after provider exposure. No live provider,
   autonomous learning, authenticated approval, adoption or full H-13 is claimed.
+
+### H-12e — read-only contrast advisory (partial)
+
+- `H-12e-real-contrast-advisory-cli.png` shows the installed CLI in a genuine
+  PTY rendered by xterm.js/Chromium. Earlier review records and judgments are a
+  fabricated disposable fixture; the displayed command does not call a model or
+  Docker, select/create candidates, run trials or move refs.
+- `H-12e-real-contrast-advisory-tests.png` is a fresh installed-wheel test run:
+  6 passed with provider and Docker mocked. Full source suite: 1,295 passed,
+  18 skipped; selected installed-wheel suite: 57 passed, 1 skipped. Changed-file
+  Ruff/format, wheel, docs and diff checks passed. Remote CI has not been run.
+- This is an unranked filter of unsigned local judgments, not independent
+  behavioral validation or proof of improvement, safety, approval, provenance,
+  automatic composition or H-12 completion.

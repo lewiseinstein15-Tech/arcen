@@ -89,8 +89,11 @@ the exact evidence and revisions.
    local replacement patches after explicit review. It can optionally create
    and run a separately confirmed, budget-bound composite test. New plans bind
    the unsigned recorded-workspace hash; older unbound plans are not upgraded
-   retroactively and do not have the guard. It does not automatically resolve conflicts or
-   perform behavioral-contrast selection.
+   retroactively and do not have the guard. A read-only advisory lists local
+   candidate wins, ties, losses and rejections using an explicit unranked rule;
+   these unsigned summaries are not independent behavioral evidence or an
+   automatic composition decision. It does not automatically resolve conflicts
+   or perform trustworthy behavioral-contrast selection.
    An optional model-drafted tentative lesson from an operator-supplied
    observation requires separate provider and save confirmations; it has no full
    trajectory and no automatic editor use. The editor can send up to three

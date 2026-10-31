@@ -196,6 +196,30 @@ def _campaign_command(args) -> int:
     from .campaign_journal import CampaignJournal
 
     store, lineage = _existing(args.store)
+    if args.campaign_command == "suggest":
+        from .contrast_suggestions import suggest_recorded_wins
+
+        report = suggest_recorded_wins(store, args.id, args.task_id)
+        print(f"Completed campaign: {report.campaign.id}; task SHA-256: {report.task_id}")
+        print(f"Baseline: {report.campaign.baseline}; commit: {report.campaign.commit}")
+        print(f"Recorded workspace SHA-256: {report.workspace_sha256}")
+        print("Unsigned local summaries can be fabricated; no trajectories are retained.")
+        print("Rule: candidate win and not rejected. Confidence is not ranked or a safety score.")
+        count = 0
+        for item in report.items:
+            if item.category == "candidate-win":
+                count += 1
+            print(f"Review: {item.review.id}; candidate: {item.review.candidate_id}")
+            print(
+                f"  recorded outcome: {item.review.judge_winner}; review state: {item.review.state}; category: {item.category}"
+            )
+            print("  changed paths: " + ", ".join(item.changed_paths))
+        print(f"Suggested for independent inspection: {count}; no candidates selected or created.")
+        print(
+            "Inspect reviews, diffs and external evidence; a composite needs separate confirmation and testing."
+        )
+        print("No provider calls, Docker, trial, approval, adoption or ref changes.")
+        return 0
     if args.campaign_command == "compose":
         from .manual_cli import compose_recorded_interactive
 
@@ -549,6 +573,11 @@ def main(argv: list[str] | None = None) -> int:
     for action in ("status", "stop"):
         command = campaign_commands.add_parser(action)
         command.add_argument("id")
+    suggest = campaign_commands.add_parser(
+        "suggest", help="read-only advisory filter of recorded candidate wins"
+    )
+    suggest.add_argument("id", help="completed campaign ID")
+    suggest.add_argument("--task-id", required=True, help="matching stored task SHA-256")
     compose = campaign_commands.add_parser(
         "compose", help="manually compose candidates from one completed campaign"
     )

@@ -50,6 +50,7 @@ jobs:
             "$GITHUB_WORKSPACE/tests/test_harness_conflict_resolution.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_conflict_cli.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_compose_test_workflow.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_contrast_suggestions.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_reflection_cli.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_experience_editor.py" \
             "$GITHUB_WORKSPACE/tests/test_budget_preflight.py" \

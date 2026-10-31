@@ -51,6 +51,7 @@ def main() -> int:
             "arcen/harness/portability.py",
             "arcen/harness/executor.py",
             "arcen/harness/conflict_resolution.py",
+            "arcen/harness/contrast_suggestions.py",
             "arcen/harness/progress.py",
             "arcen/harness/probe_hygiene.py",
             "arcen/harness/task_screen.py",

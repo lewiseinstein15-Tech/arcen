@@ -6,6 +6,33 @@ combine chosen candidates into an unadopted manifest. It is a manual aid, not
 an automatic winner selector, safe-recursion engine, authenticated approval or
 adoption gate.
 
+## Optional candidate-win advisory (H-12e, partial)
+
+After a completed local campaign, an operator can view a **read-only advisory**:
+
+```sh
+arcen harness --store "$STORE" campaign suggest "$CAMPAIGN" --task-id "$TASK_ID"
+```
+
+The rule flags a locally recorded `candidate` win only when its review has not
+been rejected. It shows ties, reference wins and rejected reviews separately;
+it neither ranks nor thresholds confidence. One low-confidence local preference
+can be flagged, while a useful tie or loss is omitted. An operator must inspect
+full available evidence, each `review show` diff and any conflict, then manually
+choose whether to compose and independently test the result. Fewer than two
+flagged records cannot satisfy the composer's 2–5 input requirement. This is not
+an automatic winner selection, behavioral validation, approval or adoption.
+
+Campaign and review databases are unsigned, can be forged, contain only reduced
+metadata, and are not an atomic cross-database snapshot. The advisory rechecks
+records during construction and validates their task, baseline, commit, candidate
+and recorded workspace associations, but a later change remains possible and
+hashes do not authenticate origin. The command does not call a provider, run
+Docker, mutate the store or move refs. It can run without an interactive TTY;
+the actual composer still requires separate human confirmation.
+
+## Manual selection and composition
+
 First run a manual campaign with multiple candidates using the same task,
 baseline, commit and budget. Use `campaign status CAMPAIGN_ID` to find its
 review IDs and `review show REVIEW_ID` to inspect them. Import the exact same

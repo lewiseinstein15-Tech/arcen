@@ -115,6 +115,9 @@ merely because a sub-scope is complete.
       journal schema v3 and enforce it on later manual starts. Older unbound
       plans remain unbound; no automatic resume, provenance or adoption.
       Automatic behavioral selection, recursion and H-12 remain open.
+- [x] H-12e: read-only advisory classification of locally recorded candidate
+      wins, ties, losses and rejections. Unsigned, not ranked or automatically
+      composed; full behavioral evidence and H-12 remain open.
 - [x] H-13a: separately confirmed budget-bound model draft from an operator
       observation and unsigned approved review, followed by independent SAVE.
       No trajectories, autonomous reflection, automatic editor injection or adoption;
