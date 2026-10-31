@@ -1208,3 +1208,18 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
 - This is an unranked filter of unsigned local judgments, not independent
   behavioral validation or proof of improvement, safety, approval, provenance,
   automatic composition or H-12 completion.
+
+### H-14b — reviewed parallel probe waves (partial)
+
+- `H-14b-real-parallel-trials-tests.png` shows a fresh installed-wheel test
+  run in a real PTY rendered by xterm.js/Chromium: 12 passed. Provider and
+  Docker boundaries are mocked; no adoption or resume takes place.
+- Full source suite: 1,307 passed, 18 skipped; selected installed-wheel suite:
+  85 passed, 4 skipped. Changed-file Ruff/format, wheel, docs and diff checks
+  passed. The updated CI configuration has not been executed remotely.
+- The Python-only primitive waits for a reference and then starts bounded
+  candidate waves against one snapshot with a shared in-process budget. It
+  does not judge, persist, select, adopt or resume. Budgets are not durable or
+  cross-process, preflight is non-reserving, and already-started work is not
+  canceled. This parallel path has not been tested with real Docker or a live
+  provider. Full H-14 remains open; see `docs/HARNESS-PARALLEL-TRIALS.md`.

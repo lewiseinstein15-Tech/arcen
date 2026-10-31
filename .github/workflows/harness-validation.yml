@@ -55,6 +55,7 @@ jobs:
             "$GITHUB_WORKSPACE/tests/test_harness_experience_editor.py" \
             "$GITHUB_WORKSPACE/tests/test_budget_preflight.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_concurrency.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_parallel_trials.py" \
             "$GITHUB_WORKSPACE/tests/test_portability_cli.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_task_screen.py" \
             "$GITHUB_WORKSPACE/tests/test_probe_known_values.py" \

@@ -99,9 +99,12 @@ the exact evidence and revisions.
    trajectory and no automatic editor use. The editor can send up to three
    explicitly selected, reviewed notes as untrusted context, but this is not
    authenticated or safe against all prompt injections. The task bank is a
-   manual storage foundation only. There is no autonomous reflector, full safe
-   experience-guidance, parallel candidate scheduling or
-   sequential carry-forward recursion.
+   manual storage foundation only. A reviewed Python API can now run one
+   reference followed by bounded parallel candidate waves with an in-process
+   shared budget; it has no judging, persistence, CLI, or recovery, and real
+   Docker and live providers have not been tested for this path. There is no
+   autonomous reflector, full safe experience-guidance, durable parallel
+   campaign scheduler or sequential carry-forward recursion.
 4. **H-15–16: adoption safety and canaries.** Static protected-file checks
    exist, but no authoritative policy gate or authenticated approval exists.
    The two small manual canaries are public and easy to game; there is no

@@ -43,6 +43,7 @@ def test_validation_workflow_has_matrix_wheel_and_explicit_docker_opt_in():
     assert "test_harness_contrast_suggestions.py" in selected
     assert "test_harness_reflection_cli.py" in selected
     assert "test_harness_experience_editor.py" in selected
+    assert "test_harness_parallel_trials.py" in selected
     docker = data["jobs"]["docker-isolation"]
     steps = {step["name"]: step for step in docker["steps"]}
     assert "docker build" in steps["Build local sandbox image"]["run"]

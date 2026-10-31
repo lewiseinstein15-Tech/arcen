@@ -61,6 +61,10 @@ merely because a sub-scope is complete.
 - [x] H-11g: guided selection of one to five candidates for a single manually
       confirmed sequential campaign, with lower-bound admission checks. This
       completes only this sub-scope, not H-11, H-14 or the Governor.
+- [x] H-14b: reviewed Python-only bounded parallel probe waves over one
+      reference and two to five candidates, using an in-process shared budget.
+      Mock-verified only; no judge, persistence, selection, adoption, automatic
+      resume, durable concurrency, or cross-process guarantees. H-14 remains open.
 - [x] H-11h: metadata-only best-effort manual campaign progress in the CLI
       and trusted callback API. Not durable, authenticated, replayable, or
       integrated into the session NDJSON stream; safe resume remains absent.
