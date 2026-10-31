@@ -40,6 +40,7 @@ def test_validation_workflow_has_matrix_wheel_and_explicit_docker_opt_in():
     assert "test_harness_conflict_resolution.py" in selected
     assert "test_harness_conflict_cli.py" in selected
     assert "test_harness_compose_test_workflow.py" in selected
+    assert "test_harness_reflection_cli.py" in selected
     docker = data["jobs"]["docker-isolation"]
     steps = {step["name"]: step for step in docker["steps"]}
     assert "docker build" in steps["Build local sandbox image"]["run"]
@@ -50,8 +51,13 @@ def test_validation_workflow_has_matrix_wheel_and_explicit_docker_opt_in():
     )
     live = steps["Run explicitly enabled real-Docker checks"]
     assert live["env"]["ARCEN_TEST_DOCKER_ISOLATION"] == "1"
+    assert (
+        live["env"]["ARCEN_H12_DOCKER_IMAGE"] == "ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0"
+    )
     for name in (
         "test_turn_isolation.py",
+        "test_h12c_docker.py",
+        "test_h12d_docker.py",
         "test_manual_campaign.py",
         "test_harness_canary.py",
         "test_harness_portability.py",

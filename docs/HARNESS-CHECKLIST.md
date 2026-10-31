@@ -115,6 +115,10 @@ merely because a sub-scope is complete.
       journal schema v3 and enforce it on later manual starts. Older unbound
       plans remain unbound; no automatic resume, provenance or adoption.
       Automatic behavioral selection, recursion and H-12 remain open.
+- [x] H-13a: separately confirmed budget-bound model draft from an operator
+      observation and unsigned approved review, followed by independent SAVE.
+      No trajectories, autonomous reflection, editor injection or adoption;
+      provider validation and the full H-13 ticket remain open.
 - [x] H-17d: optional per-instance, in-process trial slots for SharedBudget;
       full slots fail without spending, and errors stop the budget. No durable
       concurrency, waiting, kill switch, hard runtime or spending enforcement.

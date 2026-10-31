@@ -91,8 +91,10 @@ the exact evidence and revisions.
    the unsigned recorded-workspace hash; older unbound plans are not upgraded
    retroactively and do not have the guard. It does not automatically resolve conflicts or
    perform behavioral-contrast selection.
-   The task bank is a manual storage foundation only. There is no model-backed
-   reflector, experience-guided editor, parallel candidate scheduling or
+   An optional model-drafted tentative lesson from an operator-supplied
+   observation requires separate provider and save confirmations; it has no full
+   trajectory and no automatic editor use. The task bank is a manual storage
+   foundation only. There is no autonomous reflector, experience-guided editor, parallel candidate scheduling or
    sequential carry-forward recursion.
 4. **H-15–16: adoption safety and canaries.** Static protected-file checks
    exist, but no authoritative policy gate or authenticated approval exists.

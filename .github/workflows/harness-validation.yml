@@ -50,6 +50,7 @@ jobs:
             "$GITHUB_WORKSPACE/tests/test_harness_conflict_resolution.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_conflict_cli.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_compose_test_workflow.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_reflection_cli.py" \
             "$GITHUB_WORKSPACE/tests/test_budget_preflight.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_concurrency.py" \
             "$GITHUB_WORKSPACE/tests/test_portability_cli.py" \
@@ -86,11 +87,12 @@ jobs:
       - name: Run explicitly enabled real-Docker checks
         env:
           ARCEN_TEST_DOCKER_ISOLATION: "1"
+          ARCEN_H12_DOCKER_IMAGE: ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0
         run: |
           test -n "$ARCEN_PORTABILITY_IMAGE_A" && test -n "$ARCEN_PORTABILITY_IMAGE_B"
           test "$ARCEN_PORTABILITY_IMAGE_A" != "$ARCEN_PORTABILITY_IMAGE_B"
           python -m pytest -q \
-            tests/test_h12_docker.py tests/test_harness_portability.py tests/test_turn_isolation.py tests/test_probe_container.py tests/test_headless.py \
+            tests/test_h12_docker.py tests/test_h12c_docker.py tests/test_h12d_docker.py tests/test_harness_portability.py tests/test_turn_isolation.py tests/test_probe_container.py tests/test_headless.py \
             tests/test_probe_execution.py tests/test_harness_comparison.py \
             tests/test_manual_campaign.py tests/test_campaign_journal.py \
             tests/test_harness_budget.py tests/test_durable_budget.py \

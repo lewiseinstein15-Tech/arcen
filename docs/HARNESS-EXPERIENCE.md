@@ -1,10 +1,11 @@
 # Manually curated experience (experimental)
 
-`ExperienceLibrary` is an offline foundation for H-13, **not an automatic
-reflector or completed improvement library**. A trusted Python caller can store
-a manually written observation in the existing `MemoryStore` graph, associated
-with an approved local paired-review record. It never selects a candidate,
-changes the adopted ref, calls a model, or feeds notes into an editor prompt.
+`ExperienceLibrary` is a foundation for H-13, **not an automatic reflector or
+completed improvement library**. A trusted Python caller can store a manually
+written observation in the existing `MemoryStore` graph, associated with an
+approved local paired-review record. The library itself does not call a model;
+the separate optional CLI reflection workflow described below does. Neither
+selects a candidate, changes the adopted ref or feeds notes into an editor prompt.
 
 ```python
 from arcen.harness.experience import ExperienceLibrary
@@ -93,3 +94,37 @@ memory constructor can alter them. An interrupted initialization can leave an
 incomplete database that is refused on later access; inspect it and backups
 before any manual recovery. These controls do not authenticate records or turn
 local notes into trustworthy model input.
+
+## Optional model-drafted hypothesis (H-13a, partial)
+
+`experience reflect` takes an operator-written single-line observation file and
+an approved paired review, asks a pinned provider for one tentative hypothesis,
+then separately asks the operator whether to save it. It does not reconstruct
+or send full trajectories, conduct independent research, select a winner, or
+feed a lesson into the editor. The model cannot verify the observation and may
+hallucinate. The provider sees the observation, topic, recorded winner and
+confidence, and the baseline planner identity; it does **not** see the displayed
+review diff. Review and trust the full provider config and observation before
+confirming; data may leave the machine and the call may cost money.
+
+```sh
+arcen harness --store "$STORE" experience reflect careful-check \
+  --review "$REVIEW_ID" --observation-file ./observation.txt \
+  --config ./arcen.yaml --budget "$BUDGET"
+```
+
+The file must be a bounded regular UTF-8 file (no final symlink), with one
+single-line nonempty observation. Common-shaped secrets and the configured
+provider key are rejected, but secret/injection detection is incomplete.
+A budget-bound provider call is made only after exact `REFLECT REVIEW_ID`
+confirmation. The budget checks admissions, not USD or token spend; a failed
+call can consume an admission. Cancel before `SAVE TOPIC REVIEW_ID` to avoid
+writing. Review the displayed, untrusted draft independently: it may contain
+unsafe instructions despite the warning and format checks. Saved text is prefixed
+`Model-drafted hypothesis:` and retained in plaintext with normal lesson history
+and expiry; that label and the linked approval are unsigned and can be forged.
+The review is rechecked before saving; local databases are trusted and are not
+an atomic or authenticated evidence system. The observation and exact baseline
+are inspected before exposure, and the review and file are reread after the
+first confirmation. No automatic editor injection, adoption, recursion or safe
+resume is enabled. Paid-provider integration is not yet validated.

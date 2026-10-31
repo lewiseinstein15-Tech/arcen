@@ -312,6 +312,19 @@ def _experience_command(args) -> None:
 
         record_experience_interactive(store, lineage, args.topic, args.review)
         return
+    if args.experience_command == "reflect":
+        from .manual_cli import reflect_experience_interactive
+
+        reflect_experience_interactive(
+            store,
+            lineage,
+            args.topic,
+            args.review,
+            args.observation_file,
+            args.config,
+            args.budget,
+        )
+        return
     if not path.exists() and not path.is_symlink():
         if args.experience_command == "list":
             print("No stored experience notes.")
@@ -436,6 +449,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     record.add_argument("topic")
     record.add_argument("--review", required=True, help="approved paired review ID")
+    reflect = experience_commands.add_parser(
+        "reflect", help="draft a tentative lesson with explicit provider and save confirmations"
+    )
+    reflect.add_argument("topic")
+    reflect.add_argument("--review", required=True)
+    reflect.add_argument("--observation-file", required=True)
+    reflect.add_argument("--config", required=True)
+    reflect.add_argument("--budget", required=True)
     experience_commands.add_parser("list", help="list non-expired notes")
     show_experience = experience_commands.add_parser("show", help="show one non-expired note")
     show_experience.add_argument("topic")

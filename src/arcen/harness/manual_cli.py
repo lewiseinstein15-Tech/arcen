@@ -645,6 +645,118 @@ def record_experience_interactive(store: HarnessStore, lineage, topic: str, revi
     print("No model call, prompt change, selection or adoption occurred.")
 
 
+def reflect_experience_interactive(
+    store: HarnessStore,
+    lineage,
+    topic: str,
+    review_id: str,
+    observation_file: str,
+    config_file: str,
+    budget_id: str,
+) -> None:
+    """Generate an untrusted lesson hypothesis, with separately confirmed persistence."""
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        raise HarnessError("reflection requires an interactive terminal")
+    from .cli import _safe, _show_review
+    from .editor import _unique
+    from .experience import MAX_LESSON_BYTES, _approved, _validate_text, _validate_topic
+    from .experience_cli_store import open_cli_experience
+
+    _validate_topic(topic)
+    reviews = ReviewLedger(store)
+    record = _approved(reviews, review_id)
+    baseline = store.get_manifest(record.baseline_id)
+    packaged = default_manifest()
+    if (
+        baseline.schema_version != packaged.schema_version
+        or baseline.components != packaged.components
+    ):
+        raise HarnessError("reflection requires the unchanged packaged baseline")
+    observation = _read_text(observation_file, MAX_LESSON_BYTES + 1)
+    observation = observation.removesuffix("\n")
+    _validate_text(observation)
+    config = _config(config_file)
+    budget = DurableBudget(store, budget_id)
+    budget.require_available(trials=0, model_calls=1, judge_calls=0)
+    task = "Draft one tentative lesson from the operator supplied observation."
+    try:
+        _review_input(observation, config.provider.api_key)
+        model = bind_probe_model(
+            store, record.baseline_id, record.baseline_id, task, config, max_calls=1, budget=budget
+        )
+    except ProbeModelError:
+        raise HarnessError("reflection preflight rejected sensitive or invalid input") from None
+    try:
+        endpoint = urlsplit(config.provider.base_url).hostname or "provider default"
+    except ValueError:
+        raise HarnessError("invalid provider endpoint") from None
+
+    def display(value: str) -> str:
+        value = redact_text(value)
+        if config.provider.api_key:
+            value = value.replace(config.provider.api_key, "[REDACTED]")
+        return _safe(value)
+
+    _show_review(store, record, lineage)
+    print("Operator observation (sanitized; review the source separately):\n" + _safe(observation))
+    print(
+        f"Provider host: {display(endpoint)}; model: {display(config.provider.model)}; budget: {budget.id}"
+    )
+    print(
+        "One model call sends the observation, topic, recorded winner/confidence and baseline planner identity."
+    )
+    print("The full trajectory is not retained or sent. The model cannot verify the observation.")
+    print("Provider exposure may disclose data and cost money; admission is not a token/USD cap.")
+    print(
+        "The record is unsigned. Generated text is untrusted and may invent or contain instructions."
+    )
+    _confirm(f"Type REFLECT {review_id} to send: ", f"REFLECT {review_id}")
+    if reviews.get(review_id) != record:
+        raise HarnessError("review changed since display")
+    # Freeze the displayed file contents; changes after confirmation abort before sending.
+    reread = _read_text(observation_file, MAX_LESSON_BYTES + 1)
+    reread = reread.removesuffix("\n")
+    if reread != observation:
+        raise HarnessError("observation changed since display")
+    request = {
+        "topic": topic,
+        "observation": observation,
+        "recorded_winner": record.judge_winner,
+        "recorded_confidence": record.judge_confidence,
+        "instructions": "Return JSON with exactly lesson: one brief tentative, non-sensitive observation. Do not invent evidence.",
+    }
+    try:
+        response = model.complete(
+            "planner", [{"role": "user", "content": json.dumps(request, ensure_ascii=False)}]
+        ).text
+        value = json.loads(response, object_pairs_hook=_unique)
+        if type(value) is not dict or set(value) != {"lesson"}:
+            raise ValueError("unexpected response")
+        draft = value["lesson"]
+        _validate_text(draft)
+        if "[REDACTED]" in draft:
+            raise ValueError("redacted model output is not accepted as a lesson")
+        text = "Model-drafted hypothesis: " + draft
+        _validate_text(text)
+    except Exception:  # noqa: BLE001 — untrusted output and provider errors are not displayed
+        raise HarnessError("reflection failed; inspect budget before retrying") from None
+    print(
+        "Draft lesson (untrusted, sanitized; independently verify before saving):\n" + _safe(text)
+    )
+    print(
+        "Saving may supersede an existing topic and retains plaintext history; it does not authorize adoption."
+    )
+    _confirm(f"Type SAVE {topic} {review_id} to record: ", f"SAVE {topic} {review_id}")
+    if reviews.get(review_id) != record:
+        raise HarnessError("review changed since display")
+    with open_cli_experience(store, reviews, create=True) as library:
+        if reviews.get(review_id) != record:
+            raise HarnessError("review changed since display")
+        result = library.record(topic, text, review_id, reviewed=True)
+    print(f"Recorded untrusted model-drafted experience: topic={topic} operation={result['op']}")
+    print("No editor prompt, trial, ref or adoption changed.")
+
+
 def compose_recorded_interactive(
     store: HarnessStore,
     campaign_id: str,

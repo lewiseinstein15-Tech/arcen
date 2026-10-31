@@ -1163,3 +1163,20 @@ PTY rendered by xterm.js/Chromium. Four mock-boundary cases passed; four
 real-Docker cases were deliberately skipped because Docker is absent here. This
 is preparation, **not** a Docker pass. Exact opt-in instructions and limitations
 are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
+
+### H-13a — explicitly confirmed model-drafted lesson (partial)
+
+- `H-13a-real-reflection-confirm.png` is the installed `arcen harness` command
+  in a genuine PTY rendered by xterm.js/Chromium, using a disposable fabricated
+  local review and observation. Capture stops at `REFLECT`; no provider call,
+  lesson write, trial or adoption occurred.
+- `H-13a-real-reflection-tests.png` is a fresh installed-wheel terminal run:
+  12 passed with provider mocked. Full source suite: 1,278 passed, 18 skipped;
+  selected installed-wheel suite: 60 passed. Changed-file Ruff/format, wheel,
+  docs and diff checks passed. CI configuration includes these tests and the
+  H-12c/d Docker cases but has not run remotely at this revision.
+- Reflection consumes only an operator observation and unsigned metadata, not
+  retained trajectories; generated hypotheses can be wrong or adversarial.
+  Explicit `REFLECT` and `SAVE` are required, and no editor injection, adoption,
+  automatic reflection, safe resume or full H-13 completion is claimed. No live
+  external provider was used to validate this change.
