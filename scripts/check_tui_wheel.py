@@ -22,6 +22,7 @@ def main() -> int:
             "arcen/tui/fixtures/server-replan.jsonl",
             "arcen/tui/harness_demo.py",
             "arcen/tui/harness_progress.py",
+            "arcen/stream/events_v2.py",
             "arcen/prompts/system.md",
             "arcen/prompts/draft.md",
             "arcen/prompts/forge.md",

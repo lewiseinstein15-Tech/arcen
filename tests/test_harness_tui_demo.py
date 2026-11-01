@@ -81,6 +81,8 @@ async def test_demo_completes_headlessly_without_network_or_external_calls(monke
     async with app.run_test(headless=True, size=(132, 40)):
         await __import__("asyncio").wait_for(app.finished.wait(), 10)
         assert app.progress.accepted == 9
+        assert app.demo_emitter.last_seq == 9
+        assert all(event["ts"] > 0 for event in app.demo_emitter.replay(0))
         text = rendered(app.narration.items)
         assert "SIMULATED" in text and "no real execution" in text
         assert "No candidate was adopted" in text

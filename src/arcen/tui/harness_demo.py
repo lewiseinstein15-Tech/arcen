@@ -15,9 +15,12 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 
+from arcen.stream.emitter import StreamEmitter
+from arcen.stream.events_v2 import ProgressStream
+from arcen.tui.adapter import EventAdapter
 from arcen.tui.app import ArcenApp, Footer, Header
 from arcen.tui.cards.goal import goal_card
-from arcen.tui.harness_progress import HarnessProgressView
+from arcen.tui.harness_progress import register_v2_progress
 from arcen.tui.theme import TOKENS
 from arcen.tui.views.rail import RunStateRail
 from arcen.tui.views.stream import BackToLive, Narration, StreamView
@@ -122,13 +125,17 @@ class HarnessDemo(ArcenApp):
         self.narration.push(
             goal_card("SIMULATED Harness² campaign · no real execution or approval")
         )
-        self.progress = HarnessProgressView(self.narration)
+        self.adapter = EventAdapter(self.narration, self.rail)
+        self.progress = register_v2_progress(self.adapter)
+        self.demo_emitter = StreamEmitter("offline-simulated-harness")
+        self.demo_emitter.subscribe(self.adapter.apply)
+        self.demo_progress = ProgressStream(self.demo_emitter)
         asyncio.create_task(self.driver())
 
     async def driver(self) -> None:
         for event in simulated_progress():
             await asyncio.sleep(self.interval)
-            self.progress.apply(event)
+            self.demo_progress(event)
         self.finished.set()
         if self.headless_mode:
             await asyncio.sleep(0.2)

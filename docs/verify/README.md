@@ -1261,3 +1261,22 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
 - Provider responses were mocked; no judge, live provider, automatic resume,
   adoption or real-container crash recovery was tested. The earlier entries
   describe what was known at their capture time. Full H-14/H-17 remain open.
+
+### H-11i — opt-in campaign progress v2 bridge (partial)
+
+- `H-11i-real-v2-simulation.png` is a fresh installed `arcen-tui --demo
+  --harness` PTY capture rendered by xterm.js/Chromium. It is an explicitly
+  labelled, fabricated offline simulation; no campaign, Docker, provider,
+  approval or adoption occurred. The demo uses the new emitter bridge and
+  opt-in TUI registration.
+- `H-11i-real-v2-progress-tests.png` is a fresh installed-wheel terminal run:
+  **25 passed**; provider and Docker are mocked. Full source: **1,352 passed,
+  19 skipped**. Selected installed-wheel tests: **90 passed, 1 skipped**.
+  Changed-file Ruff/format, wheel, docs and diff checks passed. The updated CI
+  configuration has not been run remotely.
+- Seven metadata-only manual progress types can opt in to a session emitter.
+  The frozen legacy types and strict decoder are unchanged; the legacy TUI
+  ignores unknown types. Events are unauthenticated, best-effort narration,
+  not durable evidence or authorization. The live server and CLI are not wired
+  to this bridge, and the full architecture v2 event contract and H-11 remain
+  incomplete. No live provider was tested.

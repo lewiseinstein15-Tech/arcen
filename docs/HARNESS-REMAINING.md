@@ -30,6 +30,10 @@ the exact evidence and revisions.
   flow connects editor, optional manual syntactic composition, up to five
   human-selected sequential comparisons and pending reviews. Metadata-only,
   best-effort CLI progress reports are not a persistent or authenticated stream.
+  A Python-only opt-in bridge can stamp seven existing metadata events onto a
+  session emitter, and the offline demo renders them through a registered TUI
+  adapter. The live server/CLI are not wired to this bridge, which does not
+  provide the full v2 contract, durable history, authorization or resume.
   A separate command can compose human-selected candidates from a completed
   campaign's local summaries.
 - Durable journal and shared admission counts; optional stop at stage

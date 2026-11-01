@@ -65,6 +65,10 @@ merely because a sub-scope is complete.
       reference and two to five candidates, using an in-process shared budget.
       Mock-verified only; no judge, persistence, selection, adoption, automatic
       resume, durable concurrency, or cross-process guarantees. H-14 remains open.
+- [x] H-11i: opt-in metadata-only v2 progress bridge on the existing session
+      emitter, with strict decoding and optional TUI registration. The offline
+      demo exercises it; the live server and CLI do not. It is not the complete
+      v2 contract, durable evidence, approval or recovery. H-11 remains open.
 - [x] H-11h: metadata-only best-effort manual campaign progress in the CLI
       and trusted callback API. Not durable, authenticated, replayable, or
       integrated into the session NDJSON stream; safe resume remains absent.

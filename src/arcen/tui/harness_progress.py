@@ -1,7 +1,8 @@
 """Read-only rendering of local manual-campaign progress metadata.
 
-This is not wired to the live server event stream. Progress is best-effort,
-unsigned and non-authoritative; it never grants approval or changes refs.
+The optional registration below can consume validated v2 progress when an
+application explicitly connects it; the server is not wired to it. Progress is
+best-effort, unsigned and non-authoritative; it never grants approval or changes refs.
 """
 
 from __future__ import annotations
@@ -78,3 +79,32 @@ class HarnessProgressView:
         self.last_seq = event["seq"]
         self.accepted += 1
         return True
+
+
+def register_v2_progress(adapter):
+    """Opt in to metadata-only v2 cards on an existing event adapter.
+
+    This does not start a campaign or connect the server. Malformed or
+    unexpected fields are discarded, and unsigned records are not evidence.
+    Existing handlers are never replaced.
+    """
+    from arcen.stream.events import EventError
+    from arcen.stream.events_v2 import V2_PROGRESS_TYPES, progress_from_wire
+    from arcen.tui.adapter import EventAdapter
+
+    if type(adapter) is not EventAdapter:
+        raise ValueError("expected a TUI event adapter")
+    if any(kind in adapter.handlers for kind in V2_PROGRESS_TYPES):
+        raise ValueError("v2 progress handler already registered")
+    view = HarnessProgressView(adapter.narration)
+
+    def handle(event):
+        try:
+            progress = progress_from_wire(event)
+        except EventError:
+            return
+        view.apply(progress)
+
+    for kind in V2_PROGRESS_TYPES:
+        adapter.register_handler(kind, handle)
+    return view
