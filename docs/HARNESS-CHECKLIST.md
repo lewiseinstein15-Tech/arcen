@@ -61,6 +61,10 @@ merely because a sub-scope is complete.
 - [x] H-11g: guided selection of one to five candidates for a single manually
       confirmed sequential campaign, with lower-bound admission checks. This
       completes only this sub-scope, not H-11, H-14 or the Governor.
+- [x] H-17f: parallel-probe error handling reports whether its budget-stop calls
+      returned without error; failed stops end local scheduling and are not
+      presented as successful global stops. Mock-tested; no in-flight kill,
+      universal budget enforcement or complete H-17.
 - [x] H-14c: parallel probes reject mismatched or malformed result attribution
       and terminal status; an uncertain durable trial retains its slot. Mocked
       Docker/provider tests only. In-flight work may continue; H-14 remains open.

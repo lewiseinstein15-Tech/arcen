@@ -11,6 +11,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
+from threading import Lock
 
 from arcen.config import ArcenConfig
 
@@ -37,11 +38,14 @@ class TrialAttempt:
 
 @dataclass(frozen=True, slots=True)
 class ParallelTrials:
+    """Ephemeral results; stop-call success is not proof of a global stop."""
+
     reference: TrialAttempt
     candidates: tuple[TrialAttempt, ...]
     unstarted: tuple[str, ...]
     stop_reason: str | None
     workspace_sha256: str
+    budget_stop_call_succeeded: bool | None = None
 
 
 def run_reviewed_parallel_trials(
@@ -147,6 +151,24 @@ def run_reviewed_parallel_trials(
         raise HarnessError("reviewed workspace snapshot does not match expected hash")
     _reject_snapshot_secrets(snapshot, hidden)
     executor = NativeDockerProbeExecutor()
+    stop_lock = Lock()
+    stop_attempts: list[bool] = []
+
+    def stop_budget() -> None:
+        # A failed write cannot prove the shared budget closed. Still stop this
+        # invocation, await submitted work, and never expose exception details.
+        try:
+            budget.stop()
+        except Exception:  # noqa: BLE001 — store errors can contain sensitive details
+            succeeded = False
+        else:
+            succeeded = True
+        with stop_lock:
+            stop_attempts.append(succeeded)
+
+    def stop_status() -> bool | None:
+        with stop_lock:
+            return all(stop_attempts) if stop_attempts else None
 
     def attempt(model: BoundProbeModel) -> TrialAttempt:
         identifier = model.plan.candidate_id
@@ -170,17 +192,22 @@ def run_reviewed_parallel_trials(
         except BudgetExhausted:
             return TrialAttempt(identifier, "budget_closed", None)
         except ProbeUnavailable:
-            budget.stop()  # isolation or cleanup uncertainty: fail conservatively
+            stop_budget()  # isolation or cleanup uncertainty: fail conservatively
             return TrialAttempt(identifier, "unavailable", None)
         except Exception:  # noqa: BLE001 — provider and executor details may contain secrets
-            budget.stop()
+            stop_budget()
             return TrialAttempt(identifier, "unavailable", None)
         return TrialAttempt(identifier, "ok" if result.status == "ok" else "failed", result)
 
     reference = attempt(models[0])
     if reference.status != "ok":
         return ParallelTrials(
-            reference, (), candidate_ids, "reference_" + reference.status, snapshot.sha256
+            reference,
+            (),
+            candidate_ids,
+            "reference_" + reference.status,
+            snapshot.sha256,
+            stop_status(),
         )
     attempts: list[TrialAttempt] = []
     submitted = 0
@@ -188,9 +215,9 @@ def run_reviewed_parallel_trials(
     try:
         pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="arcen-probe")
     except Exception:  # noqa: BLE001 — no work started; avoid leaking executor errors
-        budget.stop()
+        stop_budget()
         return ParallelTrials(
-            reference, (), candidate_ids, "scheduler_unavailable", snapshot.sha256
+            reference, (), candidate_ids, "scheduler_unavailable", snapshot.sha256, stop_status()
         )
     with pool:
         for offset in range(0, len(candidate_ids), workers):
@@ -205,7 +232,7 @@ def run_reviewed_parallel_trials(
                     futures.append(pool.submit(attempt, model))
                     submitted += 1
                 except Exception:  # noqa: BLE001 — already submitted work is still awaited
-                    budget.stop()
+                    stop_budget()
                     stop_reason = "scheduler_unavailable"
                     break
             wave = tuple(future.result() for future in futures)
@@ -216,5 +243,10 @@ def run_reviewed_parallel_trials(
                 stop_reason = "candidate_wave_failed"
                 break
     return ParallelTrials(
-        reference, tuple(attempts), candidate_ids[submitted:], stop_reason, snapshot.sha256
+        reference,
+        tuple(attempts),
+        candidate_ids[submitted:],
+        stop_reason,
+        snapshot.sha256,
+        stop_status(),
     )

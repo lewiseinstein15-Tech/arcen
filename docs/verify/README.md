@@ -1378,3 +1378,23 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   prevent a persistent stop. The checks do not authenticate results or prove
   isolation; no automatic slot recovery, selection or adoption is provided.
   Full H-14 and H-17 remain open.
+
+### H-17f — budget-stop failure reporting (partial)
+
+- `H-17f-real-mock-stop.png` is a fresh installed `arcen-tui --no-serve` PTY
+  capture rendered by xterm.js/Chromium. A clearly simulated HTTP fixture
+  formatted a real parallel API result with a mocked executor and a deliberately
+  failing stop method over local SQLite. The parallel API itself does not emit
+  TUI events. No real Docker, external provider, adoption or resume was used.
+- `H-17f-real-stop-tests.png` shows **9 passed** on a fresh installed-wheel PTY
+  run. Python 3.13 full source suite: **1,463 passed, 19 skipped**. Selected
+  installed-wheel suites: **244 passed, 6 skipped** on both Python 3.12.16 and
+  3.13. Changed-file Ruff/format, wheel, docs and diff checks passed. The
+  expanded GitHub workflow has not yet run remotely.
+- The parallel result reports `budget_stop_call_succeeded`: `None` means no
+  outer stop call, `True` means all outer calls returned without exception,
+  and `False` means at least one raised. Failure ends scheduling in this
+  invocation and awaits already-started peers, but a durable stop may not be
+  recorded. Success is not independent read-back, a universal kill switch or
+  protection from callers bypassing the budget. Durable uncertain slots remain
+  occupied; no automatic recovery or safe resume is provided. H-17 remains open.

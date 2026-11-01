@@ -119,8 +119,10 @@ the exact evidence and revisions.
    or opt-in durable budget and cooperative persisted trial slots. Identity and
    terminal consistency are checked; a mismatch stops scheduling and retains
    an affected durable slot. This does not authenticate evidence, and a budget
-   stop may fail if its database fails. Results have no judging, persistence,
-   CLI, or recovery. The user reported a narrow
+   stop may fail if its database fails. The parallel result reports whether
+   this invocation's stop calls returned without error; that does not prove a
+   persistent or universal stop. Results have no judging, persistence, CLI, or
+   recovery. The user reported a narrow
    real-Docker smoke passing at `51d971a`, with the provider mocked; live
    providers remain untested for this path. There is no
    autonomous reflector, full safe experience-guidance, durable parallel
