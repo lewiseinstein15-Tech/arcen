@@ -1239,3 +1239,14 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   A killed process can leave an occupied slot without closing its budget. Local
   filesystem and database integrity are trusted. Real Docker and live provider
   behavior of this parallel path remain unverified. H-17 remains open.
+
+### H-17e — laptop Docker smoke preparation
+
+- `H-17e-real-laptop-preflight.png` shows a fresh installed-wheel PTY test run
+  via xterm.js/Chromium: **20 passed, 1 skipped**. The real-Docker test was
+  deliberately skipped here because no Docker daemon was available; the local
+  smoke used mocked Docker and provider responses.
+- `tests/test_h17e_docker.py` and `HARNESS-H17E-LAPTOP-TEST.md` prepare a
+  separate real-Docker run: one reference and two concurrent candidate
+  containers with a subprocess checking the durable slot cap. Provider is
+  mocked. Laptop result and remote CI are not yet known.

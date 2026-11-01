@@ -143,6 +143,10 @@ merely because a sub-scope is complete.
 
 ## Verification still required
 
+- [ ] H-17e real-Docker parallel smoke on the laptop. The prepared test and
+      instructions are in `HARNESS-H17E-LAPTOP-TEST.md`; the local preflight
+      used mock Docker and skipped the real-container case.
+
 - [x] H-12d Docker smoke: user reported 8 passed at `2ff50ba`; see
       `docs/HARNESS-H12D-LAPTOP-TEST.md`. Provider and judgment were mocked;
       H-12 and safe resume remain open.

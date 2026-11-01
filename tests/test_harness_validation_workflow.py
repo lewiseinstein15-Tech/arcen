@@ -45,6 +45,7 @@ def test_validation_workflow_has_matrix_wheel_and_explicit_docker_opt_in():
     assert "test_harness_experience_editor.py" in selected
     assert "test_harness_parallel_trials.py" in selected
     assert "test_durable_trial_slots.py" in selected
+    assert "test_h17e_docker.py" in selected
     docker = data["jobs"]["docker-isolation"]
     steps = {step["name"]: step for step in docker["steps"]}
     assert "docker build" in steps["Build local sandbox image"]["run"]
@@ -62,6 +63,8 @@ def test_validation_workflow_has_matrix_wheel_and_explicit_docker_opt_in():
         "test_turn_isolation.py",
         "test_h12c_docker.py",
         "test_h12d_docker.py",
+        "test_h17e_docker.py",
+        "test_durable_trial_slots.py",
         "test_manual_campaign.py",
         "test_harness_canary.py",
         "test_harness_portability.py",
