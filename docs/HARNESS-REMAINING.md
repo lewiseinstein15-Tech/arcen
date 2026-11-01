@@ -34,7 +34,11 @@ the exact evidence and revisions.
   session emitter. The offline demo and an opt-in live TUI reader can render
   them, including on replay, but the actual server and campaign CLI are not
   wired to produce these events. This bridge does not provide the full v2
-  contract, durable history, authorization or resume.
+  contract, durable history, authorization or resume. The live client drops
+  duplicate-key NDJSON and invalid type/sequence envelopes, and applies the
+  envelope check to replay; replay JSON duplicate keys are not checked. This
+  is not complete payload validation, authentication, resource bounding, or
+  protection against a validly shaped malicious stream.
   A separate command can compose human-selected candidates from a completed
   campaign's local summaries.
 - Durable journal and shared admission counts; optional stop at stage

@@ -36,6 +36,26 @@ TRANSPORT_FRAMES = frozenset({"stream.ping", "stream.done"})
 TERMINAL_EVENTS = frozenset({"run.done", "run.error"})
 
 
+def is_app_event(value: object) -> bool:
+    """Check the minimal live/replay envelope, not the event payload or origin."""
+    return (
+        type(value) is dict
+        and type(value.get("type")) is str
+        and bool(value["type"])
+        and type(value.get("seq")) is int
+        and value["seq"] > 0
+    )
+
+
+def _unique_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON field")
+        result[key] = value
+    return result
+
+
 class ArcenAPIError(RuntimeError):
     """A non-2xx server reply, carrying the FastAPI ``detail`` when present."""
 
@@ -172,7 +192,8 @@ class ArcenClient:
 
         Contract honored (same as the TypeScript reader):
 
-        - malformed JSON lines are skipped, never fatal;
+        - malformed or duplicate-key JSON lines are skipped;
+        - app events require a nonempty string type and positive integer seq;
         - seq-less transport frames (``stream.ping``) are invisible;
         - ``stream.done`` ends the iteration cleanly;
         - a 404 hold race is retried with backoff instead of surfacing;
@@ -220,18 +241,18 @@ class ArcenClient:
                                 continue
                             if event.get("type") == "stream.done":
                                 return
-                            if "seq" not in event:
-                                continue  # stream.ping and any future keepalive
-                            seen_seq = int(event.get("seq", seen_seq or 0))
+                            if not is_app_event(event):
+                                continue  # keepalives and malformed envelopes
+                            seen_seq = event["seq"]
                             yield event
                     if buffer.strip():
                         event = self._parse_line(buffer)
                         if (
                             event is not None
                             and event.get("type") != "stream.done"
-                            and "seq" in event
+                            and is_app_event(event)
                         ):
-                            seen_seq = int(event.get("seq", seen_seq or 0))
+                            seen_seq = event["seq"]
                             yield event
                     return
             except httpx.HTTPError as exc:
@@ -251,7 +272,7 @@ class ArcenClient:
         if not line:
             return None
         try:
-            data = json.loads(line)
-        except json.JSONDecodeError:
+            data = json.loads(line, object_pairs_hook=_unique_pairs)
+        except (ValueError, RecursionError):
             return None
         return data if isinstance(data, dict) else None

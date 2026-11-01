@@ -45,6 +45,7 @@ jobs:
           PYTHONPATH="$GITHUB_WORKSPACE/tests" python -m pytest --import-mode=importlib -o addopts='' -q \
             "$GITHUB_WORKSPACE/tests/test_harness_tui_demo.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_live_progress.py" \
+            "$GITHUB_WORKSPACE/tests/test_tui_stream_hygiene.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_stream_v2.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_fusion.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_portability.py" \

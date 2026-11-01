@@ -1313,3 +1313,25 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   unauthenticated narration. It does not wire a producer to the real ARCEN
   server or CLI and adds no campaign controls, approval, adoption or safe
   resume. Full H-20 remains open.
+
+### H-19f — malformed TUI stream envelope handling (partial)
+
+- `H-19f-real-stream-fixture.png` is a fresh installed `arcen-tui --no-serve
+  --url ... --harness-progress` capture from a real PTY using xterm.js/Chromium.
+  A labelled simulated local HTTP fixture sent fabricated progress interspersed
+  with duplicate-key, invalid-sequence and invalid-type frames. It did not run
+  a campaign, Docker, provider, approval or adoption. The image shows the
+  client running, not by itself proof of every rejected frame.
+- `H-19f-real-stream-tests.png` shows **13 passed** on a fresh installed-wheel
+  run with mock HTTP and replay, using the same PTY capture method. The Python
+  3.13 full source suite reported **1,371 passed, 19 skipped**; selected
+  installed-wheel tests reported **103 passed** on each of Python 3.12.16 and
+  3.13. Changed-file Ruff, wheel contents, docs and diff checks passed. Updated
+  GitHub CI has not yet run remotely.
+- Live NDJSON now rejects duplicate JSON keys and app frames without a nonempty
+  string type and positive non-boolean integer sequence. The same envelope
+  check protects replay, but duplicate keys in replay JSON are not detected.
+  Invalid frames do not advance the transport's reconnect cursor. This is not
+  complete legacy-payload validation, stream authentication, resource bounding
+  or safe resume; validly shaped malicious records and cursor jumps remain
+  possible. H-19 remains open.

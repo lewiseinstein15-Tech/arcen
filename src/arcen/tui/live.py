@@ -32,6 +32,7 @@ from arcen.tui.client import (
     TERMINAL_EVENTS,
     ArcenAPIError,
     ArcenClient,
+    is_app_event,
     new_session_id,
 )
 from arcen.tui.composer import COMMANDS, Composer
@@ -382,7 +383,9 @@ class LiveApp(ArcenApp):
         await self._stream_loop()
 
     def _apply_event(self, event: dict) -> bool:
-        seq = event.get("seq")
+        if not is_app_event(event):
+            return False
+        seq = event["seq"]
         last = self.adapter.state.last_seq
         if isinstance(seq, int) and not isinstance(seq, bool) and seq > last + 1:
             self._notice(f"event gap: expected {last + 1}, received {seq}")
