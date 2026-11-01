@@ -22,6 +22,7 @@ from .policy import review_candidate
 from .probe import ProbeUnavailable
 from .probe_execution import (
     ReviewedProbeResult,
+    _matches_bound_probe,
     _reviewed_config,
     _run_bound_probe,
 )
@@ -222,6 +223,12 @@ def run_manual_campaign(
             "harness.probe.done", candidate_id=baseline_id, role="reference", status="unavailable"
         )
         return result("reference_isolation_failed")
+    if not _matches_bound_probe(reference, snapshot, reference_model):
+        reference = None  # Do not return misattributed evidence to the caller.
+        progress.emit(
+            "harness.probe.done", candidate_id=baseline_id, role="reference", status="unavailable"
+        )
+        return result("reference_result_mismatch")
     progress.emit(
         "harness.probe.done",
         candidate_id=baseline_id,
@@ -253,6 +260,11 @@ def run_manual_campaign(
                 "harness.probe.done", candidate_id=candidate, role="candidate", status="unavailable"
             )
             return result("candidate_isolation_failed", candidate)
+        if not _matches_bound_probe(trial, snapshot, model):
+            progress.emit(
+                "harness.probe.done", candidate_id=candidate, role="candidate", status="unavailable"
+            )
+            return result("candidate_result_mismatch", candidate)
         progress.emit(
             "harness.probe.done",
             candidate_id=candidate,

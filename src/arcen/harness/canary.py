@@ -19,7 +19,12 @@ from .durable_budget import DurableBudget
 from .manifest import default_manifest
 from .policy import review_candidate
 from .probe import ProbeUnavailable
-from .probe_execution import _CanaryCommands, _reviewed_config, _run_bound_probe
+from .probe_execution import (
+    _CanaryCommands,
+    _matches_bound_probe,
+    _reviewed_config,
+    _run_bound_probe,
+)
 from .probe_model import bind_probe_model
 from .probe_workspace import snapshot_git_commit
 from .resolver import HarnessError
@@ -149,6 +154,9 @@ def run_manual_canaries(
         except (ProbeUnavailable, BudgetExhausted):
             findings.append(CanaryFinding(case.id, "inconclusive", "not-run"))
             return report("inconclusive")
+        if not _matches_bound_probe(reference, snapshot, reference_model):
+            findings.append(CanaryFinding(case.id, "inconclusive", "not-run"))
+            return report("inconclusive")
         if reference.status == "error" or reference.canary_passed is None:
             findings.append(CanaryFinding(case.id, "inconclusive", "not-run"))
             return report("inconclusive")
@@ -158,6 +166,9 @@ def run_manual_canaries(
         try:
             candidate = _run_bound_probe(snapshot, cfg, candidate_model, canary=_commands(case))
         except (ProbeUnavailable, BudgetExhausted):
+            findings.append(CanaryFinding(case.id, "passed", "inconclusive"))
+            return report("inconclusive")
+        if not _matches_bound_probe(candidate, snapshot, candidate_model):
             findings.append(CanaryFinding(case.id, "passed", "inconclusive"))
             return report("inconclusive")
         if candidate.status == "error" or candidate.canary_passed is None:

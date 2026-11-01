@@ -19,6 +19,14 @@ completed comparisons and records. It never selects a winner, approves a
 review, moves a ref, enables candidate selection or adopts. A baseline need not
 be the currently adopted one; later gates must independently verify freshness.
 
+Before judging or recording, each trial result must match the bound baseline,
+selected candidate, commit and workspace digest, and carry a consistent final
+status event. A mismatch stops this campaign with `reference_result_mismatch`
+or `candidate_result_mismatch`; earlier pending records remain. If the journal
+is still running it is marked failed; an already stopped journal remains stopped.
+A shared budget is not automatically closed. These consistency checks do not authenticate results or prove Docker
+isolation, cleanup, correctness, or resistance to a malicious executor.
+
 A `SharedBudget` or SQLite-backed `DurableBudget` and a `ReviewLedger` for the
 same store are mandatory. See `HARNESS-DURABLE-BUDGET.md` for the durable option. The budget reserves a trial per container, a call per bound probe
 model invocation and a callback admission per judge invocation; the baseline is

@@ -54,6 +54,28 @@ class ReviewedProbeResult:
     canary_passed: bool | None = None
 
 
+def _matches_bound_probe(result: object, snapshot: GitSnapshot, model: BoundProbeModel) -> bool:
+    """Check local result attribution, not authenticity, isolation or correctness."""
+    return (
+        type(result) is ReviewedProbeResult
+        and result.baseline_id == model.plan.baseline_id
+        and result.candidate_id == model.plan.candidate_id
+        and result.commit == snapshot.commit
+        and result.workspace_sha256 == snapshot.sha256
+        and type(result.status) is str
+        and result.status in {"ok", "failed", "error"}
+        and type(result.events) is tuple
+        and bool(result.events)
+        and type(result.events[-1]) is dict
+        and (
+            result.events[-1].get("type") == "run.error"
+            if result.status == "error"
+            else result.events[-1].get("type") == "run.done"
+            and result.events[-1].get("status") == result.status
+        )
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _CanaryCommands:
     """Trusted, code-defined commands; not a public verifier authority."""

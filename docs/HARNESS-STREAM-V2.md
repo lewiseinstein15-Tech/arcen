@@ -5,7 +5,8 @@ wire representation: `harness.campaign.start`, `harness.policy`,
 `harness.probe.start`, `harness.probe.done`, `harness.judge`, `harness.review`,
 and `harness.campaign.done`. Their content is limited to IDs, enumerated
 statuses, counts and confidence. They contain no task text, transcript, patch,
-provider output or credentials. Best-effort validation does not authenticate
+provider output or credentials. New mismatch stop-reason values were added in
+H-11j; older strict v2 readers may discard those particular stop events. Best-effort validation does not authenticate
 local records and cannot make an untrusted process or subscriber safe.
 
 A trusted Python caller can pass `ProgressStream(emitter)` as the existing

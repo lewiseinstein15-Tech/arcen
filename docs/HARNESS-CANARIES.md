@@ -48,7 +48,10 @@ it. The normal probe's TEMPER check may rerun the model's last command.
 For each case, a baseline error or failure yields **inconclusive** and stops.
 If the baseline passes but the candidate fails, the report is **regression**
 and stops. Infrastructure errors, malformed verifier results and budget
-exhaustion are inconclusive, not regression or success. Only when both pass
+exhaustion are inconclusive, not regression or success. A result with a
+mismatched baseline, candidate, commit, workspace or terminal status is also
+inconclusive. This is a local consistency check, not authenticated evidence or
+proof that the intended case ran. Only when both pass
 both cases is the report **passed**. Output is ephemeral and unsigned; no
 journal, authenticated evidence, persistent canary history or acceptance gate
 is produced. Existing Python callers and local databases are trusted and can

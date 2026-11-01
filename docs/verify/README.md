@@ -1335,3 +1335,26 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   complete legacy-payload validation, stream authentication, resource bounding
   or safe resume; validly shaped malicious records and cursor jumps remain
   possible. H-19 remains open.
+
+### H-11j / H-21g — probe-result attribution checks (partial)
+
+- `H-11j-real-mock-campaign.png` is a fresh installed `arcen-tui --no-serve
+  --url ... --harness-progress` PTY capture rendered by xterm.js/Chromium. A
+  labelled simulated HTTP fixture replayed progress from the actual manual
+  campaign code after its candidate result was deliberately altered. Docker,
+  provider and the fixture server were mocked; no real isolation, external
+  model, approval or adoption was exercised.
+- `H-11j-real-probe-tests.png` shows **63 passed** on a fresh installed-wheel
+  PTY test run. Python 3.13 full source suite: **1,434 passed, 19 skipped**.
+  Selected installed-wheel suites: **195 passed, 5 skipped** on Python 3.12.16
+  and 3.13. Changed-file Ruff/format, wheel, docs and diff checks passed.
+  Updated GitHub CI has not yet run remotely.
+- The manual campaign, paired comparison and manual canary now check local
+  result type, baseline/candidate IDs, commit, workspace hash and terminal
+  status against bound inputs before further processing. Mismatches stop the
+  current campaign, prevent the paired judge or produce an inconclusive canary.
+  Prior pending records can remain, and the shared budget is not automatically
+  stopped. These checks are not authenticated evidence, a sandbox proof, a
+  guarantee that a canary case actually ran, or safe resume. Earlier strict v2
+  readers may drop the two newly added mismatch stop reasons. H-11, H-16 and
+  H-21 remain open.
