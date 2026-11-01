@@ -104,8 +104,9 @@ the exact evidence and revisions.
    manual storage foundation only. A reviewed Python API can now run one
    reference followed by bounded parallel candidate waves with an in-process
    or opt-in durable budget and cooperative persisted trial slots. Results have
-   no judging, persistence, CLI, or recovery, and real
-   Docker and live providers have not been tested for this path. There is no
+   no judging, persistence, CLI, or recovery. The user reported a narrow
+   real-Docker smoke passing at `51d971a`, with the provider mocked; live
+   providers remain untested for this path. There is no
    autonomous reflector, full safe experience-guidance, durable parallel
    campaign scheduler or sequential carry-forward recursion.
 4. **H-15–16: adoption safety and canaries.** Static protected-file checks

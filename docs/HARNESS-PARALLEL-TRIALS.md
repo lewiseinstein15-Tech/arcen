@@ -39,6 +39,7 @@ kill, provider billing cap, fair queue, crash recovery or safe automatic resume.
 a process crash may lose accounting. Snapshot and model hashes are not trust
 or authorization. Secret checks are incomplete, local artifacts and providers
 remain untrusted, and the API does not establish improvement or approve a
-candidate. Do not use it for unattended recursion or adoption. Real Docker and
-live-provider behavior of this parallel path have not been verified; tests
-mock both boundaries. The full H-14 ticket remains open.
+candidate. Do not use it for unattended recursion or adoption. The user
+reported a narrow real-Docker smoke passing at `51d971a`, with provider mocked;
+live-provider behavior remains untested. This is not a safety proof. The full
+H-14 ticket remains open.

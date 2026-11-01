@@ -48,3 +48,16 @@ paste credentials. If interrupted, inspect `docker ps -a --filter label=arcen.tu
 do not remove unrelated containers. Passing this smoke test is not a full
 security certification, safe crash recovery, universal concurrency enforcement,
 a live-provider validation, or completion of H-14/H-17.
+
+## User-reported laptop result
+
+The user reported running the commands above at commit
+`51d971a32240dafb26c7a478c7fda5371652c74d` with Python 3.12.14 and image
+`arcen-h12-test:local`. The image built successfully, and pytest reported
+**21 passed in 55.69s**, with no skips. This is the user's terminal report, not
+an independent execution in the agent workspace. One test used three real
+Docker containers, including two concurrently held candidates; the other
+process checked the SQLite slot limit. Model responses were mocked; no judge or
+paid provider was used. This narrow smoke does not validate live-provider
+behavior, container crash recovery, universal concurrency enforcement, safe
+resume, adoption, or the complete H-14/H-17 tickets.

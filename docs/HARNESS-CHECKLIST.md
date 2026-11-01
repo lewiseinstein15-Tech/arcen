@@ -133,7 +133,8 @@ merely because a sub-scope is complete.
       with a persisted per-budget cap across cooperating local processes.
       Crashed/uncertain slots are never automatically reclaimed; other APIs can
       bypass this cap. No kill switch, trusted cross-host scheduler or automatic
-      resume. Real Docker and remote CI have not been tested. H-17 remains open.
+      resume. A narrow real-Docker smoke passed on the laptop with the provider
+      mocked; remote CI has not been tested. H-17 remains open.
 - [x] H-17d: optional per-instance, in-process trial slots for SharedBudget;
       full slots fail without spending, and errors stop the budget. No durable
       concurrency, waiting, kill switch, hard runtime or spending enforcement.
@@ -143,9 +144,9 @@ merely because a sub-scope is complete.
 
 ## Verification still required
 
-- [ ] H-17e real-Docker parallel smoke on the laptop. The prepared test and
-      instructions are in `HARNESS-H17E-LAPTOP-TEST.md`; the local preflight
-      used mock Docker and skipped the real-container case.
+- [x] H-17e real-Docker parallel smoke: user reported 21 passed, no skips at
+      `51d971a`; see `HARNESS-H17E-LAPTOP-TEST.md`. The provider was mocked;
+      crash recovery, live providers and full H-17 remain unverified.
 
 - [x] H-12d Docker smoke: user reported 8 passed at `2ff50ba`; see
       `docs/HARNESS-H12D-LAPTOP-TEST.md`. Provider and judgment were mocked;

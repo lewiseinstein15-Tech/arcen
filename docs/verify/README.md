@@ -1250,3 +1250,14 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   separate real-Docker run: one reference and two concurrent candidate
   containers with a subprocess checking the durable slot cap. Provider is
   mocked. Laptop result and remote CI are not yet known.
+
+### H-17e — user-reported laptop Docker result
+
+- The user reported commit `51d971a32240dafb26c7a478c7fda5371652c74d`,
+  Python 3.12.14 and image `arcen-h12-test:local`: **21 passed in 55.69s**,
+  with no skips. This is a terminal report, not a screenshot or independent
+  execution by the agent. The real-Docker test held two candidate containers
+  concurrently and checked the durable cap from another local process.
+- Provider responses were mocked; no judge, live provider, automatic resume,
+  adoption or real-container crash recovery was tested. The earlier entries
+  describe what was known at their capture time. Full H-14/H-17 remain open.
