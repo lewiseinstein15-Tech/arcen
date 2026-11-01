@@ -1223,3 +1223,19 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   cross-process, preflight is non-reserving, and already-started work is not
   canceled. This parallel path has not been tested with real Docker or a live
   provider. Full H-14 remains open; see `docs/HARNESS-PARALLEL-TRIALS.md`.
+
+### H-17e — cooperative durable trial slots (partial)
+
+- `H-17e-real-durable-concurrency-tests.png` is a fresh installed-wheel run
+  in a real PTY rendered by xterm.js/Chromium: 19 passed. It uses real local
+  SQLite and an independently killed subprocess; provider and Docker are
+  mocked for the parallel probe path.
+- Full source suite: 1,326 passed, 18 skipped; selected installed-wheel suite:
+  85 passed, 3 skipped. Changed-file Ruff/format, wheel, docs and diff checks
+  passed. The updated CI has not been executed remotely.
+- SQLite slots are opt-in, per durable budget, for cooperating local processes
+  using the reviewed parallel API. Other APIs can bypass the cap; no distributed
+  lease, in-flight kill, automatic reclaim, safe resume or adoption is provided.
+  A killed process can leave an occupied slot without closing its budget. Local
+  filesystem and database integrity are trusted. Real Docker and live provider
+  behavior of this parallel path remain unverified. H-17 remains open.

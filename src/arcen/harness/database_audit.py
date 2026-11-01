@@ -19,6 +19,7 @@ _DATABASES = (
     "reviews.sqlite3",
     "campaigns.sqlite3",
     "budgets.sqlite3",
+    "trial_slots.sqlite3",
     "experience.sqlite3",
 )
 
@@ -71,6 +72,10 @@ def audit_auxiliary_databases(store: HarnessStore) -> int:
                 from .durable_budget import DurableBudget
 
                 DurableBudget.validate_database_schema(store)
+            elif name == "trial_slots.sqlite3":
+                from .durable_trial_slots import DurableTrialSlots
+
+                DurableTrialSlots.validate_database_schema(store)
         except (sqlite3.Error, OSError, HarnessError):
             raise HarnessError(f"invalid auxiliary database: {name}") from None
         count += 1

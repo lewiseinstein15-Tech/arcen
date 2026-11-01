@@ -129,6 +129,11 @@ merely because a sub-scope is complete.
 - [x] H-13b: up to three operator-selected, baseline-matched active notes can
       be separately confirmed as untrusted editor context. No automatic injection,
       safety guarantee or adoption; full H-13 remains open.
+- [x] H-17e: opt-in SQLite trial slots for the reviewed parallel Python API,
+      with a persisted per-budget cap across cooperating local processes.
+      Crashed/uncertain slots are never automatically reclaimed; other APIs can
+      bypass this cap. No kill switch, trusted cross-host scheduler or automatic
+      resume. Real Docker and remote CI have not been tested. H-17 remains open.
 - [x] H-17d: optional per-instance, in-process trial slots for SharedBudget;
       full slots fail without spending, and errors stop the budget. No durable
       concurrency, waiting, kill switch, hard runtime or spending enforcement.

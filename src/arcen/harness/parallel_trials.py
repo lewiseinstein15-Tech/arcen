@@ -1,8 +1,8 @@
 """Explicit, bounded in-process parallel probes; no judge, selection or resume.
 
-Only cooperating work sharing the same SharedBudget is counted. The local
-caller, provider, Git and Docker daemon/image are trusted. In-flight work is
-not killed when a peer fails, and there is no durable or cross-process limit.
+Only cooperating work using the same budget and, for durable budgets, the
+same slot database is counted. The local caller, provider, Git and Docker
+daemon/image are trusted. In-flight work is not killed when a peer fails.
 """
 
 from __future__ import annotations
@@ -15,6 +15,8 @@ from pathlib import Path
 from arcen.config import ArcenConfig
 
 from .budget import BudgetExhausted, SharedBudget, TrialConcurrencyFull
+from .durable_budget import DurableBudget
+from .durable_trial_slots import DurableTrialSlots
 from .executor import NativeDockerProbeExecutor
 from .manifest import default_manifest
 from .probe import ProbeUnavailable
@@ -51,8 +53,9 @@ def run_reviewed_parallel_trials(
     *,
     repo: str | Path,
     commit: str,
-    budget: SharedBudget,
+    budget: SharedBudget | DurableBudget,
     workers: int,
+    durable_slots: DurableTrialSlots | None = None,
     reviewed_inputs: bool = False,
     max_model_calls_per_trial: int = 4,
     sensitive_values: tuple[str, ...] = (),
@@ -61,14 +64,25 @@ def run_reviewed_parallel_trials(
     """Run a reference then bounded waves of independent candidate probes.
 
     All trials share one archived Git snapshot, reviewed inputs and a shared
-    in-process admission budget. A failed wave prevents later waves, but its
+    admission budget. Durable budgets additionally require matching persisted
+    trial slots, which only limit cooperating users. A failed wave prevents later waves, but its
     other already-started work is awaited, not cancelled. Results are ephemeral
     and unjudged. This does not select, approve, adopt, persist or resume.
     """
     if reviewed_inputs is not True:
         raise HarnessError("explicit review of parallel trial inputs is required")
-    if type(store) is not HarnessStore or type(budget) is not SharedBudget:
-        raise HarnessError("parallel trials require a store and shared in-process budget")
+    if type(store) is not HarnessStore or type(budget) not in (SharedBudget, DurableBudget):
+        raise HarnessError("parallel trials require a store and supported shared budget")
+    if type(budget) is SharedBudget:
+        if durable_slots is not None:
+            raise HarnessError("in-process budget cannot use durable trial slots")
+    elif (
+        type(durable_slots) is not DurableTrialSlots
+        or durable_slots.budget.id != budget.id
+        or durable_slots.budget.store.root != budget.store.root
+        or budget.store.root != store.root
+    ):
+        raise HarnessError("durable budget requires matching durable trial slots")
     if (
         type(baseline_id) is not str
         or type(candidate_ids) is not tuple
@@ -80,6 +94,8 @@ def run_reviewed_parallel_trials(
         raise HarnessError("parallel trials require 2 to 5 distinct candidates")
     if type(workers) is not int or not 1 <= workers <= min(4, len(candidate_ids)):
         raise HarnessError("parallel workers must be between 1 and min(4, candidate count)")
+    if durable_slots is not None and workers > durable_slots.snapshot().max_active:
+        raise HarnessError("parallel workers exceed durable concurrency limit")
     if expected_workspace_sha256 is not None and (
         type(expected_workspace_sha256) is not str
         or not re.fullmatch(r"[0-9a-f]{64}", expected_workspace_sha256)
@@ -135,7 +151,11 @@ def run_reviewed_parallel_trials(
     def attempt(model: BoundProbeModel) -> TrialAttempt:
         identifier = model.plan.candidate_id
         try:
-            result = executor.execute(snapshot, cfg, model)
+            if durable_slots is None:
+                result = executor.execute(snapshot, cfg, model)
+            else:
+                with durable_slots.trial_slot():
+                    result = executor.execute(snapshot, cfg, model)
         except TrialConcurrencyFull:
             return TrialAttempt(identifier, "concurrency_full", None)
         except BudgetExhausted:

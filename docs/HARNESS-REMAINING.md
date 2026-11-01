@@ -37,8 +37,10 @@ the exact evidence and revisions.
   budgets can check a momentary minimum without reserving capacity; the
   portability API rejects an obvious shortfall before checking images or
   starting trials. An optional in-process SharedBudget cap limits cooperating
-  trial concurrency; durable/cross-process concurrency remains absent. A later
-  stop, expiry or competing consumer may still interrupt.
+  trial concurrency. Opt-in SQLite slots now provide a persistent per-budget
+  cap across cooperating local processes using the reviewed parallel Python API;
+  other APIs can bypass it, and crashed or uncertain slots are never reclaimed
+  automatically. A later stop, expiry or competing consumer may still interrupt.
 - Reviewed trial archives reject exact occurrences of the configured provider
   key before Docker or provider calls. Paired/manual campaigns also check
   explicitly supplied sensitive values. Paired/campaign model inputs and
@@ -101,7 +103,8 @@ the exact evidence and revisions.
    authenticated or safe against all prompt injections. The task bank is a
    manual storage foundation only. A reviewed Python API can now run one
    reference followed by bounded parallel candidate waves with an in-process
-   shared budget; it has no judging, persistence, CLI, or recovery, and real
+   or opt-in durable budget and cooperative persisted trial slots. Results have
+   no judging, persistence, CLI, or recovery, and real
    Docker and live providers have not been tested for this path. There is no
    autonomous reflector, full safe experience-guidance, durable parallel
    campaign scheduler or sequential carry-forward recursion.
@@ -112,8 +115,10 @@ the exact evidence and revisions.
    block based on canaries, live monitoring or automatic rollback.
 5. **H-17: full Governor.** Durable limits count cooperating admissions and
    have an admission cutoff. They do not enforce a USD/token budget, hard
-   runtime deadline, durable/cross-process concurrency ceiling, provider billing guarantee,
-   in-flight kill switch, early elimination, convergence stopping or caching.
+   runtime deadline, universal cross-process concurrency enforcement, provider
+   billing guarantee, in-flight kill switch, early elimination, convergence
+   stopping or caching. The opt-in SQLite slot cap does not constrain callers
+   that do not use it, and does not recover crashed slots.
 6. **H-18–19: judging and probe hardening.** Reduced/blinded evidence and
    manual judgments do not constitute verifier fusion or a confidence gate.
    The task-text heuristic is easily evaded; provider egress restrictions,
