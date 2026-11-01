@@ -1280,3 +1280,17 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   not durable evidence or authorization. The live server and CLI are not wired
   to this bridge, and the full architecture v2 event contract and H-11 remain
   incomplete. No live provider was tested.
+
+### CI — deterministic Docker detection and pytest subprocess tests
+
+- GitHub Harness validation run `41354334179` for `a4d736c` had a successful
+  real-Docker job but failed the Python 3.12 and 3.13 full suites on the same
+  two environment-dependent tests: daemon availability and noisy third-party
+  pytest plugin stderr. The failure did not establish a production regression.
+- The server warning test now explicitly mocks an unavailable daemon, and the
+  planted-assertion subprocess disables third-party pytest plugin autoload.
+  No production code or model payload was changed.
+- Fresh local full suites on Python 3.12.16 and 3.13 each reported **1,352
+  passed, 19 skipped**. `CI-real-runner-determinism-tests.png` shows a fresh
+  installed-package Python 3.12 PTY run of nine focused tests, rendered using
+  xterm.js/Chromium. GitHub validation of the follow-up commit is pending.

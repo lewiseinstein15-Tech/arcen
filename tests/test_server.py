@@ -435,10 +435,15 @@ def test_run_auto_fails_closed_when_daemon_absent(client, monkeypatch) -> None:
     assert not any(e["type"] == "command" for e in events)
 
 
-def test_boot_warns_when_docker_pinned_but_unavailable(caplog) -> None:
+def test_boot_warns_when_docker_pinned_but_unavailable(caplog, monkeypatch) -> None:
     """sandbox.backend='docker' with no daemon → the boot logs a warning."""
     import logging
 
+    from arcen.sandbox import runtime as runtime_mod
+
+    # GitHub-hosted runners can have a working daemon. Test the unavailable
+    # case explicitly rather than depending on the machine running pytest.
+    monkeypatch.setattr(runtime_mod, "_docker_client", lambda: None)
     cfg = ArcenConfig()
     cfg.sandbox.backend = "docker"
     with caplog.at_level(logging.WARNING, logger="arcen.server"):

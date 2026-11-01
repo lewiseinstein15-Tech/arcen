@@ -34,7 +34,11 @@ def test_planted_broken_code_fails(temper, tmp_path) -> None:
     events = temper.verify(
         step=2,
         target=str(tmp_path),
-        checks=[f"python3 -m pytest -q {tmp_path / 'test_broken.py'}"],
+        checks=[
+            # Installed third-party pytest plugins can emit warnings on stderr;
+            # the verifier prefers stderr, hiding the planted assertion output.
+            f"PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q {tmp_path / 'test_broken.py'}"
+        ],
     )
     assert [type(e) for e in events] == [VerifyStart, StepFail]
     fail = events[1]
