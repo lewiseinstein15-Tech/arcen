@@ -61,6 +61,9 @@ merely because a sub-scope is complete.
 - [x] H-11g: guided selection of one to five candidates for a single manually
       confirmed sequential campaign, with lower-bound admission checks. This
       completes only this sub-scope, not H-11, H-14 or the Governor.
+- [x] H-14c: parallel probes reject mismatched or malformed result attribution
+      and terminal status; an uncertain durable trial retains its slot. Mocked
+      Docker/provider tests only. In-flight work may continue; H-14 remains open.
 - [x] H-14b: reviewed Python-only bounded parallel probe waves over one
       reference and two to five candidates, using an in-process shared budget.
       Mock-verified only; no judge, persistence, selection, adoption, automatic
@@ -78,9 +81,9 @@ merely because a sub-scope is complete.
 - [x] H-11h: metadata-only best-effort manual campaign progress in the CLI
       and trusted callback API. Not durable, authenticated, replayable, or
       integrated into the session NDJSON stream; safe resume remains absent.
-- [x] H-21a: CI workflow configuration for installed-wheel and opt-in Docker
-      validation, structurally tested locally. A remote run is still required;
-      this does not complete portability, CI verification or H-21.
+- [x] H-21a: CI workflow for installed-wheel and real-Docker validation. GitHub
+      run 41356481120 passed for the earlier `4cb3e1a` baseline; later workflow
+      changes have not been run remotely. This does not complete H-21.
 - [x] H-19a: reviewed trial snapshots reject exact configured provider keys;
       comparisons and campaigns also reject explicitly supplied known values
       before trial admission. Not a complete secret or injection scanner.
@@ -111,7 +114,8 @@ merely because a sub-scope is complete.
       No campaign controls, approval, adoption or complete H-20.
 - [x] H-21b: CI configuration checks installed import origin and runs selected
       installed-wheel harness/TUI tests outside the checkout; wheel contents
-      include the new modules. Remote execution has not been verified.
+      include the new modules. The earlier CI baseline passed remotely; the
+      subsequently expanded selected suite has not yet run remotely.
 - [x] H-21c: interactive and Python two-image baseline/candidate comparisons
       share a budget and reject a changed second workspace snapshot. Local
       Docker/provider are mocked; images and evidence remain untrusted claims,

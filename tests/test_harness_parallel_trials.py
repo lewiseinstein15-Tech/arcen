@@ -20,6 +20,10 @@ from arcen.harness.lineage import HarnessLineage
 from arcen.harness.probe_execution import ReviewedProbeResult
 
 
+def terminal(status):
+    return ({"type": "run.done", "status": status},)
+
+
 def cap(**kwargs):
     return SharedBudget(
         **(
@@ -126,7 +130,9 @@ def test_waves_run_in_parallel_but_preserve_result_order(tmp_path, monkeypatch):
             finally:
                 with lock:
                     state["active"] -= 1
-        return ReviewedProbeResult(baseline, identifier, snapshot.commit, snapshot.sha256, "ok", ())
+        return ReviewedProbeResult(
+            baseline, identifier, snapshot.commit, snapshot.sha256, "ok", terminal("ok")
+        )
 
     monkeypatch.setattr(parallel_trials.NativeDockerProbeExecutor, "execute", execute)
     result = run(args, budget)
@@ -152,7 +158,7 @@ def test_failed_wave_prevents_later_candidates_but_keeps_inflight_results(tmp_pa
             snapshot.commit,
             snapshot.sha256,
             "failed" if identifier == first else "ok",
-            (),
+            terminal("failed" if identifier == first else "ok"),
         )
 
     monkeypatch.setattr(parallel_trials.NativeDockerProbeExecutor, "execute", execute)
@@ -171,7 +177,12 @@ def test_reference_failure_stops_before_candidates(tmp_path, monkeypatch):
     def execute(_self, snapshot, cfg, model):
         budget.reserve_trial()
         return ReviewedProbeResult(
-            baseline, model.plan.candidate_id, snapshot.commit, snapshot.sha256, "failed", ()
+            baseline,
+            model.plan.candidate_id,
+            snapshot.commit,
+            snapshot.sha256,
+            "failed",
+            terminal("failed"),
         )
 
     monkeypatch.setattr(parallel_trials.NativeDockerProbeExecutor, "execute", execute)
@@ -260,7 +271,7 @@ def test_stop_after_reference_prevents_any_candidate_submission(tmp_path, monkey
         budget.reserve_trial()
         budget.stop()
         return ReviewedProbeResult(
-            args[1], model.plan.candidate_id, snapshot.commit, snapshot.sha256, "ok", ()
+            args[1], model.plan.candidate_id, snapshot.commit, snapshot.sha256, "ok", terminal("ok")
         )
 
     monkeypatch.setattr(parallel_trials.NativeDockerProbeExecutor, "execute", execute)
@@ -275,7 +286,7 @@ def test_mismatched_executor_result_fails_closed_and_stops_budget(tmp_path, monk
 
     def execute(_self, snapshot, cfg, model):
         return ReviewedProbeResult(
-            args[1], model.plan.candidate_id, snapshot.commit, "0" * 64, "ok", ()
+            args[1], model.plan.candidate_id, snapshot.commit, "0" * 64, "ok", terminal("ok")
         )
 
     monkeypatch.setattr(parallel_trials.NativeDockerProbeExecutor, "execute", execute)
@@ -323,7 +334,9 @@ def test_partial_submission_waits_for_started_work_and_reports_unstarted(tmp_pat
             started.set()
             time.sleep(0.05)
             finished.append(identifier)
-        return ReviewedProbeResult(args[1], identifier, snapshot.commit, snapshot.sha256, "ok", ())
+        return ReviewedProbeResult(
+            args[1], identifier, snapshot.commit, snapshot.sha256, "ok", terminal("ok")
+        )
 
     class BrokenPool(ThreadPoolExecutor):
         def __init__(self, **kwargs):

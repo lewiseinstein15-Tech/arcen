@@ -60,6 +60,7 @@ jobs:
             "$GITHUB_WORKSPACE/tests/test_budget_preflight.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_concurrency.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_parallel_trials.py" \
+            "$GITHUB_WORKSPACE/tests/test_parallel_result_binding.py" \
             "$GITHUB_WORKSPACE/tests/test_durable_trial_slots.py" \
             "$GITHUB_WORKSPACE/tests/test_h17e_docker.py" \
             "$GITHUB_WORKSPACE/tests/test_portability_cli.py" \

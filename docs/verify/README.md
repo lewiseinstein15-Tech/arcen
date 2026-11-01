@@ -1358,3 +1358,23 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   guarantee that a canary case actually ran, or safe resume. Earlier strict v2
   readers may drop the two newly added mismatch stop reasons. H-11, H-16 and
   H-21 remain open.
+
+### H-14c — parallel result consistency and slot retention (partial)
+
+- `H-14c-real-mock-parallel.png` is a fresh installed `arcen-tui --no-serve`
+  PTY capture rendered by xterm.js/Chromium. A clearly simulated HTTP fixture
+  formatted the result of a real parallel API invocation using a mocked
+  executor and local SQLite; the parallel API does not emit TUI events. No
+  real Docker, provider, campaign adoption or safe resume was exercised.
+- `H-14c-real-parallel-tests.png` shows **20 passed** on a fresh
+  installed-wheel PTY test run. Python 3.13 full source suite: **1,454 passed,
+  19 skipped**. Selected installed-wheel suites: **235 passed, 6 skipped** on
+  Python 3.12.16 and 3.13. Changed-file Ruff/format, wheel, docs and diff
+  checks passed. Updated GitHub CI has not yet run remotely.
+- Parallel results must now match the bound baseline, candidate, snapshot and
+  terminal status. A mismatch halts later scheduling and attempts to stop the
+  budget; a durable slot is retained on the uncertain result. A concurrent
+  already-started peer is awaited, not canceled. Budget storage failure may
+  prevent a persistent stop. The checks do not authenticate results or prove
+  isolation; no automatic slot recovery, selection or adoption is provided.
+  Full H-14 and H-17 remain open.

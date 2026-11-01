@@ -48,6 +48,7 @@ def test_validation_workflow_has_matrix_wheel_and_explicit_docker_opt_in():
     assert "test_harness_reflection_cli.py" in selected
     assert "test_harness_experience_editor.py" in selected
     assert "test_harness_parallel_trials.py" in selected
+    assert "test_parallel_result_binding.py" in selected
     assert "test_durable_trial_slots.py" in selected
     assert "test_h17e_docker.py" in selected
     docker = data["jobs"]["docker-isolation"]

@@ -20,7 +20,7 @@ from .durable_trial_slots import DurableTrialSlots
 from .executor import NativeDockerProbeExecutor
 from .manifest import default_manifest
 from .probe import ProbeUnavailable
-from .probe_execution import ReviewedProbeResult, _reviewed_config
+from .probe_execution import ReviewedProbeResult, _matches_bound_probe, _reviewed_config
 from .probe_hygiene import _reject_snapshot_secrets
 from .probe_model import BoundProbeModel, bind_probe_model
 from .probe_workspace import snapshot_git_commit
@@ -150,12 +150,21 @@ def run_reviewed_parallel_trials(
 
     def attempt(model: BoundProbeModel) -> TrialAttempt:
         identifier = model.plan.candidate_id
+
+        def execute_checked() -> ReviewedProbeResult:
+            result = executor.execute(snapshot, cfg, model)
+            if not _matches_bound_probe(result, snapshot, model):
+                raise ProbeUnavailable("probe result did not match reviewed inputs")
+            return result
+
         try:
             if durable_slots is None:
-                result = executor.execute(snapshot, cfg, model)
+                result = execute_checked()
             else:
+                # Keep the durable slot on attribution/terminal uncertainty,
+                # just as for an executor or cleanup failure.
                 with durable_slots.trial_slot():
-                    result = executor.execute(snapshot, cfg, model)
+                    result = execute_checked()
         except TrialConcurrencyFull:
             return TrialAttempt(identifier, "concurrency_full", None)
         except BudgetExhausted:
@@ -164,15 +173,6 @@ def run_reviewed_parallel_trials(
             budget.stop()  # isolation or cleanup uncertainty: fail conservatively
             return TrialAttempt(identifier, "unavailable", None)
         except Exception:  # noqa: BLE001 — provider and executor details may contain secrets
-            budget.stop()
-            return TrialAttempt(identifier, "unavailable", None)
-        if (
-            type(result) is not ReviewedProbeResult
-            or result.candidate_id != identifier
-            or result.baseline_id != baseline_id
-            or result.commit != snapshot.commit
-            or result.workspace_sha256 != snapshot.sha256
-        ):
             budget.stop()
             return TrialAttempt(identifier, "unavailable", None)
         return TrialAttempt(identifier, "ok" if result.status == "ok" else "failed", result)

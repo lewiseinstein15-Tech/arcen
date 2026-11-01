@@ -1,6 +1,6 @@
 # Harness²: remaining work and safety status
 
-Status as of 31 October 2026. This is a work-in-progress implementation, not a claim
+Status as of 2 November 2026. This is a work-in-progress implementation, not a claim
 that the Harness² roadmap is complete. The earlier Omarchy Docker runs covered
 the then-current isolation and manual-campaign foundations, using mocked models
 and judges. Newer editor, CLI, canary and cleanup paths have not all been
@@ -116,8 +116,11 @@ the exact evidence and revisions.
    authenticated or safe against all prompt injections. The task bank is a
    manual storage foundation only. A reviewed Python API can now run one
    reference followed by bounded parallel candidate waves with an in-process
-   or opt-in durable budget and cooperative persisted trial slots. Results have
-   no judging, persistence, CLI, or recovery. The user reported a narrow
+   or opt-in durable budget and cooperative persisted trial slots. Identity and
+   terminal consistency are checked; a mismatch stops scheduling and retains
+   an affected durable slot. This does not authenticate evidence, and a budget
+   stop may fail if its database fails. Results have no judging, persistence,
+   CLI, or recovery. The user reported a narrow
    real-Docker smoke passing at `51d971a`, with the provider mocked; live
    providers remain untested for this path. There is no
    autonomous reflector, full safe experience-guidance, durable parallel
@@ -145,8 +148,9 @@ the exact evidence and revisions.
    simulated Harness² TUI demo renders example progress. An opt-in live client
    can render compatible progress events from a stream, but ARCEN's server does
    not yet produce campaign events and there is no integrated campaign control
-   or approval surface. Cross-platform/install checks,
-   a remotely verified CI run, a real end-to-end demo and complete operator
+   or approval surface. GitHub CI passed for baseline `4cb3e1a`, but later
+   local changes and the expanded workflow have not been verified remotely.
+   Cross-platform/install checks, a real end-to-end demo and complete operator
    documentation still need work. New real-Docker paths and any paid-provider integration require
    validation on suitable systems; mock tests are not that validation.
 
