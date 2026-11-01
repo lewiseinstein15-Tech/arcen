@@ -67,8 +67,9 @@ merely because a sub-scope is complete.
       resume, durable concurrency, or cross-process guarantees. H-14 remains open.
 - [x] H-11i: opt-in metadata-only v2 progress bridge on the existing session
       emitter, with strict decoding and optional TUI registration. The offline
-      demo exercises it; the live server and CLI do not. It is not the complete
-      v2 contract, durable evidence, approval or recovery. H-11 remains open.
+      demo and opt-in live reader use it; the server and CLI do not emit it.
+      It is not the complete v2 contract, durable evidence, approval or recovery.
+      H-11 remains open.
 - [x] H-11h: metadata-only best-effort manual campaign progress in the CLI
       and trusted callback API. Not durable, authenticated, replayable, or
       integrated into the session NDJSON stream; safe resume remains absent.
@@ -95,6 +96,10 @@ merely because a sub-scope is complete.
       cross-database or authorization verification; rollback remains disabled.
 - [x] H-20a / H-22a: a clearly simulated offline harness TUI demo and read-only
       renderer for local progress metadata. No live stream, approval or adoption.
+- [x] H-20b: opt-in live TUI rendering of validated, unsigned v2 progress
+      received from a compatible stream, including reconnect and session replay.
+      Mock-server tested; the real server does not yet emit campaign progress.
+      No campaign controls, approval, adoption or complete H-20.
 - [x] H-21b: CI configuration checks installed import origin and runs selected
       installed-wheel harness/TUI tests outside the checkout; wheel contents
       include the new modules. Remote execution has not been verified.

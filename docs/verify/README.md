@@ -1293,4 +1293,23 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
 - Fresh local full suites on Python 3.12.16 and 3.13 each reported **1,352
   passed, 19 skipped**. `CI-real-runner-determinism-tests.png` shows a fresh
   installed-package Python 3.12 PTY run of nine focused tests, rendered using
-  xterm.js/Chromium. GitHub validation of the follow-up commit is pending.
+  xterm.js/Chromium. GitHub Harness validation run `41356481120` subsequently
+  passed on Python 3.12, Python 3.13 and real Docker.
+
+### H-20b — opt-in live progress reader (partial)
+
+- `H-20b-real-live-fixture.png` is a fresh capture of the installed
+  `arcen-tui --no-serve --url ... --harness-progress` running in a real PTY,
+  rendered by xterm.js/Chromium. Its local HTTP endpoint was a clearly labelled
+  simulated fixture producing fabricated NDJSON metadata. No actual ARCEN
+  campaign, sandbox, provider, approval or adoption was exercised.
+- Python 3.13 full source suite: **1,358 passed, 19 skipped**. Selected
+  installed-wheel tests: **91 passed** each on Python 3.12.16 and 3.13.
+  Changed-file Ruff, wheel contents, docs and diff checks passed; `live.py` was
+  already not wholly Ruff-formatted on the parent commit. Updated GitHub CI has
+  not yet run remotely.
+- The live reader is off by default, validates the seven v2 progress schemas,
+  reinstalls its handler on session replacement, and provides read-only,
+  unauthenticated narration. It does not wire a producer to the real ARCEN
+  server or CLI and adds no campaign controls, approval, adoption or safe
+  resume. Full H-20 remains open.

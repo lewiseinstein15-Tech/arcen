@@ -31,9 +31,10 @@ the exact evidence and revisions.
   human-selected sequential comparisons and pending reviews. Metadata-only,
   best-effort CLI progress reports are not a persistent or authenticated stream.
   A Python-only opt-in bridge can stamp seven existing metadata events onto a
-  session emitter, and the offline demo renders them through a registered TUI
-  adapter. The live server/CLI are not wired to this bridge, which does not
-  provide the full v2 contract, durable history, authorization or resume.
+  session emitter. The offline demo and an opt-in live TUI reader can render
+  them, including on replay, but the actual server and campaign CLI are not
+  wired to produce these events. This bridge does not provide the full v2
+  contract, durable history, authorization or resume.
   A separate command can compose human-selected candidates from a completed
   campaign's local summaries.
 - Durable journal and shared admission counts; optional stop at stage
@@ -133,8 +134,10 @@ the exact evidence and revisions.
    for purposes of future automation. Model pin names do not authenticate model
    weights, and local hashes/review labels are not signatures.
 7. **H-20–22: surface, portability and release.** A clearly labelled offline
-   simulated Harness² TUI demo renders example progress, but there is no live
-   integrated campaign TUI or approval surface. Cross-platform/install checks,
+   simulated Harness² TUI demo renders example progress. An opt-in live client
+   can render compatible progress events from a stream, but ARCEN's server does
+   not yet produce campaign events and there is no integrated campaign control
+   or approval surface. Cross-platform/install checks,
    a remotely verified CI run, a real end-to-end demo and complete operator
    documentation still need work. New real-Docker paths and any paid-provider integration require
    validation on suitable systems; mock tests are not that validation.

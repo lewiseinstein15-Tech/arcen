@@ -63,9 +63,20 @@ class LiveApp(ArcenApp):
         Binding("ctrl+end", "narration_live", "Back to live", priority=True),
     ]
 
-    def __init__(self, *, base_url: str = DEFAULT_BASE_URL, session_id: str | None = None,
-                 client: ArcenClient | None = None, retry_seconds: float = RETRY_SECONDS):
+    def __init__(
+        self,
+        *,
+        base_url: str = DEFAULT_BASE_URL,
+        session_id: str | None = None,
+        client: ArcenClient | None = None,
+        retry_seconds: float = RETRY_SECONDS,
+        harness_progress: bool = False,
+    ):
+        if type(harness_progress) is not bool:
+            raise ValueError("harness_progress must be a boolean")
         super().__init__()
+        self.harness_progress_enabled = harness_progress
+        self.harness_progress_view = None
         self._auto_exit = False
         self.client = client or ArcenClient(base_url)
         self._owns_client = client is None
@@ -103,9 +114,18 @@ class LiveApp(ArcenApp):
     def on_mount(self) -> None:
         super().on_mount()
         self.narration.bind_stream(self.query_one(StreamView))
-        self.adapter = EventAdapter(self.narration, self.rail, self.header, self.footer)
+        self.adapter = self._create_adapter()
         self.query_one(Composer).focus()
         self._reader_task = asyncio.create_task(self._boot_and_stream())
+
+    def _create_adapter(self) -> EventAdapter:
+        adapter = EventAdapter(self.narration, self.rail, self.header, self.footer)
+        self.harness_progress_view = None
+        if self.harness_progress_enabled:
+            from arcen.tui.harness_progress import register_v2_progress
+
+            self.harness_progress_view = register_v2_progress(adapter)
+        return adapter
 
     async def on_unmount(self) -> None:
         self._closing = True
@@ -276,7 +296,7 @@ class LiveApp(ArcenApp):
                                    "tokens": 0, "cost_usd": 0.0, "tools": [], "replanning": False})
             self.narration.items.clear()
             self.narration._sync()
-            self.adapter = EventAdapter(self.narration, self.rail, self.header, self.footer)
+            self.adapter = self._create_adapter()
             for event in events:
                 self._apply_event(event)
             self._stream_started.clear()
@@ -423,6 +443,11 @@ def run(argv: list[str] | None = None) -> int:
     parser.add_argument("--url", default=os.environ.get("ARCEN_SERVER_URL", DEFAULT_BASE_URL))
     parser.add_argument("--session", default=None)
     parser.add_argument("--no-serve", action="store_true")
+    parser.add_argument(
+        "--harness-progress",
+        action="store_true",
+        help="render untrusted, advisory harness progress if supplied by the server",
+    )
     args = parser.parse_args(argv)
     if args.session:
         try:
@@ -433,7 +458,7 @@ def run(argv: list[str] | None = None) -> int:
 
     url, manager = ensure_server(args.url, serve=not args.no_serve)
     try:
-        LiveApp(base_url=url, session_id=args.session).run()
+        LiveApp(base_url=url, session_id=args.session, harness_progress=args.harness_progress).run()
     finally:
         if manager is not None:
             manager.stop()
