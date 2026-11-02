@@ -27,6 +27,8 @@ from arcen.harness.probe_execution import ReviewedProbeResult
         "events",
         "terminal_status",
         "terminal_type",
+        "earlier_terminal",
+        "malformed_middle",
         "result_type",
     ],
 )

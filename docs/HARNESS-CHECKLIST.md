@@ -76,6 +76,12 @@ merely because a sub-scope is complete.
       reference and two to five candidates, using an in-process shared budget.
       Mock-verified only; no judge, persistence, selection, adoption, automatic
       resume, durable concurrency, or cross-process guarantees. H-14 remains open.
+- [x] H-11k: reviewed probe results require exactly one final terminal event,
+      consistent with claimed status; malformed event envelopes and earlier
+      terminals are rejected in campaign, comparison, canary and parallel
+      attribution, and paired review recording. This does not authenticate
+      events, validate their payloads, prove isolation, or enable adoption or
+      recovery. H-11 remains open.
 - [x] H-11j / H-21g: manual campaigns, reviewed paired comparisons and manual
       canaries reject locally misattributed probe results before judging or
       recording them. Tests mock provider and Docker. This checks result shape

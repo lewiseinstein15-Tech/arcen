@@ -37,8 +37,10 @@ the exact evidence and revisions.
   human-selected sequential comparisons and pending reviews. Campaigns,
   paired comparisons and manual canaries now check each result's local
   baseline, candidate, commit, workspace and terminal status binding before
-  further judging or recording. Mismatches stop the current operation; they do
-  not authenticate the executor or close a shared budget. Metadata-only,
+  further judging or recording. The local sequence check also rejects malformed
+  event envelopes or earlier terminal events; paired review recording uses the
+  same check. Mismatches stop the current operation; they do not authenticate
+  the executor, validate all event payloads or close a shared budget. Metadata-only,
   best-effort CLI progress reports are not a persistent or authenticated stream.
   A Python-only opt-in bridge can stamp seven existing metadata events onto a
   session emitter. The offline demo and an opt-in live TUI reader can render

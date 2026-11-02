@@ -37,6 +37,7 @@ def test_validation_workflow_has_matrix_wheel_and_explicit_docker_opt_in():
     assert "cd /tmp" in selected and "--import-mode=importlib" in selected
     assert "test_git_package.py" in selected
     assert "test_harness_static_policy_inspection.py" in selected
+    assert "test_probe_terminal_consistency.py" in selected
     assert "test_probe_snapshot_offline.py" in selected
     assert "test_probe_git_filters.py" in selected
     assert "test_tui_stream_bounds.py" in selected

@@ -1,5 +1,22 @@
 # Verification screenshots
 
+## H-11k — local terminal-event consistency
+
+Fresh installed-command PTY → xterm.js → Chromium captures:
+
+- `H-11k-real-terminal-test.png` runs the installed Python 3.13 wheel against
+  deliberately fabricated conflicting events, showing actual paired-review
+  refusal and zero created records. Its focused installed-wheel test run passed
+  **24 tests**.
+- `H-11k-real-tui-fixture.png` is the actual installed TUI receiving explicitly
+  **simulated** events that narrate that real local refusal. It is not live
+  campaign integration, authenticated evidence, an approval, or adoption.
+
+The full source suite passed **1623 tests, 19 skipped**. The broader focused
+installed-wheel suite passed **160 tests, 1 skipped** on each of Python 3.12
+and 3.13. This check does not prove isolation or event authenticity; H-11 stays
+open.
+
 ## H-15a — advisory static policy inspection
 
 Fresh PTY → xterm.js → Chromium captures using the installed Python 3.13

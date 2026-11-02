@@ -32,8 +32,14 @@ def corrupt(result, field):
         "events": (),
         "terminal_status": ({"type": "run.done", "status": "failed"},),
         "terminal_type": ({"type": "run.error"},),
+        "earlier_terminal": ({"type": "run.error"}, {"type": "run.done", "status": "ok"}),
+        "malformed_middle": ({"type": "run.start"}, None, {"type": "run.done", "status": "ok"}),
     }
-    key = "events" if field in {"terminal_status", "terminal_type"} else field
+    key = (
+        "events"
+        if field in {"terminal_status", "terminal_type", "earlier_terminal", "malformed_middle"}
+        else field
+    )
     return replace(result, **{key: updates[field]})
 
 
@@ -49,6 +55,8 @@ def corrupt(result, field):
         "events",
         "terminal_status",
         "terminal_type",
+        "earlier_terminal",
+        "malformed_middle",
         "result_type",
     ],
 )
@@ -101,6 +109,8 @@ def test_campaign_stops_before_attributing_mismatched_result(tmp_path, monkeypat
         "events",
         "terminal_status",
         "terminal_type",
+        "earlier_terminal",
+        "malformed_middle",
         "result_type",
     ],
 )
@@ -147,6 +157,8 @@ def test_paired_comparison_rejects_mismatch_before_judge(tmp_path, monkeypatch, 
         "events",
         "terminal_status",
         "terminal_type",
+        "earlier_terminal",
+        "malformed_middle",
         "result_type",
     ],
 )

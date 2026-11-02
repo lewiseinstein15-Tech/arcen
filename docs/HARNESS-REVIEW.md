@@ -46,8 +46,11 @@ print(record.id)
 
 `store` and `comparison_result` are the existing store and result from
 `run_reviewed_comparison` or `compare_reviewed_proposals` (the latter's
-comparison result). Both trials must have successful terminal events and share
-the same baseline, commit and workspace digest. The stored judge winner may be
+comparison result). Both trials must have exactly one terminal event at the end,
+consistent with a successful result, and share the same baseline, commit and
+workspace digest. All event envelopes must be dictionaries with a string type;
+this is not full event-payload validation. Contradictory earlier terminals are
+rejected before a paired record is inserted. The stored judge winner may be
 reference, candidate **or tie**; none automatically triggers a decision. A
 static and paired request for the same manifests may coexist. A second pending
 request of the same type is refused.

@@ -54,6 +54,34 @@ class ReviewedProbeResult:
     canary_passed: bool | None = None
 
 
+def _has_consistent_terminal(events: object, status: object) -> bool:
+    """Require one terminal event, at the end, consistent with the claimed status.
+
+    This checks local event envelopes only; it neither authenticates a result
+    nor validates the contents of non-terminal events.
+    """
+    if (
+        type(events) is not tuple
+        or not events
+        or type(status) is not str
+        or status not in {"ok", "failed", "error"}
+    ):
+        return False
+    for event in events[:-1]:
+        if (
+            type(event) is not dict
+            or type(event.get("type")) is not str
+            or event["type"] in ("run.done", "run.error")
+        ):
+            return False
+    terminal = events[-1]
+    if type(terminal) is not dict or type(terminal.get("type")) is not str:
+        return False
+    if status == "error":
+        return terminal["type"] == "run.error"
+    return terminal["type"] == "run.done" and terminal.get("status") == status
+
+
 def _matches_bound_probe(result: object, snapshot: GitSnapshot, model: BoundProbeModel) -> bool:
     """Check local result attribution, not authenticity, isolation or correctness."""
     return (
@@ -62,17 +90,7 @@ def _matches_bound_probe(result: object, snapshot: GitSnapshot, model: BoundProb
         and result.candidate_id == model.plan.candidate_id
         and result.commit == snapshot.commit
         and result.workspace_sha256 == snapshot.sha256
-        and type(result.status) is str
-        and result.status in {"ok", "failed", "error"}
-        and type(result.events) is tuple
-        and bool(result.events)
-        and type(result.events[-1]) is dict
-        and (
-            result.events[-1].get("type") == "run.error"
-            if result.status == "error"
-            else result.events[-1].get("type") == "run.done"
-            and result.events[-1].get("status") == result.status
-        )
+        and _has_consistent_terminal(result.events, result.status)
     )
 
 
