@@ -1482,3 +1482,26 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   This is not a global HTTP memory limit or safe resume: other endpoints and
   transport allocations remain outside this scope; the client's bounded 404
   retries have no delay. H-19 remains open.
+
+### H-19j — disable Git promisor lazy fetch for probe snapshots (partial)
+
+- `H-19j-real-snapshot-refusal.png` is a fresh installed `arcen-tui --no-serve`
+  PTY rendered through xterm.js/Chromium. A simulated local HTTP fixture narrated
+  an actual installed snapshot-reader refusal for a missing local promisor blob.
+  The TUI events are fixture-generated; no real campaign, Docker or model ran.
+- `H-19j-real-snapshot-tests.png` shows **6 passed** on a fresh installed-wheel
+  PTY run. Python 3.13 full source suite: **1,545 passed, 19 skipped**. Selected
+  installed-wheel Git/package/probe/workflow suites: **70 passed, 2 skipped**
+  on each of Python 3.12.16 and 3.13.16. The workflow change has not run on
+  GitHub yet. Docker/provider were mocked or skipped.
+- Real local promisor fixtures removed a commit, tree or blob in turn; the
+  snapshot refused each. Controls verified that an unguarded Git archive did
+  fetch the missing object from a local promisor. A reviewed-probe test checks
+  that a missing blob prevents trial admission, Docker and provider calls.
+  SHA-256 Git repositories and unsupported-flag failure were also tested.
+- The shared runner now uses Git's `--no-lazy-fetch`, including package reads.
+  Older Git versions without that flag and repositories with missing required
+  objects fail closed. This blocks Git's promisor lazy fetch, not arbitrary
+  execution or network access from malicious local Git/configuration. It is not
+  authentication, a secret scan or a replacement for Docker isolation; H-19
+  remains open.

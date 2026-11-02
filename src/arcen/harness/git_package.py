@@ -48,16 +48,12 @@ def read_git_package(repo: str | Path, commit: str, path: str) -> bytes:
         root = root.resolve(strict=True)
         if not root.is_dir():
             raise HarnessError("repository must be a directory")
-        # Fail closed on Git versions without --no-lazy-fetch: promisor
-        # repositories must never retrieve missing objects from a remote here.
-        if (
-            _run_git(root, ["--no-lazy-fetch", "cat-file", "-t", commit], max_bytes=128)
-            != b"commit\n"
-        ):
+        # The shared Git runner fails closed without --no-lazy-fetch support.
+        if _run_git(root, ["cat-file", "-t", commit], max_bytes=128) != b"commit\n":
             raise HarnessError("Git object is not a commit")
         entry = _run_git(
             root,
-            ["--no-lazy-fetch", "ls-tree", "-z", "--full-tree", commit, "--", path],
+            ["ls-tree", "-z", "--full-tree", commit, "--", path],
             max_bytes=1024,
         )
         # Exact mode/type/path check prevents accepting symlinks and gitlinks.
@@ -79,7 +75,7 @@ def read_git_package(repo: str | Path, commit: str, path: str) -> bytes:
         # than resolving the path again, then verify its package independently.
         return _run_git(
             root,
-            ["--no-lazy-fetch", "cat-file", "blob", metadata[2].decode("ascii")],
+            ["cat-file", "blob", metadata[2].decode("ascii")],
             max_bytes=MAX_PACKAGE_BYTES,
         )
     except HarnessError:

@@ -163,7 +163,7 @@ def test_git_subprocess_environment_has_no_inherited_credentials(tmp_path, monke
         assert kwargs["env"].get("AWS_SECRET_ACCESS_KEY") is None
         assert kwargs["env"]["GIT_TERMINAL_PROMPT"] == "0"
         assert kwargs.get("shell", False) is False
-        assert args[0][0] == "/usr/bin/git"
+        assert args[0][:4] == ["/usr/bin/git", "--no-lazy-fetch", "-C", str(repo)]
 
 
 def test_archive_importer_accepts_normalized_git_snapshot(tmp_path):

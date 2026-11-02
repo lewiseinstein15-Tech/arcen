@@ -27,7 +27,13 @@ trust boundary. See `HARNESS-EDITOR.md` and `HARNESS-STORE.md` for other limits.
 
 `snapshot_git_commit(repo, commit)` accepts an explicit full local commit ID,
 not a branch or an arbitrary command. It runs fixed Git commands with a minimal
-host environment and produces a bounded, normalized archive. Untracked files,
+host environment and produces a bounded, normalized archive. The shared runner
+requires Git's `--no-lazy-fetch` option on every object read and archive; a
+missing promisor object or a Git version without that option fails closed rather
+than fetching the object. Populate reviewed objects beforehand through your own
+trusted workflow. The Git executable, repository, local configuration and
+filesystem are trusted; this is not an OS-level network sandbox against malicious
+local Git or configuration. Untracked files,
 working-tree changes and `.git` are excluded; Git archive attributes such as
 `export-ignore` still apply. Links, submodules and special files are rejected,
 as are common credential filenames and directories. Archive content and limits

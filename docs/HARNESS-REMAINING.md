@@ -68,6 +68,11 @@ the exact evidence and revisions.
   cap across cooperating local processes using the reviewed parallel Python API;
   other APIs can bypass it, and crashed or uncertain slots are never reclaimed
   automatically. A later stop, expiry or competing consumer may still interrupt.
+- The shared Git object reader now disables promisor lazy fetch for probe
+  snapshots as well as signed-package reads. Missing objects and Git versions
+  without `--no-lazy-fetch` fail closed; the local Git executable, repository,
+  configuration and filesystem remain trusted. This is not an OS-level
+  network boundary and does not authenticate commits or scan for all secrets.
 - Reviewed trial archives reject exact occurrences of the configured provider
   key before Docker or provider calls. Paired/manual campaigns also check
   explicitly supplied sensitive values. Paired/campaign model inputs and

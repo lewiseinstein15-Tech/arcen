@@ -104,6 +104,10 @@ merely because a sub-scope is complete.
 - [x] H-19d: extra caller-provided known values are checked in model-bound
       inputs and best-effort redacted from reviewed model/tool evidence.
       This is not comprehensive secret detection; H-19 remains open.
+- [x] H-19j: the shared local Git object reader disables promisor lazy fetch
+      for probe snapshots and signed-package reads, and fails if Git lacks that
+      option or needed objects are absent. This trusts local Git, repository and
+      configuration; it is not OS-level egress isolation. H-19 remains open.
 - [x] H-19i: TUI live-stream HTTP error bodies are closed without being read;
       a 409 compaction reset occurs at most once with a resume hint, and an
       unresolved compaction halts the stream. No global HTTP, retry, total

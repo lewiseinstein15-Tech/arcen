@@ -44,7 +44,12 @@ class GitSnapshot:
 
 
 def _run_git(repo: Path, args: list[str], *, max_bytes: int) -> bytes:
-    """Read bounded Git output with timeout; never invoke a shell or network."""
+    """Read bounded Git output with a timeout and no promisor-object fetch.
+
+    Git versions without --no-lazy-fetch fail closed. The local repository,
+    filesystem, configuration and Git executable remain trusted inputs; this
+    is not an OS-level network sandbox for a malicious Git executable or config.
+    """
     env = {
         "PATH": "/usr/bin:/bin",
         "HOME": "/nonexistent",
@@ -58,7 +63,7 @@ def _run_git(repo: Path, args: list[str], *, max_bytes: int) -> bytes:
     }
     try:
         proc = subprocess.Popen(
-            [_GIT, "-C", str(repo), *args],
+            [_GIT, "--no-lazy-fetch", "-C", str(repo), *args],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
