@@ -568,7 +568,7 @@ The following are backlog entries, not authorization to implement any later phas
 - **Test:** add deterministic benchmark harness tests and publish run commands.
 
 ### [A-03] Safe reviewed change return
-- **Status:** [ ] todo. Design opt-in export/review of changes from disposable workspace with path, symlink, concurrency and secret protections; preserve isolation and never silently write host files.
+- **Status:** [~] in progress. Initial archive validation and temporary Git patch construction helper exists and its 9 focused tests pass. It is NOT yet connected to Docker, server events, artifact publication, or `arcen apply`; security and real-Docker integration remain unverified. Preserve isolation and never silently write host files.
 - **Test:** `pytest tests/test_sandbox.py` plus export and attack regressions.
 
 ### [A-04] Enabled-only plugin discovery

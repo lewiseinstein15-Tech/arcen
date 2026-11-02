@@ -64,3 +64,11 @@ TUI evidence uses the installed `arcen-tui` entry point with the current workspa
 ```sh
 PYTHONPATH=src /home/user/.cache/env13/bin/python scripts/terminal_shot.py --cols 150 --rows 44 --wait 13 --env PYTHONPATH=/home/user/arcen-continue/src --out docs/verify/A-08-real-tui-recorded-replay.png -- /home/user/.cache/env13/bin/arcen-tui --demo --replay
 ```
+
+A-03 design references consulted before implementation: Docker SDK container archive API https://docker-py.readthedocs.io/en/stable/containers.html ; archive risks and supported entry types https://docs.python.org/3/library/tarfile.html ; Git patch application https://git-scm.com/docs/git-apply ; subprocess argument/timeout behavior https://docs.python.org/3/library/subprocess.html ; path semantics https://docs.python.org/3/library/pathlib.html . Real Docker integration cannot be verified in this environment.
+
+A-03 current isolated helper check (not a server or Docker integration test):
+
+```sh
+TMPDIR=/home/user/.cache/tmp PYTHONPATH=src /home/user/.cache/env13/bin/python -m pytest -o asyncio_default_fixture_loop_scope=function -o addopts='' -q tests/test_a03_artifacts.py
+```
