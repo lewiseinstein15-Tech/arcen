@@ -105,7 +105,9 @@ def _diff_objects(
     return "".join(output) if output else "No differences.\n"
 
 
-def _inspect_manifest(root: str, identifier: str, *, show_diff: bool = False) -> str:
+def _inspect_manifest(
+    root: str, identifier: str, *, show_diff: bool = False, show_static_policy: bool = False
+) -> str:
     """Inspect unregistered objects without modifying refs or authorizing use."""
     store, lineage = _existing(root)
     baseline_id = lineage.resolve("refs/heads/adopted")
@@ -114,6 +116,11 @@ def _inspect_manifest(root: str, identifier: str, *, show_diff: bool = False) ->
     # Prepare the entire output before printing, so corrupt objects or failed
     # decoding cannot yield a misleading partial inspection.
     diff = _diff_objects(store, baseline_id, identifier, max_lines=2048) if show_diff else None
+    policy_review = None
+    if show_static_policy:
+        from .policy import review_candidate
+
+        policy_review = review_candidate(store, baseline_id, identifier)
     lines = [
         f"Stored manifest: {identifier}",
         f"Local adopted baseline: {baseline_id}",
@@ -129,6 +136,16 @@ def _inspect_manifest(root: str, identifier: str, *, show_diff: bool = False) ->
             "No refs, approval, execution or adoption were changed.",
         ]
     )
+    if policy_review is not None:
+        from .policy import TIER_1
+
+        lines.append("Static policy review: passed for current code-defined checks only.")
+        lines.append(f"Highest changed tier: {policy_review.highest_tier}; human review required.")
+        for path in policy_review.changed_paths:
+            tier = 1 if path in TIER_1 else 2
+            lines.append(f"  tier {tier}: {path}")
+        lines.append("Advisory only: this does not approve execution or authorize adoption.")
+        lines.append("The baseline may change later; no approval or review record was created.")
     if diff is not None:
         lines.append("Untrusted sanitized diff (may contain sensitive data):")
         lines.append(diff.rstrip("\n"))
@@ -423,6 +440,9 @@ def main(argv: list[str] | None = None) -> int:
     inspect.add_argument(
         "--diff", action="store_true", help="also show a sanitized diff; may reveal plaintext"
     )
+    inspect.add_argument(
+        "--static-policy", action="store_true", help="run advisory static checks; never approves"
+    )
     rollback = commands.add_parser("rollback", help="unavailable until adoption gates exist")
     rollback.add_argument("ref", help="target ref (not applied yet)")
     attestation = commands.add_parser(
@@ -644,7 +664,15 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "diff":
             print(_diff(args.store, args.ref), end="")
         elif args.command == "inspect":
-            print(_inspect_manifest(args.store, args.manifest, show_diff=args.diff), end="")
+            print(
+                _inspect_manifest(
+                    args.store,
+                    args.manifest,
+                    show_diff=args.diff,
+                    show_static_policy=args.static_policy,
+                ),
+                end="",
+            )
         elif args.command == "attestation":
             from .attestation import MAX_ATTESTATION_BYTES, verify_attestation
             from .manual_cli import _read_text

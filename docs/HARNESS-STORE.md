@@ -25,6 +25,31 @@ Candidate runtime selection, adoption, locking against hostile local races, git
 backing, and the full eight-component set remain future work. `--harness` accepts
 only the verified packaged adopted baseline and `harnessing.enabled` remains false.
 
+## Advisory static policy inspection
+
+```sh
+arcen harness --store /trusted/path inspect <manifest-sha256> --static-policy
+# Optional, may expose plaintext: add --diff
+```
+
+The optional check compares a stored candidate against the adopted baseline
+resolved at the start of this command. It verifies objects and an unchanged model pin,
+checks the packaged protected components, validates prompt structure, and
+reports changed Tier 1 and Tier 2 paths. The code-defined tiers must form a
+complete, disjoint partition of shipped component paths and the editable set
+must equal Tier 1 plus Tier 2; static review fails if those definitions drift.
+Unchanged, protected, corrupt or invalid candidates fail without printing a
+partial inspection. Plain `inspect` continues to perform integrity inspection
+without requiring a valid candidate.
+
+This is a point-in-time, **advisory static check**. It does not authenticate
+origin or evidence, prove safety, authorize execution, create a review record,
+approve, change refs or adopt anything. The baseline and local files may change
+after the check; no concurrency or hostile-local-process guarantee is provided.
+Static prompt validation uses temporary files; the inspection does not mutate
+the harness store. The full H-15 policy engine and all adoption gates remain
+unfinished.
+
 ## Inspection CLI
 
 ```bash

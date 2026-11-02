@@ -104,6 +104,10 @@ merely because a sub-scope is complete.
 - [x] H-19d: extra caller-provided known values are checked in model-bound
       inputs and best-effort redacted from reviewed model/tool evidence.
       This is not comprehensive secret detection; H-19 remains open.
+- [x] H-15a: static review fails on inconsistent code-defined tier/editable
+      allowlists, and optional read-only inspection reports changed tiers.
+      This is advisory only; no policy authority, approval, adoption or runtime
+      candidate selection. H-15 remains open.
 - [x] H-19k: probe snapshots reject any effective local Git filter configuration
       before `git archive`, including included config and inert filters. Real
       smudge-filter control tested; local Git/config/filesystem must be trusted

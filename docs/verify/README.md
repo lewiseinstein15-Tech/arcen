@@ -1,5 +1,22 @@
 # Verification screenshots
 
+## H-15a — advisory static policy inspection
+
+Fresh PTY → xterm.js → Chromium captures using the installed Python 3.13
+wheel:
+
+- `H-15a-real-static-inspection.png`: actual `arcen harness inspect
+  --static-policy` output for a local fixture with Tier 1 and Tier 2 changes.
+- `H-15a-real-static-tests.png`: the new installed-wheel inspection tests,
+  outside the checkout: **26 passed**.
+- `H-15a-real-tui-fixture.png`: actual installed TUI, with explicitly
+  **simulated** server events narrating a real local static-review result.
+  It does not demonstrate live TUI integration or an approval/adoption.
+
+The full source suite passed **1581 tests, 19 skipped**; focused installed-wheel
+suites passed **42 tests** on each of Python 3.12 and 3.13. The static report
+is advisory, and H-15 remains open.
+
 Standing convention for the TUI redesign (TUI-01…18) and ARCEN² harness
 rebuild (H-01…22): **every ticket ends with a screenshot of its verification
 test**, saved here as `<TICKET>.png` (with the source `.svg` alongside).

@@ -44,6 +44,7 @@ jobs:
           cd /tmp
           PYTHONPATH="$GITHUB_WORKSPACE/tests" python -m pytest --import-mode=importlib -o addopts='' -q \
             "$GITHUB_WORKSPACE/tests/test_git_package.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_static_policy_inspection.py" \
             "$GITHUB_WORKSPACE/tests/test_probe_snapshot_offline.py" \
             "$GITHUB_WORKSPACE/tests/test_probe_git_filters.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_tui_demo.py" \

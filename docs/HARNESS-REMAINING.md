@@ -24,7 +24,10 @@ the exact evidence and revisions.
   can also be verified or interactively imported directly from a specific local
   Git commit, with no checkout or ref change; this is not a complete Git-backed
   object store. None establishes signer trust, safety, execution authorization
-  or adoption.
+  or adoption. Static review also fails if the code-defined tier and editable
+  sets overlap or fail to cover the shipped components; optional read-only
+  inspection reports changed tiers. Neither is an authoritative policy gate
+  or a safety/authorization decision.
   Doctor also performs SQLite quick-check and schema validation for present
   auxiliary databases; this does not validate all records or evidence.
 - Explicit interactive manual proposal generation or patch import; a
