@@ -49,3 +49,18 @@ A-15 fresh focused test terminal capture (real PTY/xterm.js/headless Chromium; d
 ```sh
 PYTHONPATH=src /home/user/.cache/env13/bin/python scripts/terminal_shot.py --cols 145 --rows 30 --wait 11 --out docs/verify/A-15-real-async-tests.png -- /bin/bash -c 'cd ui; npm test -- --run tests/settings.test.tsx tests/markdown.test.tsx; status=$?; echo "A-15 focused tests exit: $status"; sleep 15; exit "$status"'
 ```
+
+A-08 commands (the Python environment contains project dependencies):
+
+```sh
+TMPDIR=/home/user/.cache/tmp PYTHONPATH=src /home/user/.cache/env13/bin/python -m pytest -o asyncio_default_fixture_loop_scope=function -o addopts='' -q
+cd ui
+npm test -- --run
+npx tsc -b
+```
+
+TUI evidence uses the installed `arcen-tui` entry point with the current workspace source. It replays a pre-recorded mock-provider fixture, not a live provider, benchmark or real verification run:
+
+```sh
+PYTHONPATH=src /home/user/.cache/env13/bin/python scripts/terminal_shot.py --cols 150 --rows 44 --wait 13 --env PYTHONPATH=/home/user/arcen-continue/src --out docs/verify/A-08-real-tui-recorded-replay.png -- /home/user/.cache/env13/bin/arcen-tui --demo --replay
+```

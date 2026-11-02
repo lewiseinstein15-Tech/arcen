@@ -628,3 +628,25 @@ def test_config_test_timeout_names_budget(client, monkeypatch) -> None:
     body = resp.json()
     assert body["ok"] is False
     assert body["error"] == "provider error: timeout after 15s"
+
+
+def test_a08_usage_stream_sums_provider_calls_for_direct_turn(client):
+    from arcen.llm.client import Client as MeteredProvider
+
+    def complete(**kwargs):
+        text = "DIRECT" if "Return ONLY the word" in kwargs["messages"][-1]["content"] else "hello"
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=text))],
+            usage=SimpleNamespace(prompt_tokens=10, completion_tokens=4, cost=0.25),
+        )
+
+    server_app.STATE.llm = MeteredProvider(models={"planner": "fixture"}, completion_fn=complete)
+    session = _new_session(client, "hello")
+    events = _stream_until(client, session)
+    usage = [e for e in events if e["type"] == "usage"]
+    assert len(usage) == 1
+    assert usage[0]["tokens"] == {"input": 20, "output": 8}
+    assert usage[0]["cost_usd"] == 0.5
+    assert usage[0]["measured"] is True
+    assert usage[0]["usage_source"] == usage[0]["cost_source"] == "provider"
+    assert events[-1]["type"] == "run.done"

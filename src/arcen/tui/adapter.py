@@ -85,6 +85,7 @@ class EventAdapter:
         s = self.state
         self.rail.apply_state({"steps_total": s.steps_total, "steps_done": s.steps_done,
             "phase": s.phase, "tokens": s.tokens, "cost_usd": s.cost_usd,
+            "usage_measured": s.usage_measured, "cost_known": s.cost_known,
             "tools": list(s.tools), "replanning": s.replanning})
 
     def _phase(self, phase: str) -> None:
@@ -239,6 +240,8 @@ class EventAdapter:
         tokens = e.get("tokens") if isinstance(e.get("tokens"), dict) else {}
         self.state.tokens = int(tokens.get("input", 0)) + int(tokens.get("output", 0))
         self.state.cost_usd = float(e.get("cost_usd", 0))
+        self.state.usage_measured = e.get("measured") is True
+        self.state.cost_known = self.state.usage_measured and e.get("cost_source") in {"provider", "estimated"}
         self._sync_rail()
 
     def _run_done(self, e):

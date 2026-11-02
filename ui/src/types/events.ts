@@ -159,6 +159,9 @@ export interface UsageEvent {
   ts: number;
   tokens: { input: number; output: number };
   cost_usd: number;
+  measured?: boolean;
+  usage_source?: 'provider' | 'estimated' | 'unknown';
+  cost_source?: 'provider' | 'estimated' | 'unknown';
 }
 
 export interface RunDoneEvent {

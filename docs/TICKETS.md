@@ -588,8 +588,9 @@ The following are backlog entries, not authorization to implement any later phas
 - **Test:** run isolated registry and policy tests plus targeted capability tests.
 
 ### [A-08] Truthful usage and cost
-- **Status:** [ ] todo. Follow the additive usage event decision below; distinguish unavailable measurements from actual zero and propagate provider usage without adding an event type.
-- **Test:** add provider usage, unknown and zero cases; run event and server suites.
+- **Status:** [x] verified. Additive fields retain numeric wire fields and the 17 existing event types. Per-turn accounting is conservative about missing usage and retries; old payloads render unknown. The benchmark aggregation helper is tested but not yet wired into the Phase 1B benchmark, which does not exist yet.
+- **Test:** `pytest -q tests/test_a08_usage.py tests/test_events.py tests/test_llm.py tests/test_tui_adapter.py tests/test_server.py` and `cd ui && npm test -- --run`.
+- **Verification:** full backend 1664 passed/19 skipped; frontend 86 passed; `npx tsc -b` passed. `docs/verify/A-08-real-tui-recorded-replay.png` is the installed TUI using the working tree and an explicitly labelled offline recording, not a live provider or verification run. React warnings and production build failure remain open.
 
 ### [A-09] Accurate counts and skill indexing
 - **Status:** [ ] todo. Generate honest measured catalog/default counts and describe actual skill indexing; test docs against source. Avoid claiming an absent README tool count.

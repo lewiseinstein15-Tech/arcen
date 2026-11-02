@@ -202,6 +202,9 @@ class Usage:
     tokens: dict[str, int]
     cost_usd: float
     ts: float = 0.0
+    measured: bool | None = None
+    usage_source: str | None = None
+    cost_source: str | None = None
     TYPE: ClassVar[str] = "usage"
 
 
@@ -303,6 +306,10 @@ def to_dict(event: Event) -> dict[str, Any]:
     # Absence preserves byte-identical legacy run.start events and replay.
     if isinstance(event, RunStart) and data["harness_ref"] is None:
         del data["harness_ref"]
+    if isinstance(event, Usage):
+        for key in ("measured", "usage_source", "cost_source"):
+            if data[key] is None:
+                del data[key]  # retain byte-identical legacy usage events
     seq = data.pop("seq")
     ts = data.pop("ts")
     out: dict[str, Any] = {"seq": seq, "type": event.TYPE}
@@ -334,6 +341,23 @@ def from_dict(data: dict[str, Any]) -> Event:
     if dropped:
         raise EventError(f"{etype}: unknown fields {sorted(dropped)}")
     optional = {"ts"}
+    if cls is Usage:
+        meta = {"measured", "usage_source", "cost_source"}
+        optional.update(meta)
+        present = meta & payload.keys()
+        if present and present != meta:
+            raise EventError("usage: measurement metadata must be complete")
+        if present:
+            if type(payload["measured"]) is not bool:
+                raise EventError("usage: measured must be boolean")
+            sources = {"provider", "estimated", "unknown"}
+            if any(type(payload[name]) is not str or payload[name] not in sources
+                   for name in ("usage_source", "cost_source")):
+                raise EventError("usage: invalid measurement source")
+            if not payload["measured"] and (
+                payload["usage_source"] != "unknown" or payload["cost_source"] != "unknown"
+            ):
+                raise EventError("usage: unmeasured sources must be unknown")
     if cls is RunStart:
         optional.add("harness_ref")
         if "harness_ref" in payload and (type(payload["harness_ref"]) is not str or not payload["harness_ref"]):

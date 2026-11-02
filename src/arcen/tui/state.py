@@ -23,6 +23,8 @@ class ViewState:
     steps_done: int = 0
     tokens: int = 0
     cost_usd: float = 0.0
+    usage_measured: bool = False
+    cost_known: bool = False
     tools: list[str] = field(default_factory=list)
     last_seq: int = 0
     cards: list[CardEntry] = field(default_factory=list)

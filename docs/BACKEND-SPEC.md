@@ -468,6 +468,8 @@ JSON shapes (representative, one line each as they appear on the wire):
 {"seq":17,"type":"run.error","code":"SANDBOX_UNAVAILABLE","message":"docker daemon not reachable","ts":1727500006.430}
 ```
 
+**Usage measurement (A-08).** The event type remains `usage` and the existing numeric `tokens.input`, `tokens.output`, and `cost_usd` fields remain present. New producers also emit `measured` (boolean), `usage_source` and `cost_source` (each `provider`, `estimated`, or `unknown`). When usage is unknown the numeric placeholders are zero, `measured` is false and both sources are `unknown`; consumers must display unknown and must not add placeholders to totals. Known provider token counts with no provider cost use LiteLLM's token pricing map for an estimated cost; an unavailable price uses `cost_source: "unknown"`, not a free-cost claim. A turn containing any call with missing usage is unmeasured as a whole. Failed/retried provider requests can have unreported costs and therefore make the turn unmeasured. When `measured` is true but `cost_source` is unknown, display the tokens but display cost as unknown. Benchmark aggregation must report how many runs were skipped; a sum containing only measured runs is not a full-population total. Old event payloads without the three fields still parse and render; their provenance is unknown. Old strict consumers may need updating to accept additive fields.
+
 **Resume.** The stream is replayable by `seq`. A reconnecting client sends:
 
 ```

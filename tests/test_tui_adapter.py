@@ -225,3 +225,12 @@ def test_repeated_step_pass_without_checks_keeps_verification_safe():
     adapter.apply({"type": "step.pass", "step": 1, "checks": ["one"]})
     adapter.apply({"type": "step.pass", "step": 1, "checks": []})
     assert adapter.state.verification.model.checks[0].status == "pass"
+
+
+def test_a08_old_and_unmeasured_usage_render_unknown():
+    adapter, _, rail, _, _ = setup_adapter()
+    adapter.apply({"seq": 1, "type": "usage", "tokens": {"input": 0, "output": 0}, "cost_usd": 0.0})
+    assert "unknown" in render(rail.render())
+    adapter.apply({"seq": 2, "type": "usage", "tokens": {"input": 0, "output": 0},
+                   "cost_usd": 0.0, "measured": False, "usage_source": "unknown", "cost_source": "unknown"})
+    assert "unknown" in render(rail.render())

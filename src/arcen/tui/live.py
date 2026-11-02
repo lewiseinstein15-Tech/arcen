@@ -300,7 +300,8 @@ class LiveApp(ArcenApp):
             self.header.set_phase("IDLE")
             self.footer.set_live(False)
             self.rail.apply_state({"steps_done": 0, "steps_total": 0, "phase_idx": 0,
-                                   "tokens": 0, "cost_usd": 0.0, "tools": [], "replanning": False})
+                                   "tokens": 0, "cost_usd": 0.0, "usage_measured": False,
+                                   "cost_known": False, "tools": [], "replanning": False})
             self.narration.items.clear()
             self.narration._sync()
             self.adapter = self._create_adapter()

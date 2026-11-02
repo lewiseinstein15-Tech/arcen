@@ -22,6 +22,7 @@ from typing import Any, Callable
 import litellm
 
 from arcen.harness import ResolvedPrompts, default_prompts
+from arcen.llm.usage import provider_metering
 
 litellm.suppress_debug_info = True
 
@@ -192,6 +193,9 @@ class LLMResponse:
     tokens: dict[str, int] = field(default_factory=lambda: {"input": 0, "output": 0})
     cost_usd: float = 0.0
     duration_s: float = 0.0
+    measured: bool = False
+    usage_source: str = "unknown"
+    cost_source: str = "unknown"
 
 
 class Client:
@@ -284,22 +288,16 @@ class Client:
                     **kwargs,
                 )
                 duration = time.monotonic() - start
-                usage = getattr(resp, "usage", None)
-                tokens = {
-                    "input": getattr(usage, "prompt_tokens", 0) if usage else 0,
-                    "output": getattr(usage, "completion_tokens", 0) if usage else 0,
-                }
-                cost = 0.0
-                try:
-                    cost = float(litellm.completion_cost(resp) or 0.0)
-                except Exception:
-                    cost = 0.0  # metering is best-effort; never blocks a turn
+                metering = provider_metering(resp, model)
+                if first is not None:
+                    # A failed request can have consumed unreported tokens/cost.
+                    metering = {"tokens": {"input": 0, "output": 0}, "cost_usd": 0.0,
+                                "measured": False, "usage_source": "unknown", "cost_source": "unknown"}
                 text = resp.choices[0].message.content or ""
                 return LLMResponse(
                     text=text,
                     model=model,
-                    tokens=tokens,
-                    cost_usd=cost,
+                    **metering,
                     duration_s=round(duration, 4),
                 )
             except Exception as exc:  # noqa: BLE001 — LiteLLM raises many shapes

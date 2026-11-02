@@ -45,6 +45,7 @@ from arcen.guardrails import default_policy
 from arcen.harness import HarnessError
 from arcen.harness.manifest import check_model_pin, default_manifest
 from arcen.llm.bridge import build_llm_client
+from arcen.llm.usage import MeteredClient, UsageAccumulator
 from arcen.llm.client import ProviderError, classify_provider_failure, format_provider_error
 from arcen.plugins.loader import PluginLoader
 from arcen.sandbox.turn import IsolationUnavailable, create_turn_registry, execution_status
@@ -251,6 +252,8 @@ def run_turn(
     isolated_registry = None
     pending_terminal = None
     pending_summary = None
+    usage = UsageAccumulator()
+    usage_emitted = False
 
     def emit_now(event) -> None:
         wire = emitter.emit(event)
@@ -258,7 +261,10 @@ def run_turn(
         state.store.append(session_id, wire)
 
     def emit(event) -> None:
-        nonlocal pending_terminal
+        nonlocal pending_terminal, usage_emitted
+        if event.TYPE in {"run.done", "run.error"} and not usage_emitted:
+            usage_emitted = True
+            emit_now(Usage(seq=0, **usage.result(), ts=0.0))
         # A terminal event must not claim success before container removal has
         # been confirmed. Preserve the normal event order on clean teardown.
         if isolated_registry is not None and event.TYPE in {"run.done", "run.error"}:
@@ -275,7 +281,8 @@ def run_turn(
 
         # DRAFT opens the turn — plan from the provider, or an honest
         # refusal when none is configured (never a fake bash plan, T-037)
-        draft = DraftPlanner(llm=state.llm, emit=emit)
+        turn_llm = MeteredClient(state.llm, usage) if state.llm is not None else None
+        draft = DraftPlanner(llm=turn_llm, emit=emit)
         plan_events = draft.open_turn(goal)
         if plan_events and plan_events[-1].TYPE == "answer":
             # conversational short-circuit: the greeting got its warm reply
@@ -380,7 +387,6 @@ def run_turn(
 
         emit(Memory(seq=0, op="write", entity=goal[:64],
                     fact=f"turn {run_id}: {executed} steps, verified={verified}", ts=0.0))
-        emit(Usage(seq=0, tokens={"input": 0, "output": 0}, cost_usd=0.0, ts=0.0))
 
         duration = round(time.time() - turn_start, 4)
         if failure is not None:
