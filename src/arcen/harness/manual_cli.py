@@ -1066,7 +1066,9 @@ def canary_interactive(
     review_candidate(store, baseline_id, candidate_id)
     config = _config(config_file)
     budget = DurableBudget(store, budget_id)
-    budget.checkpoint()
+    # Check again inside run_manual_canaries after confirmation: capacity can
+    # change between this advisory snapshot and the actual trial admissions.
+    budget.require_available(trials=2 * len(CASES), model_calls=2 * len(CASES), judge_calls=0)
     try:
         for case in CASES:
             bind_probe_model(store, baseline_id, baseline_id, case.task, config, budget=budget)
@@ -1101,6 +1103,10 @@ def canary_interactive(
     )
     print(
         f"Up to {2 * len(CASES)} trials and {8 * len(CASES)} model-call admissions; may stop earlier."
+    )
+    print(
+        f"Minimum available now: {2 * len(CASES)} trials and {2 * len(CASES)} model calls; "
+        "not reserved or guaranteed."
     )
     print("Candidate sanitized diff:\n" + _diff_objects(store, baseline_id, candidate_id), end="")
     print("\nPublic fixed tasks and expected output:")

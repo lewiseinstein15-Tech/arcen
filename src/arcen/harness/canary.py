@@ -126,7 +126,10 @@ def run_manual_canaries(
         raise HarnessError("canaries require the unchanged packaged baseline")
     review_candidate(store, baseline_id, candidate_id)
     cfg = _reviewed_config(config, True)
-    budget.checkpoint()
+    # This is a non-reserving snapshot, not a runtime or spending guarantee.
+    # Require enough admissions for every built-in reference/candidate pair
+    # before preparing a workspace or starting any provider/container work.
+    budget.require_available(trials=2 * len(CASES), model_calls=2 * len(CASES), judge_calls=0)
     models = tuple(
         (
             bind_probe_model(store, baseline_id, baseline_id, case.task, cfg, budget=budget),
@@ -157,7 +160,7 @@ def run_manual_canaries(
         if not _matches_bound_probe(reference, snapshot, reference_model):
             findings.append(CanaryFinding(case.id, "inconclusive", "not-run"))
             return report("inconclusive")
-        if reference.status == "error" or reference.canary_passed is None:
+        if reference.status == "error" or type(reference.canary_passed) is not bool:
             findings.append(CanaryFinding(case.id, "inconclusive", "not-run"))
             return report("inconclusive")
         if reference.status != "ok" or reference.canary_passed is not True:
@@ -171,7 +174,7 @@ def run_manual_canaries(
         if not _matches_bound_probe(candidate, snapshot, candidate_model):
             findings.append(CanaryFinding(case.id, "passed", "inconclusive"))
             return report("inconclusive")
-        if candidate.status == "error" or candidate.canary_passed is None:
+        if candidate.status == "error" or type(candidate.canary_passed) is not bool:
             findings.append(CanaryFinding(case.id, "passed", "inconclusive"))
             return report("inconclusive")
         if candidate.status != "ok" or candidate.canary_passed is not True:

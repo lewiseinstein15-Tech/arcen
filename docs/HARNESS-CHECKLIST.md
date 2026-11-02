@@ -110,6 +110,10 @@ merely because a sub-scope is complete.
 - [x] H-19d: extra caller-provided known values are checked in model-bound
       inputs and best-effort redacted from reviewed model/tool evidence.
       This is not comprehensive secret detection; H-19 remains open.
+- [x] H-16b: manual canaries reject obvious admission shortfalls before Git,
+      provider or Docker work and treat non-boolean verifier flags as
+      inconclusive. This is a non-reserving snapshot, not a guarantee of
+      completion, spend or safety; no adoption or rollback. H-16 remains open.
 - [x] H-15a: static review fails on inconsistent code-defined tier/editable
       allowlists, and optional read-only inspection reports changed tiers.
       This is advisory only; no policy authority, approval, adoption or runtime

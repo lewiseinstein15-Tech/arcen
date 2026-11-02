@@ -131,10 +131,11 @@ def test_unavailable_docker_or_bad_verifier_is_inconclusive(tmp_path, monkeypatc
     assert result.outcome == "inconclusive" and not calls and "private" not in repr(result)
 
 
-def test_budget_exhaustion_cannot_produce_pass(tmp_path, monkeypatch):
+def test_budget_exhaustion_after_preflight_cannot_produce_pass(tmp_path, monkeypatch):
     args = setup(tmp_path)
+    # The minimum is four calls, but these mocked probes each use two.
     cap = DurableBudget.create(
-        args[0], max_trials=2, max_model_calls=16, max_judge_calls=0, admission_seconds=120
+        args[0], max_trials=4, max_model_calls=4, max_judge_calls=0, admission_seconds=120
     )
     monkeypatch.setattr(probe_container, "DockerTurnRegistry", Boundary)
     calls = provider(monkeypatch)
@@ -144,7 +145,7 @@ def test_budget_exhaustion_cannot_produce_pass(tmp_path, monkeypatch):
         ("passed", "passed"),
         ("inconclusive", "not-run"),
     ]
-    assert cap.snapshot().trials == 2
+    assert cap.snapshot().trials == 3
 
 
 def test_review_and_candidate_policy_fail_before_git_or_model(tmp_path, monkeypatch):

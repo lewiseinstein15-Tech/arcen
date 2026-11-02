@@ -91,7 +91,13 @@ the exact evidence and revisions.
   secrets and most injections are not detected; inputs still require review.
   See `HARNESS-PROBE-HYGIENE.md`.
 - Two experimental, public and gameable behavioral canaries, with exact file
-  checks, not an adoption gate or security proof. An optional advisory combines
+  checks, not an adoption gate or security proof. The manual API checks for the
+  momentary minimum admissions for the complete bank before Git or trial work;
+  the interactive CLI checks before confirmation and repeats the check after.
+  The minimum is not reserved and is not sufficient to guarantee completion,
+  since probes may consume additional model calls or other users may spend the
+  capacity. Non-boolean verifier flags are inconclusive, not regressions. An
+  optional advisory combines
   a matching canary result with an unsigned paired review; it does not authorize
   adoption or establish baseline freshness.
 - An explicitly confirmed two-image portability comparison can run baseline

@@ -1,5 +1,22 @@
 # Verification screenshots
 
+## H-16b — canary admission and result safeguards
+
+Fresh PTY → xterm.js → Chromium captures using installed Python 3.13 commands:
+
+- `H-16b-real-canary-refusal.png`: actual interactive canary command refuses
+  a fixture with only three trial admissions; `budget status` confirms zero
+  trial/model admissions and an open budget. No provider or Docker was used.
+- `H-16b-real-canary-tests.png`: installed-wheel canary safeguard tests
+  outside the checkout: **18 passed**; trial/provider boundaries are mocked.
+- `H-16b-real-tui-fixture.png`: actual installed TUI with explicitly
+  **simulated** events narrating a real local admission refusal. This is not
+  live campaign integration, approval, adoption, or a safety proof.
+
+The full source suite passed **1641 tests, 19 skipped**; broader selected
+installed-wheel suites passed **172 tests, 1 skipped** each on Python 3.12 and
+3.13. The minimum is non-reserving and H-16 remains open.
+
 ## H-11k — local terminal-event consistency
 
 Fresh installed-command PTY → xterm.js → Chromium captures:

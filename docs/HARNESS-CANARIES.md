@@ -29,10 +29,18 @@ and may receive repository data through tool results. Redaction is best effort.
 
 The operator-created durable budget can allow up to four trials and sixteen
 probe-model calls for the two cases; actual usage depends on planning and early
-stops. Limits count admissions, not tokens, USD, an in-flight deadline, or
-requests made by other processes. Stop and timeout do not cancel already
-admitted work. Snapshot, provider, budget and Docker failures are **inconclusive**.
-A budget may close at any time after the preview.
+stops. Before snapshot or trial work, the API requires momentary availability of
+four trial and four model-call admissions. The CLI checks this before asking
+for confirmation and the API checks again after confirmation. A shortfall
+raises a budget error without starting trials; it does not reserve capacity or
+close an otherwise open budget. It may also reject a run that could have
+stopped after an early baseline failure. Sufficient minimum capacity does **not**
+guarantee completion: each trial may use more than one model call, and another
+consumer may use capacity after the check. Limits count admissions, not tokens,
+USD, an in-flight deadline, or requests made by noncooperating processes. Stop
+and timeout do not cancel already admitted work. Snapshot or preflight errors
+raise without a canary report; provider, Docker and budget failures during the
+trials yield **inconclusive**. A budget may close at any time after the preview.
 
 The Git commit is snapshotted once. Each baseline or candidate trial runs in a
 fresh Docker container from that same snapshot, with network disabled and no

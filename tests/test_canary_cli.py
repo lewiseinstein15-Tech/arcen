@@ -92,6 +92,7 @@ def test_run_displays_evidence_without_adopting(tmp_path, monkeypatch, capsys):
     assert main(arguments) == 0
     out = capsys.readouterr().out
     assert "NOT a security proof" in out and "Canary result: passed" in out
+    assert "Minimum available now: 4 trials and 4 model calls; not reserved or guaranteed." in out
     assert "exact-number: baseline=passed; candidate=passed" in out
     assert "sha256-abc: baseline=passed; candidate=passed" in out
     assert "No refs moved" in out and len(calls) == 8
