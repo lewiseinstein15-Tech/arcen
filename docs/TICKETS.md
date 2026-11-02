@@ -547,3 +547,70 @@ This closes the pattern where real bugs sit unactioned in a report.
 - **Test:** pytest — 401/400/403/404 → exactly 1 call; 500 → 4 calls with sleeps [1,2,4]; 429 clears on the 3rd call with sleeps [1,2]; timeout → 1 call + "timeout after 60s"; complete() defaults timeout=60; bridge passes num_retries=0/max_retries=0 and the config retry policy; run.error carries the cause and the stream closes with stream.done; probe answers the specific error in one call.
 - **Verification:** live mock provider returning 401: the run errors in <5s with `provider error: 401 …` on the stream (T4 evidence) and Test Connection shows the same class of message in the UI.
 - **Evidence:** user laptop log — `Retrying request to /chat/completions in 10.0s` ×5+ (litellm's backoff) stacked inside Client.complete's own blind 3-attempt loop, while draft.py's three `except Exception` blocks converted every provider death into a silent offline fallback or an "I couldn't plan this" refusal — the stream never carried a cause.
+
+---
+
+## Phase 0 audit tracking (2026-11-02)
+
+The following are backlog entries, not authorization to implement any later phase. Complete one ticket at a time in the approved phase and add focused failing/passing tests before closing it. Keep all 17 frozen events. Consult `AUDIT.md` for findings and limitations. Test commands below are starting regression commands; extend with ticket-specific tests. Fresh real-PTY verification screenshots are required for closure.
+
+### [P0-AUDIT] Phase 0 repository audit
+- **Status:** [~] in progress — scanner inventory complete; semantic classification of every exception/catch and complete file-by-file review are not established. Do not close or represent Phase 0 as complete until addressed.
+- **Test:** `python docs/audit/inspect_repo.py && PYTHONPATH=src python docs/audit/reproduce.py`
+- **Verification:** inventories match, source-linked audit and all requested exception dispositions are substantiated; reproduce counts; attach fresh verification evidence. Backend and frontend results are recorded in `AUDIT.md`.
+
+### [A-01] Independent verification instead of command replay
+- **Status:** [ ] todo. Avoid automatic rerunning of arbitrary mutating work commands; discover and explicitly run appropriate safe checks, report evidence and unknowns, add false-pass and side-effect regressions.
+- **Test:** `pytest tests/test_temper.py` plus new server verification tests.
+
+### [A-02] Repeatable engineering benchmark
+- **Status:** [ ] todo. Define task set and independent scoring, record resolved %, cost and elapsed time with available/unknown status, replay baseline and compare without inventing numbers.
+- **Test:** add deterministic benchmark harness tests and publish run commands.
+
+### [A-03] Safe reviewed change return
+- **Status:** [ ] todo. Design opt-in export/review of changes from disposable workspace with path, symlink, concurrency and secret protections; preserve isolation and never silently write host files.
+- **Test:** `pytest tests/test_sandbox.py` plus export and attack regressions.
+
+### [A-04] Enabled-only plugin discovery
+- **Status:** [ ] todo. Prevent disabled modules from executing during discovery while preserving explicitly trusted opt-in behavior; test with temporary import marker. Do not claim it sandboxs plugins.
+- **Test:** `PYTHONPATH=src python docs/audit/reproduce.py` captures old behavior; add an inverted regression alongside plugin tests.
+
+### [A-05] Plugin boot credential minimization
+- **Status:** [ ] todo. Pass minimal redacted boot payload rather than literal credentials; test nested secrets and plugin compatibility. Plugins remain trusted host code; no security-boundary claims.
+- **Test:** add boot-hook regression under `tests/`; run plugin/config tests.
+
+### [A-06] Observation-driven native loop
+- **Status:** [ ] todo. After authorization, design bounded one-tool-at-a-time observation and replanning with failures, budgets and preserved events; prove behavior with deterministic scripted provider.
+- **Test:** add native loop tests and run DRAFT/FORGE/server regression tests.
+
+### [A-07] Honest isolated tool capabilities
+- **Status:** [ ] todo. Expose effective safe isolated capabilities separately from registry counts; add tools only through audited isolation, never host fallback.
+- **Test:** run isolated registry and policy tests plus targeted capability tests.
+
+### [A-08] Truthful usage and cost
+- **Status:** [ ] todo. Distinguish unavailable measurements from actual zero, propagate provider usage where possible without breaking the frozen protocol.
+- **Test:** add provider usage, unknown and zero cases; run event and server suites.
+
+### [A-09] Accurate counts and skill indexing
+- **Status:** [ ] todo. Generate honest measured catalog/default counts and describe actual skill indexing; test docs against source. Avoid claiming an absent README tool count.
+- **Test:** `PYTHONPATH=src python docs/audit/reproduce.py` plus generated-documentation regression.
+
+### [A-10] Complete catch-by-catch disposition
+- **Status:** [ ] todo. Examine all Python, JS/TS and shell catch/suppression candidates in context, including minified/vendor exceptions, add missing language constructs and record each disposition, client visibility and rationale. Distinguish deliberate cleanup, fallback, redaction and real silent loss. Add follow-up tickets for new defects.
+- **Test:** `python docs/audit/inspect_repo.py` and independently review full inventory coverage and dispositions.
+
+### [A-11] Avoid killing unrelated port owners
+- **Status:** [ ] todo. `scripts/dev.sh:32-35` force-kills whatever owns development ports; replace with safe owned-process behavior after authorization, test unrelated and stale owned processes without harming real listeners.
+- **Test:** add isolated mocked shell/process tests.
+
+### [A-12] Frontend production build resource failure
+- **Status:** [ ] todo. Reproduce and diagnose `npm run build` exiting 137 after `rendering chunks...` in this environment; retry with adequate resources and fix only after cause is established. The explicit 1024 MiB Node heap retry also printed `Killed`.
+- **Test:** `cd ui && npm ci --ignore-scripts --no-audit --no-fund && npm run build`.
+
+### [A-13] Existing source provenance
+- **Status:** [ ] todo. Inventory existing attribution claims (e.g. source docstrings), verify actual origin/commit/licenses before copying anything, resolve uncertain provenance with user, update NOTICE as warranted. No allegation of infringement is established.
+- **Test:** documented provenance review and automated attribution coverage where feasible.
+
+### [A-14] React act warnings in frontend tests
+- **Status:** [ ] todo. Investigate asynchronous updates causing `act(...)` warnings; keep assertions meaningful and verify clean completion without suppressing errors.
+- **Test:** `cd ui && npm test -- --run`.
