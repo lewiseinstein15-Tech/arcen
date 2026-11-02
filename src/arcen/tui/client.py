@@ -30,6 +30,8 @@ from typing import Self
 import httpx
 
 DEFAULT_BASE_URL = "http://127.0.0.1:3002"
+# Maximum UTF-8 bytes in one live NDJSON line, not including its newline.
+MAX_LIVE_LINE_BYTES = 1024 * 1024
 # Transport frames (BACKEND-SPEC Part 9): no ``seq`` — the app ignores them.
 # stream.ping is an idle keepalive; stream.done is the clean close marker.
 TRANSPORT_FRAMES = frozenset({"stream.ping", "stream.done"})
@@ -56,6 +58,34 @@ def _unique_pairs(pairs):
     return result
 
 
+async def _bounded_live_lines(response: httpx.Response) -> AsyncIterator[bytes]:
+    """Frame identity-encoded NDJSON without retaining an unbounded partial line.
+
+    Reject an oversized frame rather than skipping it and silently advancing
+    the resume cursor past an event the TUI did not see. This bounds only this
+    parser's pending-line buffer, not HTTP transport allocation or replay.
+    """
+    pending = bytearray()
+    async for chunk in response.aiter_bytes():
+        start = 0
+        while start < len(chunk):
+            end = chunk.find(b"\n", start)
+            if end < 0:
+                end = len(chunk)
+                complete = False
+            else:
+                complete = True
+            if len(pending) + end - start > MAX_LIVE_LINE_BYTES:
+                raise ArcenStreamProtocolError("live stream frame exceeds byte limit")
+            pending.extend(memoryview(chunk)[start:end])
+            if complete:
+                yield bytes(pending)
+                pending.clear()
+            start = end + 1
+    if pending:
+        yield bytes(pending)
+
+
 class ArcenAPIError(RuntimeError):
     """A non-2xx server reply, carrying the FastAPI ``detail`` when present."""
 
@@ -63,6 +93,13 @@ class ArcenAPIError(RuntimeError):
         self.status = status
         self.detail = detail
         super().__init__(detail or f"ARCEN server returned HTTP {status}")
+
+
+class ArcenStreamProtocolError(ArcenAPIError):
+    """A stream must be stopped until the peer's protocol issue is corrected."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(0, detail)
 
 
 def new_session_id() -> str:
@@ -188,11 +225,12 @@ class ArcenClient:
         *,
         max_hold_retries: int = 100,
     ) -> AsyncIterator[dict]:
-        """Yield app events from the held NDJSON stream, forever-resumable.
+        """Yield app events from held NDJSON; retry transport errors when allowed.
 
-        Contract honored (same as the TypeScript reader):
+        Live-stream framing and reconnect behavior:
 
-        - malformed or duplicate-key JSON lines are skipped;
+        - malformed UTF-8 or duplicate-key JSON lines are skipped;
+        - oversized lines and non-identity content encodings fail the stream;
         - app events require a nonempty string type and positive integer seq;
         - seq-less transport frames (``stream.ping``) are invisible;
         - ``stream.done`` ends the iteration cleanly;
@@ -201,7 +239,9 @@ class ArcenClient:
         - ``run.done`` / ``run.error`` are yielded and then the stream is
           expected to close; an unexpected EOF just ends the iterator.
         """
-        headers = {"Last-Event-ID": str(last_event_id)} if last_event_id is not None else {}
+        headers = {"Accept-Encoding": "identity"}
+        if last_event_id is not None:
+            headers["Last-Event-ID"] = str(last_event_id)
         url = f"/api/stream?session={session}"
         retries = 0
         seen_seq = last_event_id  # advances as events render → resume cursor
@@ -230,30 +270,25 @@ class ArcenClient:
                             self._detail(response) or "stream connection failed",
                         )
 
-                    buffer = ""
-                    async for chunk in response.aiter_text():
-                        buffer += chunk
-                        parts = buffer.split("\n")
-                        buffer = parts.pop()  # keep the partial line across chunks
-                        for line in parts:
-                            event = self._parse_line(line)
-                            if event is None:
-                                continue
-                            if event.get("type") == "stream.done":
-                                return
-                            if not is_app_event(event):
-                                continue  # keepalives and malformed envelopes
-                            seen_seq = event["seq"]
-                            yield event
-                    if buffer.strip():
-                        event = self._parse_line(buffer)
-                        if (
-                            event is not None
-                            and event.get("type") != "stream.done"
-                            and is_app_event(event)
-                        ):
-                            seen_seq = event["seq"]
-                            yield event
+                    # Do not allow HTTP decompression to expand a small wire
+                    # chunk before the parser can apply its line limit.
+                    encoding = response.headers.get("content-encoding", "identity").strip().lower()
+                    if encoding not in ("", "identity"):
+                        raise ArcenStreamProtocolError("encoded live stream is not supported")
+                    async for raw_line in _bounded_live_lines(response):
+                        try:
+                            line = raw_line.decode("utf-8", errors="strict")
+                        except UnicodeDecodeError:
+                            continue
+                        event = self._parse_line(line)
+                        if event is None:
+                            continue
+                        if event.get("type") == "stream.done":
+                            return
+                        if not is_app_event(event):
+                            continue  # keepalives and malformed envelopes
+                        seen_seq = event["seq"]
+                        yield event
                     return
             except httpx.HTTPError as exc:
                 # Connection dropped mid-turn: reconnect and resume from the

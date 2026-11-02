@@ -104,6 +104,10 @@ merely because a sub-scope is complete.
 - [x] H-19d: extra caller-provided known values are checked in model-bound
       inputs and best-effort redacted from reviewed model/tool evidence.
       This is not comprehensive secret detection; H-19 remains open.
+- [x] H-19g: the TUI's successful live NDJSON reader bounds each pending line
+      to 1 MiB, refuses encoded streams and halts on oversized lines without
+      skipping forward or retrying automatically. Replay, error bodies,
+      transport chunks and total UI memory remain unbounded; H-19 remains open.
 - [x] H-19f: the TUI discards malformed event envelopes in live streams and
       session replay, and duplicate-key JSON in live NDJSON. This is not
       authentication, complete payload validation, bounded input, or safe resume;

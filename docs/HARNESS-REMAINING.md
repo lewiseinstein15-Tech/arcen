@@ -43,9 +43,15 @@ the exact evidence and revisions.
   wired to produce these events. This bridge does not provide the full v2
   contract, durable history, authorization or resume. The live client drops
   duplicate-key NDJSON and invalid type/sequence envelopes, and applies the
-  envelope check to replay; replay JSON duplicate keys are not checked. This
-  is not complete payload validation, authentication, resource bounding, or
-  protection against a validly shaped malicious stream.
+  envelope check to replay; replay JSON duplicate keys are not checked. A
+  successful live stream now accepts only identity encoding and holds at most
+  1 MiB of an incomplete NDJSON line; it fails instead of skipping an oversized
+  line and rejects invalid UTF-8. The TUI halts rather than automatically
+  retrying these protocol failures; it does not claim the run has stopped. This
+  does not bound HTTP transport allocation,
+  stream error bodies, replay, event count, rendering or total memory. It is
+  not complete payload validation, authentication or protection against a
+  validly shaped malicious stream.
   A separate command can compose human-selected candidates from a completed
   campaign's local summaries.
 - Durable journal and shared admission counts; optional stop at stage

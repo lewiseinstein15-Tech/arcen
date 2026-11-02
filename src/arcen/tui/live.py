@@ -32,6 +32,7 @@ from arcen.tui.client import (
     TERMINAL_EVENTS,
     ArcenAPIError,
     ArcenClient,
+    ArcenStreamProtocolError,
     is_app_event,
     new_session_id,
 )
@@ -86,6 +87,7 @@ class LiveApp(ArcenApp):
         self._restore_session = bool(session_id)
         self.retry_seconds = retry_seconds
         self.online = False
+        self._stream_halted = False
         self.busy = False
         self.run_id: str | None = None
         self._reader_task: asyncio.Task | None = None
@@ -164,7 +166,10 @@ class LiveApp(ArcenApp):
             self._notice("a turn is already running; draft preserved")
             return
         if not self.online:
-            self._notice("server offline; draft preserved")
+            if self._stream_halted:
+                self._notice("stream halted; inspect server and reopen session; draft preserved")
+            else:
+                self._notice("server offline; draft preserved")
             return
         self.busy = True
         self._submit_task = asyncio.create_task(self._submit_goal(value))
@@ -396,6 +401,7 @@ class LiveApp(ArcenApp):
 
     async def _stream_loop(self) -> None:
         """Reconnect after an abnormal EOF; terminal events end this pump."""
+        self._stream_halted = False
         reconnecting = False
         while not self._closing:
             self.online = await self.client.health()
@@ -435,6 +441,13 @@ class LiveApp(ArcenApp):
                     self.online = True
                     return
                 self._notice("stream disconnected; reconnecting")
+            except ArcenStreamProtocolError as exc:
+                self.online = False
+                self._stream_halted = True
+                self.header.update_meta(quarantine="stream halted · blocked")
+                self.footer.set_live(False)
+                self._notice(f"stream halted: {exc}; inspect server before reconnecting")
+                return
             except (ArcenAPIError, httpx.HTTPError, OSError) as exc:
                 self._notice(f"stream disconnected; reconnecting: {exc}")
             reconnecting = True

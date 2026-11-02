@@ -92,6 +92,16 @@ also reports offline and blocked-sandbox states; the sandbox modal shows the
 selected backend and reason. A process backend is not an isolation boundary;
 tool execution remains blocked unless Docker isolation is available.
 
+For successful live NDJSON responses, the client requests identity encoding,
+rejects compressed responses, and caps each pending line at 1 MiB (UTF-8 bytes,
+excluding the newline). An oversized line stops that connection rather than
+skipping to later events; the TUI reports the error and stops automatic
+reconnection for that stream. Inspect the server before reopening a session or
+restarting the TUI. A halted stream does not prove the run stopped. Malformed
+UTF-8 is discarded. This limit does not bound HTTP transport chunks,
+error bodies, session replay, accumulated events, or total process memory.
+It is not stream authentication, a safety guarantee or safe campaign resume.
+
 Interrupt sends `DELETE /api/run/{run_id}` **only after confirmation**. The
 server cooperatively stops between steps, so an in-progress step may finish
 first. Errors are shown without pretending the run stopped. No credentials are

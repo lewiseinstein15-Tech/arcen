@@ -1418,3 +1418,24 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   authenticated Git history. The local Git executable, repository, filesystem
   and separately supplied key must be trusted. A commit ID is not a signature;
   H-05 remains open. The expanded GitHub workflow has not yet run remotely.
+
+### H-19g — bounded live NDJSON lines (partial)
+
+- `H-19g-real-live-overflow.png` is a fresh installed `arcen-tui --no-serve`
+  PTY captured through xterm.js/Chromium. A local HTTP fixture sent two small
+  valid events followed by a line exceeding 1 MiB; the real TUI displayed the
+  halt and did not repeatedly reconnect. The fixture is explicitly simulated;
+  no Docker, model, real campaign or adoption was involved. A halted stream
+  does **not** mean a remote run has stopped.
+- `H-19g-real-boundary-tests.png` shows **14 passed** from a fresh installed
+  wheel PTY run. Full Python 3.13 source suite: **1,508 passed, 19 skipped**.
+  Focused installed-wheel TUI/client/workflow suite: **45 passed** on each of
+  Python 3.12.16 and 3.13.16. The new GitHub workflow selection has not yet run
+  remotely.
+- The line limit applies only to successful identity-encoded live NDJSON; it
+  prevents this parser from retaining more than 1 MiB for one partial line.
+  Oversized frames and encoded responses halt that stream; malformed UTF-8 is
+  skipped. It does not bound HTTP transport allocations, error bodies, replay,
+  event count, UI rendering, or total process memory. It is not authentication,
+  full payload validation, safe campaign resume or a safety/adoption gate.
+  H-19 remains open.
