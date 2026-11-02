@@ -28,6 +28,7 @@ _COMMIT = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 _GIT = "/usr/bin/git"
 _TIMEOUT = 30.0
 _MAX_TAR_OVERHEAD = 16 * 1024 * 1024
+_MAX_GIT_CONFIG_BYTES = 1024 * 1024
 _SECRET_DIRS = frozenset({".ssh", ".gnupg", ".aws", ".kube", ".azure", ".config"})
 _SECRET_NAMES = frozenset(
     {".netrc", ".npmrc", ".pypirc", "id_rsa", "id_ed25519", "credentials", "credentials.json"}
@@ -137,11 +138,35 @@ def _safe_name(name: str, is_dir: bool) -> str:
     return trimmed
 
 
+def _reject_configured_git_filters(repo: Path) -> None:
+    """Refuse local Git filter configuration before invoking Git archive.
+
+    Git archive may execute smudge/process filters from repository config,
+    selected by attributes in a commit or local attributes. The shared runner
+    excludes inherited global/system configuration. This conservative check
+    rejects *all* filter config keys, including inert entries; it is not an OS
+    sandbox and assumes trusted Git, config files and no concurrent mutation.
+    """
+    config = _run_git(repo, ["config", "--null", "--list"], max_bytes=_MAX_GIT_CONFIG_BYTES)
+    if config and not config.endswith(b"\0"):
+        raise WorkspaceError("invalid Git configuration output")
+    for item in config.split(b"\0"):
+        if not item:
+            continue
+        key = item.partition(b"\n")[0]
+        if not key:
+            raise WorkspaceError("invalid Git configuration output")
+        if key.lower().startswith(b"filter."):
+            raise WorkspaceError("Git filter configuration is not allowed for probe snapshots")
+
+
 def snapshot_git_commit(repo: str | Path, commit: str) -> GitSnapshot:
     """Snapshot tracked files from a full commit ID into a normalized tar.
 
-    This function never runs project code and rejects symlinks, submodules,
-    special files, suspicious credential paths and resource-limit violations.
+    Configured Git filters, symlinks, submodules, special files, suspicious
+    credential paths and resource-limit violations are rejected. The Git
+    executable, repository, configuration and local filesystem are trusted;
+    this is not a sandbox or a guarantee against concurrent configuration edits.
     Filenames are not a secret scanner: only use reviewed commits containing
     no credentials or other data inappropriate to expose to a model/provider.
     """
@@ -158,6 +183,7 @@ def snapshot_git_commit(repo: str | Path, commit: str) -> GitSnapshot:
         raise WorkspaceError("repository must be a directory")
     if _run_git(path, ["cat-file", "-t", commit], max_bytes=128) != b"commit\n":
         raise WorkspaceError("Git object is not a commit")
+    _reject_configured_git_filters(path)
     limits = default_policy().workspace
     limit_entries = min(limits.max_entries, MAX_FILES)
     limit_bytes = min(limits.max_file_bytes, MAX_BYTES)

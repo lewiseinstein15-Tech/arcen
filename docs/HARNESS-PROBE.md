@@ -33,7 +33,15 @@ missing promisor object or a Git version without that option fails closed rather
 than fetching the object. Populate reviewed objects beforehand through your own
 trusted workflow. The Git executable, repository, local configuration and
 filesystem are trusted; this is not an OS-level network sandbox against malicious
-local Git or configuration. Untracked files,
+local Git or configuration. Before archiving, the reader checks the effective
+local/worktree Git config (including included files), bounded to 1 MiB, and
+refuses **any** `filter.*` setting. Git archive can run smudge/process filters
+on the host; this deliberately conservative rule also rejects harmless or
+unused filters, including Git LFS configuration. The check and archive are
+separate operations: concurrent config changes can bypass it, so keep the
+repository and config trusted and stable. This is not an OS-level execution
+sandbox or a proof that all possible Git configuration effects are harmless.
+The runner ignores inherited system/global Git configuration. Untracked files,
 working-tree changes and `.git` are excluded; Git archive attributes such as
 `export-ignore` still apply. Links, submodules and special files are rejected,
 as are common credential filenames and directories. Archive content and limits

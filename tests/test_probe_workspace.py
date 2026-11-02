@@ -127,7 +127,9 @@ def test_unsafe_archive_members_rejected(tmp_path, monkeypatch, name):
     monkeypatch.setattr(
         probe_workspace,
         "_run_git",
-        lambda repo, args, **kw: b"commit\n" if args[0] == "cat-file" else raw,
+        lambda repo, args, **kw: (
+            b"commit\n" if args[0] == "cat-file" else b"" if args[0] == "config" else raw
+        ),
     )
     with pytest.raises(WorkspaceError):
         snapshot_git_commit(repo, commit)
@@ -158,7 +160,7 @@ def test_git_subprocess_environment_has_no_inherited_credentials(tmp_path, monke
 
     monkeypatch.setattr(probe_workspace.subprocess, "Popen", capture)
     snapshot_git_commit(repo, commit)
-    assert len(calls) == 2
+    assert len(calls) == 3
     for args, kwargs in calls:
         assert kwargs["env"].get("AWS_SECRET_ACCESS_KEY") is None
         assert kwargs["env"]["GIT_TERMINAL_PROMPT"] == "0"
@@ -191,7 +193,9 @@ def test_malformed_and_oversized_archive_are_rejected(tmp_path, monkeypatch):
     monkeypatch.setattr(
         probe_workspace,
         "_run_git",
-        lambda repo, args, **kw: b"commit\n" if args[0] == "cat-file" else b"not tar",
+        lambda repo, args, **kw: (
+            b"commit\n" if args[0] == "cat-file" else b"" if args[0] == "config" else b"not tar"
+        ),
     )
     with pytest.raises(WorkspaceError, match="invalid Git archive"):
         snapshot_git_commit(repo, commit)

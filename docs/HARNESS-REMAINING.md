@@ -71,8 +71,12 @@ the exact evidence and revisions.
 - The shared Git object reader now disables promisor lazy fetch for probe
   snapshots as well as signed-package reads. Missing objects and Git versions
   without `--no-lazy-fetch` fail closed; the local Git executable, repository,
-  configuration and filesystem remain trusted. This is not an OS-level
-  network boundary and does not authenticate commits or scan for all secrets.
+  configuration and filesystem remain trusted. Probe snapshots also reject any
+  effective local Git filter configuration before archive because Git can run
+  configured smudge/process filters on the host. This conservative check rejects
+  harmless filters too, and is subject to configuration changes between check
+  and archive. It is not an OS-level execution/network boundary and does not
+  authenticate commits or scan for all secrets.
 - Reviewed trial archives reject exact occurrences of the configured provider
   key before Docker or provider calls. Paired/manual campaigns also check
   explicitly supplied sensitive values. Paired/campaign model inputs and

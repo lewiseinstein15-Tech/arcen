@@ -1505,3 +1505,27 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   execution or network access from malicious local Git/configuration. It is not
   authentication, a secret scan or a replacement for Docker isolation; H-19
   remains open.
+
+### H-19k — reject configured Git filters before probe archive (partial)
+
+- `H-19k-real-filter-refusal.png` is a fresh installed `arcen-tui --no-serve`
+  PTY rendered by xterm.js/Chromium. A simulated local HTTP fixture narrated a
+  real installed snapshot-reader refusal of a configured smudge filter before
+  its marker command executed. The TUI events are fixture-generated; no real
+  campaign, Docker or model ran.
+- `H-19k-real-filter-tests.png` shows **10 passed** on a fresh installed-wheel
+  PTY run. Python 3.13 full source suite: **1,555 passed, 19 skipped**. Selected
+  installed-wheel Git/package/probe/workflow suites: **80 passed, 2 skipped**
+  on each of Python 3.12.16 and 3.13.16. The workflow change has not run on
+  GitHub yet. Docker/provider were mocked or skipped.
+- A real local Git fixture confirmed that unguarded `git archive` executes a
+  configured smudge filter, whereas the snapshot reader refuses before the
+  marker executes. Tests also cover process and unused filters, included config,
+  size and malformed config failures, normal `export-ignore` semantics, and
+  failure before budget admission, Docker and provider calls.
+- This deliberately conservative preflight rejects any effective `filter.*`
+  config, including harmless filters and Git LFS settings. The check is separate
+  from archive execution and can race with concurrent configuration changes;
+  local Git, its configuration and filesystem must remain trusted and stable.
+  It is not an OS execution/network sandbox or comprehensive Git hardening.
+  H-19 remains open.

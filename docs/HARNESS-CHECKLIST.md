@@ -104,6 +104,10 @@ merely because a sub-scope is complete.
 - [x] H-19d: extra caller-provided known values are checked in model-bound
       inputs and best-effort redacted from reviewed model/tool evidence.
       This is not comprehensive secret detection; H-19 remains open.
+- [x] H-19k: probe snapshots reject any effective local Git filter configuration
+      before `git archive`, including included config and inert filters. Real
+      smudge-filter control tested; local Git/config/filesystem must be trusted
+      and stable. This is not an OS-level execution sandbox; H-19 remains open.
 - [x] H-19j: the shared local Git object reader disables promisor lazy fetch
       for probe snapshots and signed-package reads, and fails if Git lacks that
       option or needed objects are absent. This trusts local Git, repository and
