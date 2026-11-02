@@ -104,6 +104,10 @@ merely because a sub-scope is complete.
 - [x] H-19d: extra caller-provided known values are checked in model-bound
       inputs and best-effort redacted from reviewed model/tool evidence.
       This is not comprehensive secret detection; H-19 remains open.
+- [x] H-19i: TUI live-stream HTTP error bodies are closed without being read;
+      a 409 compaction reset occurs at most once with a resume hint, and an
+      unresolved compaction halts the stream. No global HTTP, retry, total
+      memory or remote-run control guarantee; H-19 remains open.
 - [x] H-19h: the TUI bounds the raw body and top-level event count of session
       replay; rejects compressed, invalid, duplicate-key and non-finite JSON;
       and halts initial restore on these protocol errors. Transport chunks,

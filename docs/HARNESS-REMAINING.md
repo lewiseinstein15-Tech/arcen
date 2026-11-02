@@ -52,8 +52,11 @@ the exact evidence and revisions.
   session change leaves the existing session in place. These limits do not
   bound HTTP transport allocations, decoded JSON expansion, replay duration,
   other endpoint bodies, rendering or total memory. The event limit is checked
-  after parsing. They do not authenticate events, validate
-  complete payloads, stop a running agent or provide safe campaign resume.
+  after parsing. Live-stream HTTP error bodies are closed unread, and an
+  unresolved 409 compaction halts after at most one restart with a resume
+  hint. The client's 404 retries still have no delay. These measures do not
+  authenticate events, validate complete payloads, stop a running agent or
+  provide safe campaign resume.
   A separate command can compose human-selected candidates from a completed
   campaign's local summaries.
 - Durable journal and shared admission counts; optional stop at stage

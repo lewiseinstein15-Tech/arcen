@@ -277,8 +277,9 @@ class ArcenClient:
         - app events require a nonempty string type and positive integer seq;
         - seq-less transport frames (``stream.ping``) are invisible;
         - ``stream.done`` ends the iteration cleanly;
-        - a 404 hold race is retried with backoff instead of surfacing;
-        - HTTP 409 (Last-Event-ID compacted away) restarts once from zero;
+        - a 404 hold race is retried up to the retry limit (no backoff here);
+        - HTTP 409 with a resume hint restarts at most once from zero;
+        - error responses are closed without buffering their bodies;
         - ``run.done`` / ``run.error`` are yielded and then the stream is
           expected to close; an unexpected EOF just ends the iterator.
         """
@@ -287,6 +288,7 @@ class ArcenClient:
             headers["Last-Event-ID"] = str(last_event_id)
         url = f"/api/stream?session={session}"
         retries = 0
+        compacted_once = False
         seen_seq = last_event_id  # advances as events render → resume cursor
 
         while True:
@@ -299,19 +301,23 @@ class ArcenClient:
                         retries += 1
                         if retries > max_hold_retries:
                             raise ArcenAPIError(404, "session never became streamable")
-                        await response.aread()
+                        # The response context closes without reading an untrusted body.
                         continue
                     if response.status_code == 409:
-                        # Compaction horizon: drop the resume hint, replay fresh.
-                        headers.pop("Last-Event-ID", None)
-                        await response.aread()
+                        # Only one restart with a real resume hint is meaningful.
+                        # Repeated/no-hint 409 must not spin or mask a bad peer.
+                        if compacted_once or "Last-Event-ID" not in headers:
+                            raise ArcenStreamProtocolError(
+                                "stream compaction could not be resolved"
+                            )
+                        compacted_once = True
+                        headers.pop("Last-Event-ID")
+                        seen_seq = None
                         continue
                     if response.status_code >= 400:
-                        await response.aread()
-                        raise ArcenAPIError(
-                            response.status_code,
-                            self._detail(response) or "stream connection failed",
-                        )
+                        # The status is available without buffering an arbitrary
+                        # server-supplied (possibly compressed) error body.
+                        raise ArcenAPIError(response.status_code, "stream connection failed")
 
                     # Do not allow HTTP decompression to expand a small wire
                     # chunk before the parser can apply its line limit.

@@ -86,8 +86,12 @@ use the web Settings interface or configuration file instead.
 The client opens a held NDJSON stream before submitting a goal, buffers partial
 lines, ignores transport heartbeats, and resumes on disconnect using
 `Last-Event-ID`. The adapter de-duplicates replayed sequence numbers and shows
-an event-gap notice. HTTP 409 compaction triggers a replay from zero. The
-server's `run.done` or `run.error` ends the stream for that turn. The client
+an event-gap notice. HTTP 409 compaction with a resume hint triggers at most
+one restart from zero; a repeated or no-hint 409 halts that stream. Stream HTTP
+error bodies are closed unread, so server-provided details are not shown for
+this route. The client's bounded 404 retries have no delay; the TUI's outer
+reconnect loop does delay. The server's `run.done` or `run.error` ends the
+stream for that turn. The client
 also reports offline and blocked-sandbox states; the sandbox modal shows the
 selected backend and reason. A process backend is not an isolation boundary;
 tool execution remains blocked unless Docker isolation is available.

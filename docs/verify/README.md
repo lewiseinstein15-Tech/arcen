@@ -1463,3 +1463,22 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   chunk allocation, JSON object expansion, replay duration, other endpoint
   responses or total TUI memory. It does not authenticate or fully validate
   events, or establish safe campaign resume. H-19 remains open.
+
+### H-19i — bounded live-stream error handling (partial)
+
+- `H-19i-real-compaction.png` is a fresh installed `arcen-tui --no-serve
+  --session ...` PTY, rendered by xterm.js/Chromium. A clearly simulated local
+  HTTP fixture provided a replay and repeated 409 compaction responses; the TUI
+  halted instead of spinning. No Docker, model, real campaign or adoption was
+  involved. A halted stream does not prove a remote run stopped.
+- `H-19i-real-error-tests.png` shows **11 passed** from a fresh installed-wheel
+  PTY test run. Full Python 3.13 source suite: **1,539 passed, 19 skipped**.
+  Focused installed-wheel TUI/client/workflow suite: **76 passed** on each of
+  Python 3.12.16 and 3.13.16. The expanded GitHub workflow has not run remotely.
+- 404, 409 and other error responses on the live-stream route are closed without
+  reading their bodies. One 409 with a resume hint retries without the hint; a
+  repeated or no-hint 409 halts. A transport failure during reset does not
+  restore the old cursor. Server error details on this route are not displayed.
+  This is not a global HTTP memory limit or safe resume: other endpoints and
+  transport allocations remain outside this scope; the client's bounded 404
+  retries have no delay. H-19 remains open.
