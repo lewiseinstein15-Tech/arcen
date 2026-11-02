@@ -98,9 +98,16 @@ excluding the newline). An oversized line stops that connection rather than
 skipping to later events; the TUI reports the error and stops automatic
 reconnection for that stream. Inspect the server before reopening a session or
 restarting the TUI. A halted stream does not prove the run stopped. Malformed
-UTF-8 is discarded. This limit does not bound HTTP transport chunks,
-error bodies, session replay, accumulated events, or total process memory.
-It is not stream authentication, a safety guarantee or safe campaign resume.
+UTF-8 is discarded. Session replay separately requests identity encoding and
+accepts at most 8 MiB of response bytes and 10,000 top-level events. It rejects
+compressed responses, invalid UTF-8 or JSON, duplicate keys and non-finite
+numbers; replay is all-or-nothing. On these protocol errors, initial restoration
+halts before attaching the stream, while opening another session leaves the
+current session unchanged. A halted replay does not stop a remote run. The
+limits do not bound HTTP transport chunks, parsed JSON expansion, other endpoint
+bodies, replay duration, accumulated UI events or total process memory. The
+event-count check happens after JSON parsing. These limits are not event
+authentication, a safety guarantee or safe campaign resume.
 
 Interrupt sends `DELETE /api/run/{run_id}` **only after confirmation**. The
 server cooperatively stops between steps, so an in-progress step may finish

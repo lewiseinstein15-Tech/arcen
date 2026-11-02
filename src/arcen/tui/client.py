@@ -32,6 +32,9 @@ import httpx
 DEFAULT_BASE_URL = "http://127.0.0.1:3002"
 # Maximum UTF-8 bytes in one live NDJSON line, not including its newline.
 MAX_LIVE_LINE_BYTES = 1024 * 1024
+# Replay limits bound the accumulated body and number of top-level events only.
+MAX_REPLAY_BYTES = 8 * 1024 * 1024
+MAX_REPLAY_EVENTS = 10_000
 # Transport frames (BACKEND-SPEC Part 9): no ``seq`` — the app ignores them.
 # stream.ping is an idle keepalive; stream.done is the clean close marker.
 TRANSPORT_FRAMES = frozenset({"stream.ping", "stream.done"})
@@ -56,6 +59,10 @@ def _unique_pairs(pairs):
             raise ValueError("duplicate JSON field")
         result[key] = value
     return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError("non-finite JSON number")
 
 
 async def _bounded_live_lines(response: httpx.Response) -> AsyncIterator[bytes]:
@@ -97,6 +104,13 @@ class ArcenAPIError(RuntimeError):
 
 class ArcenStreamProtocolError(ArcenAPIError):
     """A stream must be stopped until the peer's protocol issue is corrected."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(0, detail)
+
+
+class ArcenReplayProtocolError(ArcenAPIError):
+    """Replay was not safely readable; no partial events are returned."""
 
     def __init__(self, detail: str) -> None:
         super().__init__(0, detail)
@@ -198,9 +212,38 @@ class ArcenClient:
         return data if isinstance(data, list) else []
 
     async def session_events(self, session: str) -> list[dict]:
-        """Full replay of one session (empty list for a fresh UUID — never 404)."""
-        data = await self._get_json(f"/api/sessions/{session}/events")
-        return data if isinstance(data, list) else []
+        """Read one bounded, identity-encoded replay; never return a partial list.
+
+        Bounds cover the accumulated response body and top-level event count,
+        not transport chunks, parsed-object expansion or total UI memory.
+        """
+        async with self._http.stream(
+            "GET", f"/api/sessions/{session}/events", headers={"Accept-Encoding": "identity"}
+        ) as response:
+            if response.status_code >= 400:
+                # Don't buffer a potentially unbounded error body for this route.
+                raise ArcenAPIError(response.status_code, "session replay request failed")
+            encoding = response.headers.get("content-encoding", "identity").strip().lower()
+            if encoding not in ("", "identity"):
+                raise ArcenReplayProtocolError("encoded session replay is not supported")
+            body = bytearray()
+            async for chunk in response.aiter_bytes():
+                if len(body) + len(chunk) > MAX_REPLAY_BYTES:
+                    raise ArcenReplayProtocolError("session replay exceeds byte limit")
+                body.extend(chunk)
+        try:
+            data = json.loads(
+                body.decode("utf-8", errors="strict"),
+                object_pairs_hook=_unique_pairs,
+                parse_constant=_reject_json_constant,
+            )
+        except (UnicodeDecodeError, ValueError, RecursionError):
+            raise ArcenReplayProtocolError("invalid session replay JSON") from None
+        if type(data) is not list:
+            raise ArcenReplayProtocolError("session replay must be a JSON array")
+        if len(data) > MAX_REPLAY_EVENTS:
+            raise ArcenReplayProtocolError("session replay exceeds event limit")
+        return data
 
     async def get_config(self) -> dict:
         data = await self._get_json("/api/config")

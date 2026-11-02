@@ -1435,7 +1435,31 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
 - The line limit applies only to successful identity-encoded live NDJSON; it
   prevents this parser from retaining more than 1 MiB for one partial line.
   Oversized frames and encoded responses halt that stream; malformed UTF-8 is
-  skipped. It does not bound HTTP transport allocations, error bodies, replay,
-  event count, UI rendering, or total process memory. It is not authentication,
+  skipped. At H-19g it did not bound replay; H-19h adds a separate replay
+  limit. It does not bound HTTP transport allocations, all error bodies,
+  rendering, or total process memory. It is not authentication,
   full payload validation, safe campaign resume or a safety/adoption gate.
   H-19 remains open.
+
+### H-19h — bounded and strict session replay (partial)
+
+- `H-19h-real-replay-rejection.png` captures a fresh installed `arcen-tui
+  --no-serve --session ...` PTY rendered through xterm.js/Chromium. A local
+  simulated HTTP fixture served a replay containing duplicate JSON keys; the
+  TUI rejected the entire replay, displayed a blocked state, and did not attach
+  the live stream. The fixture did not run Docker, a model, a real campaign or
+  adoption. A halted replay does not prove any remote run stopped.
+- `H-19h-real-replay-tests.png` shows **20 passed** from a fresh installed-wheel
+  PTY run. Full Python 3.13 source suite: **1,528 passed, 19 skipped**.
+  Focused installed-wheel TUI/client/workflow suite: **65 passed** on each of
+  Python 3.12.16 and 3.13.16. The expanded GitHub workflow has not run remotely.
+- Successful session replay is read incrementally with an 8 MiB byte cap, an
+  identity-encoding requirement and a 10,000 top-level event cap checked after
+  JSON parsing. Duplicate fields, invalid UTF-8, malformed JSON, non-finite
+  numbers and non-array roots fail without returning a partial replay. A failed
+  initial restore on these protocol errors does not automatically start the
+  stream; a failed manual session change leaves the existing session in place.
+  Other replay failures retain existing behavior. This does not bound transport
+  chunk allocation, JSON object expansion, replay duration, other endpoint
+  responses or total TUI memory. It does not authenticate or fully validate
+  events, or establish safe campaign resume. H-19 remains open.

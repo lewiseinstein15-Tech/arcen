@@ -32,6 +32,7 @@ from arcen.tui.client import (
     TERMINAL_EVENTS,
     ArcenAPIError,
     ArcenClient,
+    ArcenReplayProtocolError,
     ArcenStreamProtocolError,
     is_app_event,
     new_session_id,
@@ -167,7 +168,7 @@ class LiveApp(ArcenApp):
             return
         if not self.online:
             if self._stream_halted:
-                self._notice("stream halted; inspect server and reopen session; draft preserved")
+                self._notice("replay or stream halted; inspect server and reopen session; draft preserved")
             else:
                 self._notice("server offline; draft preserved")
             return
@@ -383,6 +384,13 @@ class LiveApp(ArcenApp):
             try:
                 for event in await self.client.session_events(self.session_id):
                     self._apply_event(event)
+            except ArcenReplayProtocolError as exc:
+                self.online = False
+                self._stream_halted = True
+                self.header.update_meta(quarantine="replay halted · blocked")
+                self.footer.set_live(False)
+                self._notice(f"session replay halted: {exc}; inspect server before reconnecting")
+                return
             except (ArcenAPIError, httpx.HTTPError, OSError) as exc:
                 self._notice(f"session replay unavailable: {exc}")
         await self._stream_loop()
