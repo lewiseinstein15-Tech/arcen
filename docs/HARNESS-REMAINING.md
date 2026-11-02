@@ -96,8 +96,10 @@ the exact evidence and revisions.
   the interactive CLI checks before confirmation and repeats the check after.
   The minimum is not reserved and is not sufficient to guarantee completion,
   since probes may consume additional model calls or other users may spend the
-  capacity. Non-boolean verifier flags are inconclusive, not regressions. An
-  optional advisory combines
+  capacity. Non-boolean verifier flags are inconclusive, not regressions. The
+  verifier also uses a no-follow, nonblocking descriptor to close a final-path
+  lstat/open symlink swap; it does not prevent shared-workspace interference or
+  establish evidence authenticity. An optional advisory combines
   a matching canary result with an unsigned paired review; it does not authorize
   adoption or establish baseline freshness.
 - An explicitly confirmed two-image portability comparison can run baseline

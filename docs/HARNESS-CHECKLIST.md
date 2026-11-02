@@ -110,6 +110,11 @@ merely because a sub-scope is complete.
 - [x] H-19d: extra caller-provided known values are checked in model-bound
       inputs and best-effort redacted from reviewed model/tool evidence.
       This is not comprehensive secret detection; H-19 remains open.
+- [x] H-16c: the fixed canary verifier opens its final output path with
+      no-follow/nonblocking flags and checks/reads the same descriptor, closing
+      an lstat-then-open symlink race. Local Linux tests only; shared-workspace
+      interference, hard links, compromised images, authenticity, adoption and
+      rollback remain out of scope. H-16 stays open.
 - [x] H-16b: manual canaries reject obvious admission shortfalls before Git,
       provider or Docker work and treat non-boolean verifier flags as
       inconclusive. This is a non-reserving snapshot, not a guarantee of

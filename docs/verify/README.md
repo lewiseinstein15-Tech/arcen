@@ -1,5 +1,24 @@
 # Verification screenshots
 
+## H-16c — canary verifier final-path symlink race
+
+Fresh installed-wheel PTY → xterm.js → Chromium captures:
+
+- `H-16c-real-verifier-tests.png`: actual local Python verifier with a
+  deterministic test-injected symlink swap. A positive control reproduces the
+  old `lstat`/open false pass; the installed no-follow verifier rejects it and
+  rejects a FIFO without blocking. The installed-wheel test file reports
+  **11 passed**. This is a local filesystem test, not a real-Docker run.
+- `H-16c-real-tui-fixture.png`: actual installed TUI with explicitly
+  **simulated** events narrating the local test. It does not demonstrate live
+  integration, authenticated evidence, approval or adoption.
+
+The full source suite passed **1652 tests, 19 skipped**; focused installed-wheel
+suites passed **150 tests, 1 skipped** each on Python 3.12 and 3.13. This fix
+only closes the final-path symlink swap; concurrent writes, hard links,
+compromised execution environments and public-task gaming remain possible.
+H-16 remains open.
+
 ## H-16b — canary admission and result safeguards
 
 Fresh PTY → xterm.js → Chromium captures using installed Python 3.13 commands:

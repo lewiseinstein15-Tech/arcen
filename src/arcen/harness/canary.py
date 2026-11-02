@@ -46,10 +46,14 @@ def _commands(case: CanaryCase) -> _CanaryCommands:
         "import os,stat,sys\n"
         f"p={path!r}; expected={case.expected!r}\n"
         "try:\n"
-        " s=os.lstat(p)\n"
-        " if not stat.S_ISREG(s.st_mode) or s.st_size != len(expected): sys.exit(1)\n"
-        " with open(p,'rb') as f: actual=f.read(len(expected)+1)\n"
-        " sys.exit(0 if actual == expected else 1)\n"
+        " if not hasattr(os,'O_NOFOLLOW') or not hasattr(os,'O_NONBLOCK'): sys.exit(2)\n"
+        " fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)\n"
+        " try:\n"
+        "  s=os.fstat(fd)\n"
+        "  if not stat.S_ISREG(s.st_mode) or s.st_size != len(expected): sys.exit(1)\n"
+        "  actual=os.read(fd,len(expected)+1)\n"
+        "  sys.exit(0 if actual == expected else 1)\n"
+        " finally: os.close(fd)\n"
         "except OSError: sys.exit(1)\n"
     )
     return _CanaryCommands(

@@ -46,12 +46,18 @@ The Git commit is snapshotted once. Each baseline or candidate trial runs in a
 fresh Docker container from that same snapshot, with network disabled and no
 host fallback. Inside each disposable workspace the fixed output path is first
 removed; if it was a directory or removal failed, the trial is inconclusive.
-After the model's normal bounded probe, a fixed verifier checks that the output
-is a regular file, not a symlink, and has the exact bytes. Container cleanup
-must succeed before any result is accepted. The model sees the public task;
-the verifier is code-defined but runs in the same container as model-generated
-commands. A malicious process or compromised image/daemon can interfere with
-it. The normal probe's TEMPER check may rerun the model's last command.
+After the model's normal bounded probe, a fixed verifier opens the final output
+path with Linux no-follow and nonblocking flags, then checks that same file
+descriptor is regular, has the exact size and contains the expected bytes.
+This prevents the final path being swapped to a symlink between an `lstat` and
+an ordinary open. A FIFO cannot block the verifier; missing required flags yield
+an inconclusive verifier error. Parent path safety and immutable contents are
+not established: hard links or a process with shared filesystem access can
+still interfere. Container cleanup must succeed before any result is accepted.
+The model sees the public task; the verifier is code-defined but runs in the
+same container as model-generated commands. A malicious process or compromised
+image/daemon can interfere with it. The normal probe's TEMPER check may rerun
+the model's last command.
 
 For each case, a baseline error or failure yields **inconclusive** and stops.
 If the baseline passes but the candidate fails, the report is **regression**
