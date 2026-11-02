@@ -20,8 +20,11 @@ the exact evidence and revisions.
 - Content-addressed manifests/objects, local lineage and review metadata,
   baseline selection, candidate diff inspection and strict static policy review.
   Explicit-key signed packages can be verified and manually imported as objects;
-  unregistered objects can be inspected without changing refs. Neither operation
-  establishes signer trust, safety, execution authorization or adoption.
+  unregistered objects can be inspected without changing refs. A signed package
+  can also be verified or interactively imported directly from a specific local
+  Git commit, with no checkout or ref change; this is not a complete Git-backed
+  object store. None establishes signer trust, safety, execution authorization
+  or adoption.
   Doctor also performs SQLite quick-check and schema validation for present
   auxiliary databases; this does not validate all records or evidence.
 - Explicit interactive manual proposal generation or patch import; a

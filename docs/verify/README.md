@@ -1398,3 +1398,23 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
   recorded. Success is not independent read-back, a universal kill switch or
   protection from callers bypassing the budget. Durable uncertain slots remain
   occupied; no automatic recovery or safe resume is provided. H-17 remains open.
+
+### H-05a — signed package transport from local Git (partial)
+
+- `H-05a-real-git-package.png` captures a fresh installed `arcen harness
+  package verify-git` command in a real PTY rendered by xterm.js/Chromium. The
+  committed package and key are test fixtures; no actual signer trust or
+  adoption is claimed.
+- `H-05a-real-git-tests.png` shows a fresh installed-wheel PTY test run:
+  **31 passed** with one pytest configuration warning (plugin autoload was
+  disabled for this focused, synchronous test). Python 3.13 full source suite:
+  **1,494 passed, 19 skipped**. Selected installed-wheel suites: **68 passed**
+  on each of Python 3.12.16 and 3.13.16, including a real local promisor control
+  test showing normal Git lazy-fetches a removed blob while ARCEN refuses it.
+- `H-05a-real-tui-demo.png` is a fresh installed `arcen-tui --demo` PTY frame,
+  also rendered by xterm.js/Chromium. Its simulated session is **not** a Git
+  package integration, real Docker run, real model call or proof of isolation.
+- This is manual signed-package transport, not a Git-backed adoption store or
+  authenticated Git history. The local Git executable, repository, filesystem
+  and separately supplied key must be trusted. A commit ID is not a signature;
+  H-05 remains open. The expanded GitHub workflow has not yet run remotely.

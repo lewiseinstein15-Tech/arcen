@@ -42,6 +42,10 @@ merely because a sub-scope is complete.
       human A/B judge and pending-review workflow; no adoption or safe resume.
 - [x] Operator-chosen syntactic composition, including from unsigned local
       campaign summaries; resulting candidates require separate testing.
+- [x] H-05a: inspect or interactively import an explicitly signed v1 package
+      from a full local Git commit without checkout, hooks, ref changes or
+      adoption. The key and repository are trusted; this is not a complete
+      Git-backed store, authenticated lineage or full H-05.
 - [x] H-04a: disabled harnessing configuration rejects unsupported settings and
       non-boolean values; validated config updates fail without side effects.
       H-04 package, signatures and trust remain incomplete.

@@ -437,7 +437,7 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--public-key", required=True, help="trusted raw Ed25519 public key as hex")
     package = commands.add_parser("package", help="export, inspect or import objects; no adoption")
     package_commands = package.add_subparsers(dest="package_command", required=True)
-    for action in ("export", "verify", "import"):
+    for action in ("export", "verify", "import", "verify-git", "import-git"):
         command = package_commands.add_parser(action, help=f"{action} a detached signed package")
         command.add_argument("--manifest", required=True, help="expected manifest SHA-256")
         command.add_argument(
@@ -446,6 +446,10 @@ def main(argv: list[str] | None = None) -> int:
         if action == "export":
             command.add_argument("--attestation", required=True, help="detached signature file")
             command.add_argument("--output", required=True, help="new output path; never overwrite")
+        elif action in ("verify-git", "import-git"):
+            command.add_argument("--repo", required=True, help="trusted local Git repository")
+            command.add_argument("--commit", required=True, help="full lowercase Git commit ID")
+            command.add_argument("--path", required=True, help="literal committed package path")
         else:
             command.add_argument("--file", required=True, help="package file to inspect")
     baseline = commands.add_parser("pin-baseline", help="create an unadopted fixed-model baseline")
@@ -680,18 +684,25 @@ def main(argv: list[str] | None = None) -> int:
                 write_new_package(args.output, data)
                 print("Signed package written to new file; contents are plaintext.")
             else:
-                if args.package_command == "import" and (
+                if args.package_command in ("import", "import-git") and (
                     not sys.stdin.isatty() or not sys.stdout.isatty()
                 ):
                     raise HarnessError("package import requires an interactive terminal")
-                data = _read_text(args.file, MAX_PACKAGE_BYTES).encode("utf-8")
+                if args.package_command in ("verify-git", "import-git"):
+                    from .git_package import read_git_package
+
+                    data = read_git_package(args.repo, args.commit, args.path)
+                else:
+                    data = _read_text(args.file, MAX_PACKAGE_BYTES).encode("utf-8")
             result = verify_package(data, args.manifest, public_key)
+            if args.package_command in ("verify-git", "import-git"):
+                print(f"Committed package: {args.commit}:{args.path}")
             print(f"Verified manifest: {result.attestation.manifest}")
             print(f"Signer public-key SHA-256: {result.attestation.public_key_sha256}")
             print(f"Signed parent claim: {result.attestation.parent or 'none'}")
             print(f"Components: {result.component_count}; unique objects: {result.unique_objects}")
             print("Key trust, lineage, safety and authorization are not established.")
-            if args.package_command == "import":
+            if args.package_command in ("import", "import-git"):
                 store, _ = _existing(args.store)
                 print(
                     "Import writes plaintext objects only; failures may leave unreferenced objects."
