@@ -58,7 +58,7 @@ describe('T-036: settings view', () => {
     render(<App />);
     fireEvent.click(screen.getByTestId('nav-settings'));
     expect(await screen.findByTestId('settings-view')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-provider')).toBeInTheDocument();
+    expect(await screen.findByTestId('settings-provider')).toBeInTheDocument();
     expect(screen.getByTestId('settings-agents')).toBeInTheDocument();
     expect(screen.getByTestId('settings-sandbox')).toBeInTheDocument();
     expect(screen.getByTestId('settings-general')).toBeInTheDocument();
@@ -362,13 +362,15 @@ describe('T-038: sandbox backend', () => {
 // T-039 (Option B) — dark-only is honest: the dead theme stub is gone.
 describe('T-039: theme stub removed', () => {
   it('Settings renders no theme toggle at all', async () => {
+    let releaseConfig!: () => void;
+    const configResponse = new Promise<Response>((resolve) => {
+      releaseConfig = () => resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
+    });
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (String(url).includes('/api/sandbox/status')) {
         return Promise.resolve(new Response(JSON.stringify(sandboxStatus()), { status: 200 }));
       }
-      if (String(url).includes('/api/config')) {
-        return Promise.resolve(new Response(JSON.stringify(configFixture()), { status: 200 }));
-      }
+      if (String(url).includes('/api/config')) return configResponse;
       return Promise.resolve(new Response('[]', { status: 200 }));
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -376,6 +378,9 @@ describe('T-039: theme stub removed', () => {
     render(<App />);
     fireEvent.click(screen.getByTestId('nav-settings'));
     await screen.findByTestId('settings-view');
+    expect(screen.getByText('loading configuration…')).toBeInTheDocument();
+    releaseConfig();
+    await screen.findByTestId('settings-general');
     expect(screen.queryByTestId('theme-select')).not.toBeInTheDocument();
     expect(screen.queryByText('Theme')).not.toBeInTheDocument();
     // the general section keeps its live controls

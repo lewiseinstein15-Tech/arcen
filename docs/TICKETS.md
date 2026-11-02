@@ -555,7 +555,7 @@ This closes the pattern where real bugs sit unactioned in a report.
 The following are backlog entries, not authorization to implement any later phase. Complete one ticket at a time in the approved phase and add focused failing/passing tests before closing it. Keep all 17 frozen events. Consult `AUDIT.md` for findings and limitations. Test commands below are starting regression commands; extend with ticket-specific tests. Fresh real-PTY verification screenshots are required for closure.
 
 ### [P0-AUDIT] Phase 0 repository audit
-- **Status:** [~] in progress — scanner inventory complete; semantic classification of every exception/catch and complete file-by-file review are not established. Do not close or represent Phase 0 as complete until addressed.
+- **Status:** [x] Phase 0 approved with conditions by user on 2026-11-02. Scanner inventory complete; semantic classification and full file-by-file review are not established and remain tracked in A-10.
 - **Test:** `python docs/audit/inspect_repo.py && PYTHONPATH=src python docs/audit/reproduce.py`
 - **Verification:** inventories match, source-linked audit and all requested exception dispositions are substantiated; reproduce counts; attach fresh verification evidence. Backend and frontend results are recorded in `AUDIT.md`.
 
@@ -576,7 +576,7 @@ The following are backlog entries, not authorization to implement any later phas
 - **Test:** `PYTHONPATH=src python docs/audit/reproduce.py` captures old behavior; add an inverted regression alongside plugin tests.
 
 ### [A-05] Plugin boot credential minimization
-- **Status:** [ ] todo. Pass minimal redacted boot payload rather than literal credentials; test nested secrets and plugin compatibility. Plugins remain trusted host code; no security-boundary claims.
+- **Status:** [ ] todo. Stop passing the full config; pass only the minimum boot payload each plugin needs, redacted of credentials; test nested secrets and plugin compatibility. Plugins remain trusted host code; no security-boundary claims.
 - **Test:** add boot-hook regression under `tests/`; run plugin/config tests.
 
 ### [A-06] Observation-driven native loop
@@ -584,11 +584,11 @@ The following are backlog entries, not authorization to implement any later phas
 - **Test:** add native loop tests and run DRAFT/FORGE/server regression tests.
 
 ### [A-07] Honest isolated tool capabilities
-- **Status:** [ ] todo. Expose effective safe isolated capabilities separately from registry counts; add tools only through audited isolation, never host fallback.
+- **Status:** [ ] todo, Phase 4. Expose effective safe isolated capabilities separately from registry counts; allow `file.read`, `file.edit`, `search.text`, and `file.glob` inside the container under Phase 4 edit rules. Never fall back to host execution.
 - **Test:** run isolated registry and policy tests plus targeted capability tests.
 
 ### [A-08] Truthful usage and cost
-- **Status:** [ ] todo. Distinguish unavailable measurements from actual zero, propagate provider usage where possible without breaking the frozen protocol.
+- **Status:** [ ] todo. Follow the additive usage event decision below; distinguish unavailable measurements from actual zero and propagate provider usage without adding an event type.
 - **Test:** add provider usage, unknown and zero cases; run event and server suites.
 
 ### [A-09] Accurate counts and skill indexing
@@ -596,7 +596,7 @@ The following are backlog entries, not authorization to implement any later phas
 - **Test:** `PYTHONPATH=src python docs/audit/reproduce.py` plus generated-documentation regression.
 
 ### [A-10] Complete catch-by-catch disposition
-- **Status:** [ ] todo. Examine all Python, JS/TS and shell catch/suppression candidates in context, including minified/vendor exceptions, add missing language constructs and record each disposition, client visibility and rationale. Distinguish deliberate cleanup, fallback, redaction and real silent loss. Add follow-up tickets for new defects.
+- **Status:** [ ] todo, finish before Phase 9. Write a script to classify all 338 inventoried Python handlers as `control-flow`, `converted-to-event`, `hidden-no-log`, or `cleanup`; record uncertainty for human review and create one ticket per confirmed `hidden-no-log` handler. Also examine the Python suppression blocks and JS/TS and shell candidates in context, including minified/vendor exceptions; record visibility and rationale and add missing language constructs. A syntactic label alone does not prove semantic visibility.
 - **Test:** `python docs/audit/inspect_repo.py` and independently review full inventory coverage and dispositions.
 
 ### [A-11] Avoid killing unrelated port owners
@@ -604,7 +604,7 @@ The following are backlog entries, not authorization to implement any later phas
 - **Test:** add isolated mocked shell/process tests.
 
 ### [A-12] Frontend production build resource failure
-- **Status:** [ ] todo. Reproduce and diagnose `npm run build` exiting 137 after `rendering chunks...` in this environment; retry with adequate resources and fix only after cause is established. The explicit 1024 MiB Node heap retry also printed `Killed`.
+- **Status:** [ ] todo. Reproduce and diagnose `npm run build` exiting 137 after `rendering chunks...`; check memory first. On 2026-11-02 `/proc/meminfo` reported MemTotal 2030404 kB, MemAvailable 1141216 kB and zero swap; `/sys/fs/cgroup/user/memory.max` was 1944915968 bytes and `memory.events` reported `oom_kill 2`. No pre-build counters were captured, so attribution of either kill is not proven. Retry with adequate resources and fix only after cause is established. The explicit 1024 MiB Node heap retry also printed `Killed`.
 - **Test:** `cd ui && npm ci --ignore-scripts --no-audit --no-fund && npm run build`.
 
 ### [A-13] Existing source provenance
@@ -614,3 +614,16 @@ The following are backlog entries, not authorization to implement any later phas
 ### [A-14] React act warnings in frontend tests
 - **Status:** [ ] todo. Investigate asynchronous updates causing `act(...)` warnings; keep assertions meaningful and verify clean completion without suppressing errors.
 - **Test:** `cd ui && npm test -- --run`.
+
+### Phase 1A specification received 2026-11-02
+
+- Work A-08, A-03, A-01 in that order, one ticket at a time. Rerun all earlier tests three times before each next ticket; max five fix attempts. User approval for Phase 1A is given, but a separate schema-breaking approval is required before changing frozen NDJSON compatibility.
+- A-08: keep existing numeric token and cost fields, add `measured`, `usage_source`, `cost_source`; user approved this additive payload change instead of nullable numbers. Unknown is numeric zero with `measured=false` and sources `unknown`; never sum it as a real zero. Use provider counts and provider/estimated cost as available. UI and TUI show unknown, old events still render, benchmark aggregation counts skipped runs. Update BACKEND-SPEC; preserve 17 event types.
+- A-03: emit patch artifact path and changed files; write `~/.arcen/artifacts/<session>/patch.diff`, never write to the user repository automatically, preserve no host binds and no network, provide explicit `arcen apply <session>`, and defend artifact paths and untrusted patch contents. Preserve the 17 frozen event types unless breaking change is approved.
+- A-01: detect pytest/npm/cargo/go test, run in the same sandbox after work, pass only on zero; no test command means unverified, and never repeat arbitrary last command or use `true`. Test a non-bash step yielding unverified when no test is found and failing tests yielding fail.
+- Phase 1B needs Docker, one fixed named model, 20 local tasks, SWE-bench Lite 30-task subset adapter, Terminal-Bench adapter and mini-SWE-agent baseline; score from exported patch, report task and aggregate resolved %, cost, steps and time. Stop if Docker is unavailable; never invent results. No Phase 2 before baseline and user approval.
+
+### [A-15] Stabilize async frontend test assertions
+- **Status:** [x] verified regression fix before A-08. Third pre-ticket frontend regression failed in `tests/settings.test.tsx` T-039 because `settings-view` can still be the loading view: `TestingLibraryElementError: Unable to find an element by: [data-testid="settings-general"]`. On the third post-fix suite the clipboard test failed because the write call is observable before the asynchronous copied state: `Unable to find an element with the text: copied`.
+- **Test:** `cd ui && npm test -- --run tests/settings.test.tsx tests/markdown.test.tsx` and repeat the full frontend suite; deliberately defer the config and clipboard responses to exercise the asynchronous boundaries.
+- **Verification:** assertions about loaded controls and the absent theme occur after configuration loads; clipboard confirmation is asserted after write completion; no product behavior change. Fresh PTY evidence: `docs/verify/A-15-real-async-tests.png`; focused tests 26 passed, full frontend suite 84 passed in three successive runs. React act warnings remain A-14.

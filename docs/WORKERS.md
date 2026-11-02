@@ -39,3 +39,13 @@ Fresh audit evidence (a real PTY, xterm.js and headless Chromium, not a TUI feat
 ```sh
 PYTHONPATH=src /home/user/.cache/env13/bin/python scripts/terminal_shot.py --cols 150 --rows 28 --wait 4 --out docs/verify/P0-AUDIT-inventory.png -- /bin/bash -c 'PYTHONPATH=src /home/user/.cache/env13/bin/python docs/audit/reproduce.py; /home/user/.cache/env13/bin/python docs/audit/inspect_repo.py; sleep 10'
 ```
+
+A-15 test guidance: https://testing-library.com/docs/queries/about/ (`findBy` waits for an asynchronously appearing element). Exact focused command: `cd ui && npm test -- --run tests/settings.test.tsx`.
+
+A-08 metering documentation consulted before implementation: https://docs.litellm.ai/docs/completion/token_usage (`cost_per_token`, `model_cost`).
+
+A-15 fresh focused test terminal capture (real PTY/xterm.js/headless Chromium; displays test output, not a live UI demonstration):
+
+```sh
+PYTHONPATH=src /home/user/.cache/env13/bin/python scripts/terminal_shot.py --cols 145 --rows 30 --wait 11 --out docs/verify/A-15-real-async-tests.png -- /bin/bash -c 'cd ui; npm test -- --run tests/settings.test.tsx tests/markdown.test.tsx; status=$?; echo "A-15 focused tests exit: $status"; sleep 15; exit "$status"'
+```
