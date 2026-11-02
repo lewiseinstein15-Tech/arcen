@@ -67,8 +67,20 @@ PYTHONPATH=src /home/user/.cache/env13/bin/python scripts/terminal_shot.py --col
 
 A-03 design references consulted before implementation: Docker SDK container archive API https://docker-py.readthedocs.io/en/stable/containers.html ; archive risks and supported entry types https://docs.python.org/3/library/tarfile.html ; Git patch application https://git-scm.com/docs/git-apply ; subprocess argument/timeout behavior https://docs.python.org/3/library/subprocess.html ; path semantics https://docs.python.org/3/library/pathlib.html . Real Docker integration cannot be verified in this environment.
 
-A-03 current isolated helper check (not a server or Docker integration test):
+A-03 superseded host-side patch-construction helper and its tests were removed. Current preliminary validation checks are unit tests only, not fake-runtime, server, export/apply or Docker integration tests:
 
 ```sh
-TMPDIR=/home/user/.cache/tmp PYTHONPATH=src /home/user/.cache/env13/bin/python -m pytest -o asyncio_default_fixture_loop_scope=function -o addopts='' -q tests/test_a03_artifacts.py
+TMPDIR=/home/user/.cache/tmp PYTHONPATH=src /home/user/.cache/phase1a-env/bin/python -m pytest -o asyncio_default_fixture_loop_scope=function -o addopts='' -q tests/test_a03_patch_validation.py
+/home/user/.cache/phase1a-env/bin/ruff check src/arcen/sandbox/patch_validation.py tests/test_a03_patch_validation.py
+/home/user/.cache/phase1a-env/bin/ruff format --check src/arcen/sandbox/patch_validation.py tests/test_a03_patch_validation.py
+```
+
+2026-11-02 restored-environment regression gate documentation: Python venv https://docs.python.org/3/library/venv.html ; pip install https://pip.pypa.io/en/stable/cli/pip_install/ ; npm clean install https://docs.npmjs.com/cli/v10/commands/npm-ci ; pytest https://docs.pytest.org/en/stable/how-to/usage.html .
+
+```sh
+python -m venv /home/user/.cache/phase1a-env
+TMPDIR=/home/user/.cache/tmp /home/user/.cache/phase1a-env/bin/python -m pip install -e '.[dev,tui]'
+cd ui && npm ci --ignore-scripts --no-audit --no-fund
+TMPDIR=/home/user/.cache/tmp PYTHONPATH=src /home/user/.cache/phase1a-env/bin/python -m pytest -o asyncio_default_fixture_loop_scope=function -o addopts='' -q
+cd ui && npm test -- --run
 ```

@@ -568,7 +568,7 @@ The following are backlog entries, not authorization to implement any later phas
 - **Test:** add deterministic benchmark harness tests and publish run commands.
 
 ### [A-03] Safe reviewed change return
-- **Status:** [~] in progress. Initial archive validation and temporary Git patch construction helper exists and its 9 focused tests pass. It is NOT yet connected to Docker, server events, artifact publication, or `arcen apply`; security and real-Docker integration remain unverified. Preserve isolation and never silently write host files.
+- **Status:** [~] in progress, not Done (mock). The superseded host-side Git patch constructor was removed; it did not satisfy the required inside-container design. A preliminary standalone patch validator and 15 unit tests exist, and Git was added to the sandbox Dockerfile, but the image has not been built or tested. Snapshot-baseline protection, bounded container diff export, metadata publication, server event integration, explicit apply, complete fake-runtime tests and the real-Docker smoke procedure remain unimplemented. The validator is not connected to the runtime and is not a security assurance. Preserve isolation and never silently write host files.
 - **Test:** `pytest tests/test_sandbox.py` plus export and attack regressions.
 
 ### [A-04] Enabled-only plugin discovery
@@ -588,7 +588,7 @@ The following are backlog entries, not authorization to implement any later phas
 - **Test:** run isolated registry and policy tests plus targeted capability tests.
 
 ### [A-08] Truthful usage and cost
-- **Status:** [x] verified. Additive fields retain numeric wire fields and the 17 existing event types. Per-turn accounting is conservative about missing usage and retries; old payloads render unknown. The benchmark aggregation helper is tested but not yet wired into the Phase 1B benchmark, which does not exist yet.
+- **Status:** [x] accepted for mock tests only; live provider run: unverified. Additive fields retain numeric wire fields and the 17 existing event types. Per-turn accounting is conservative about missing usage and retries; old payloads render unknown. The benchmark aggregation helper is tested but not yet wired into the Phase 1B benchmark, which does not exist yet.
 - **Test:** `pytest -q tests/test_a08_usage.py tests/test_events.py tests/test_llm.py tests/test_tui_adapter.py tests/test_server.py` and `cd ui && npm test -- --run`.
 - **Verification:** full backend 1664 passed/19 skipped; frontend 86 passed; `npx tsc -b` passed. `docs/verify/A-08-real-tui-recorded-replay.png` is the installed TUI using the working tree and an explicitly labelled offline recording, not a live provider or verification run. React warnings and production build failure remain open.
 
