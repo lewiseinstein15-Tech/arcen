@@ -54,3 +54,64 @@ def collect_export_stream(
             raise
         raise ArtifactError("sandbox export stream failed") from exc
     return bytes(stdout), bytes(stderr)
+
+
+# A fixed exporter, never generated from workspace data or the model. This runs
+# only in the disposable container. The resulting tar is untrusted regardless.
+CONTAINER_EXPORTER = r"""
+import os
+import sys
+import tarfile
+
+with tarfile.open(fileobj=sys.stdout.buffer, mode="w|") as tar:
+    def fail(exc):
+        raise exc
+    for root, dirs, files in os.walk(".", followlinks=False, onerror=fail):
+        dirs[:] = sorted(name for name in dirs if name.lower() != ".git")
+        files = sorted(name for name in files if name.lower() != ".git")
+        for name in dirs + files:
+            path = os.path.join(root, name)
+            tar.add(path, arcname=path[2:], recursive=False)
+"""
+
+
+def export_workspace(client, container: Killable) -> bytes:
+    """Execute the fixed tar producer in the existing container and cap output.
+
+    Do not use the returned archive without the host-side safe extractor. Failed
+    execution, transport errors, oversized output and stderr all reject it.
+    """
+    api = client.api
+    stream = None
+    try:
+        created = api.exec_create(
+            container.id,
+            cmd=[
+                "timeout",
+                "--kill-after=2s",
+                "120s",
+                "/usr/local/bin/python",
+                "-I",
+                "-c",
+                CONTAINER_EXPORTER,
+            ],
+            user="65534:65534",
+            privileged=False,
+            workdir="/workspace",
+            environment={"HOME": "/tmp", "LANG": "C.UTF-8", "PATH": "/usr/local/bin:/usr/bin:/bin"},
+        )
+        exec_id = created["Id"]
+        stream = api.exec_start(exec_id, stream=True, demux=True)
+        stdout, stderr = collect_export_stream(stream, container)
+        if api.exec_inspect(exec_id).get("ExitCode") != 0 or stderr:
+            raise ArtifactError("sandbox workspace export failed")
+        return stdout
+    except ArtifactError:
+        raise
+    except Exception as exc:
+        raise ArtifactError("sandbox workspace export failed") from exc
+    finally:
+        if stream is not None:
+            close = getattr(stream, "close", None)
+            if close is not None:
+                close()
