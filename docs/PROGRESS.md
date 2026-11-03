@@ -30,3 +30,4 @@
 2026-11-03T14:24:06Z | RECOVERY-A01 | cff7f40 | Next: restore visible unverified indicators and run complete regression suites.
 2026-11-03T14:24:53Z | RECOVERY-A01 | 0b9584c | Next: run full suites, repair remaining missing intervening changes, then connect A-03a export.
 2026-11-03T14:25:25Z | RECOVERY-A05 | 8b38f32 | Next: run full regression, fix remaining lost A-04/A-07/A-09 changes before A-03a.
+2026-11-03T14:25:58Z | RECOVERY-A04 | 141203a | Next: run full suites; repair remaining missing changes before connecting A-03a export.
