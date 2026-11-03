@@ -39,7 +39,7 @@ from pydantic import ValidationError
 
 from arcen.agents.draft import DraftPlanner
 from arcen.agents.forge import ForgeExecutor
-from arcen.agents.temper import TemperVerifier
+from arcen.agents.temper import verify_sandbox_tests
 from arcen.config import ArcenConfig, default_config_path, load_config, resolve_secrets, save_config
 from arcen.guardrails import default_policy
 from arcen.harness import HarnessError
@@ -376,14 +376,13 @@ def run_turn(
                 break
             pending = list(new_steps)  # corrected steps replace the remainder
 
-        # TEMPER verifies adversarially — smoke-check re-runs the last command
-        verified = False
+        # Discover tests in the same sandbox; never replay a work command.
+        verification_status = "unverified"
         if failure is None and last_cmd is not None and last_ok:
-            tool, cmd_args = last_cmd
-            check = cmd_args.get("cmd", "true") if tool == "bash" else "true"
-            temper = TemperVerifier(run_registry, emit=emit, adversarial=True, reruns=1)
-            verdict = temper.verify(step=executed, target=goal[:64], checks=[check])
-            verified = verdict[-1].TYPE == "step.pass"
+            verification_status = verify_sandbox_tests(
+                run_registry, step=executed, target=goal[:64], emit=emit
+            )
+        verified = verification_status == "pass"
 
         emit(Memory(seq=0, op="write", entity=goal[:64],
                     fact=f"turn {run_id}: {executed} steps, verified={verified}", ts=0.0))
@@ -397,8 +396,14 @@ def run_turn(
             pending_summary = Answer(seq=0, text=f"Done. {executed} step(s) executed against: {goal}. Verification passed.", ts=0.0)
             emit(RunDone(seq=0, status="ok", steps=executed, duration_s=duration, ts=0.0))
         else:
-            pending_summary = Answer(seq=0, text=f"Turn failed: verification did not pass after {executed} step(s).", ts=0.0)
-            emit(RunDone(seq=0, status="failed", steps=executed, duration_s=duration, ts=0.0))
+            text = (
+                f"Work executed, but verification is unverified: no test command found after {executed} step(s)."
+                if verification_status == "unverified"
+                else f"Turn failed: verification did not pass after {executed} step(s)."
+            )
+            pending_summary = Answer(seq=0, text=text, ts=0.0)
+            emit(RunDone(seq=0, status="failed", steps=executed, duration_s=duration,
+                         verification_status=verification_status, ts=0.0))
     except IsolationUnavailable as exc:
         emit(RunError(seq=0, code="SANDBOX_UNAVAILABLE", message=str(exc), ts=0.0))
     except ProviderError as exc:
