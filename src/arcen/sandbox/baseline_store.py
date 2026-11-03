@@ -153,6 +153,7 @@ def capture_workspace_baseline(
     """
     import os
 
+    from arcen.guardrails import default_policy
     from arcen.harness.probe_workspace import _reject_configured_git_filters, _run_git
     from arcen.sandbox.workspace import snapshot_workspace
 
@@ -173,7 +174,13 @@ def capture_workspace_baseline(
         )
         if not _BASE.fullmatch(base):
             raise ArtifactError("invalid workspace HEAD")
-        snapshot = snapshot_workspace(root, exclude_git=True)
+        limits = default_policy().workspace
+        snapshot = snapshot_workspace(
+            root,
+            exclude_git=True,
+            max_entries=limits.max_entries,
+            max_file_bytes=limits.max_file_bytes,
+        )
         after = (
             _run_git(root, ["rev-parse", "--verify", "HEAD^{commit}"], max_bytes=128)
             .decode("ascii")

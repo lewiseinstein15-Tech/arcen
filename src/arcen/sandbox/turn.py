@@ -46,7 +46,12 @@ class DockerTurnRegistry:
     supports_host_diff = False
 
     def __init__(
-        self, config, *, docker_client: Any | None = None, workspace: str | None = None
+        self,
+        config,
+        *,
+        docker_client: Any | None = None,
+        workspace: str | None = None,
+        snapshot: bytes | None = None,
     ) -> None:
         sandbox = config.sandbox
         self.policy = default_policy()
@@ -61,7 +66,17 @@ class DockerTurnRegistry:
         turn_id = uuid.uuid4().hex
         container_name = "arcen-turn-" + turn_id
         run_attempted = False
-        snapshot = None
+        if workspace is not None and snapshot is not None:
+            raise IsolationUnavailable(
+                "Provide either a workspace or a captured snapshot, not both."
+            )
+        if snapshot is not None:
+            from arcen.sandbox.patch_validation import MAX_PATCH_BYTES
+
+            if not isinstance(snapshot, bytes) or len(snapshot) > MAX_PATCH_BYTES:
+                raise IsolationUnavailable(
+                    "Workspace snapshot rejected: invalid or oversized archive"
+                )
         if workspace is not None:
             try:
                 snapshot = snapshot_workspace(
@@ -243,6 +258,15 @@ class DockerTurnRegistry:
         except Exception as exc:  # noqa: BLE001 — tool failures are values
             return {"ok": False, "result": None, "error": str(exc)}
 
+    def export_workspace(self) -> bytes:
+        """Collect an untrusted tar from this live isolated turn, never a host mount."""
+        from arcen.sandbox.export_stream import export_workspace
+        from arcen.sandbox.patch_validation import ArtifactError
+
+        if self._container is None:
+            raise ArtifactError("sandbox workspace export requested after close")
+        return export_workspace(self._client, self._container)
+
     def close(self, *, strict: bool = False) -> None:
         """Remove the container; strict callers fail if cleanup cannot be confirmed."""
         container, self._container = self._container, None
@@ -300,5 +324,7 @@ def execution_status(config) -> dict:
     }
 
 
-def create_turn_registry(config, *, workspace: str | None = None) -> DockerTurnRegistry:
-    return DockerTurnRegistry(config, workspace=workspace)
+def create_turn_registry(
+    config, *, workspace: str | None = None, snapshot: bytes | None = None
+) -> DockerTurnRegistry:
+    return DockerTurnRegistry(config, workspace=workspace, snapshot=snapshot)

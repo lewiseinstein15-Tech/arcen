@@ -559,3 +559,32 @@ def test_docker_null_binds_and_tmpfs_mount_are_accepted():
     registry = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
     registry.close(strict=True)
     assert docker.container.removed
+
+
+def test_captured_snapshot_is_imported_unchanged_and_export_is_bounded(monkeypatch):
+    from arcen.sandbox import turn
+
+    docker = FakeDocker()
+    seen = []
+    monkeypatch.setattr(turn, "import_workspace", lambda client, container, data: seen.append(data))
+    registry = DockerTurnRegistry(ArcenConfig(), docker_client=docker, snapshot=b"host baseline")
+    assert seen == [b"host baseline"]
+    docker.output = [(b"candidate tar", None)]
+    assert registry.export_workspace() == b"candidate tar"
+    assert docker.run_args["volumes"] == {} and docker.run_args["network_mode"] == "none"
+    registry.close(strict=True)
+
+
+def test_ambiguous_or_oversized_prepared_workspace_rejected_before_docker():
+    from arcen.sandbox.patch_validation import MAX_PATCH_BYTES
+
+    docker = FakeDocker()
+    with pytest.raises(IsolationUnavailable, match="either"):
+        DockerTurnRegistry(
+            ArcenConfig(), docker_client=docker, workspace="unused", snapshot=b"data"
+        )
+    with pytest.raises(IsolationUnavailable, match="oversized"):
+        DockerTurnRegistry(
+            ArcenConfig(), docker_client=docker, snapshot=b"x" * (MAX_PATCH_BYTES + 1)
+        )
+    assert docker.run_args is None
