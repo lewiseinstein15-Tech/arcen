@@ -2,8 +2,8 @@
 # ARCEN dev stack — backend on :3002, UI on :5173, one command, clean exit.
 #
 # Fixes the "second run broke" failure: the venv is activated (or created)
-# before anything else, so uvicorn always runs with arcen importable; stale
-# processes on 3002/5173 are killed so vite never has to fall back to 5174.
+# before starting either service. Occupied ports cause an explicit error;
+# this script never signals unrelated processes.
 #
 # The UI's Vite proxy targets /api/* on localhost:3002; starting the
 # backend FIRST is what keeps `npm run dev` free of ECONNREFUSED spam.
@@ -26,32 +26,36 @@ else
   pip install -e ".[dev]"
 fi
 
-# 2. Kill stale processes on 3002 and 5173 — no "Port 5173 in use",
-#    no orphaned backend serving an old build.
-for port in 3002 5173; do
-  pid="$(lsof -ti tcp:$port 2>/dev/null || true)"
-  if [ -n "$pid" ]; then
-    echo "[dev] killing stale process on :$port ($pid)"
-    kill -9 $pid 2>/dev/null || true
-  fi
-done
+# 2. Refuse occupied ports rather than killing their owners. The later
+# server bind is still authoritative if another process races this check.
+python scripts/dev_ports.py
 
 # 3. Start the backend
 echo "[dev] starting backend: uvicorn arcen.server.app:app --port 3002"
 uvicorn arcen.server.app:app --port 3002 &
 BACKEND_PID=$!
-trap 'kill "$BACKEND_PID" 2>/dev/null || true' EXIT
+trap 'kill %1 2>/dev/null || true' EXIT
 
 # 4. Wait for health before the UI starts proxying at it
+healthy=0
 for i in $(seq 1 30); do
-  if curl -sf http://localhost:3002/api/health >/dev/null 2>&1; then
-    echo "[dev] backend healthy: http://localhost:3002/api/health → {\"ok\": true}"
+  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+    echo "[dev] backend exited before becoming healthy" >&2
+    exit 1
+  fi
+  if curl -sf http://localhost:3002/api/health >/dev/null 2>&1 && kill -0 "$BACKEND_PID" 2>/dev/null; then
+    echo "[dev] backend healthy: http://localhost:3002/api/health"
+    healthy=1
     break
   fi
   sleep 0.5
 done
+if [ "$healthy" -ne 1 ]; then
+  echo "[dev] backend health check timed out" >&2
+  exit 1
+fi
 
 # 5. Start the frontend (foreground; exit tears the backend down via trap)
 echo "[dev] starting frontend (ui/)"
 cd ui
-exec npm run dev
+npm run dev
