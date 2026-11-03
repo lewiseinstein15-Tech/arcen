@@ -51,3 +51,11 @@ def test_unchanged_attributes_are_ignored_and_changes_refused():
     changed[".gitattributes"] = (b"changed", 0o644)
     with pytest.raises(ArtifactError, match="gitattributes"):
         build_host_patch(snapshot(original), snapshot(changed))
+
+
+def test_host_diff_new_and_deleted_binary_and_empty_files():
+    baseline = snapshot({"deleted.bin": (b"\x00old\xff", 0o644), "emptygone": (b"", 0o644)})
+    candidate = snapshot({"added.bin": (b"\x00new\xff", 0o644), "emptynew": (b"", 0o644)})
+    patch = build_host_patch(baseline, candidate)
+    assert set(validate_patch(patch)) == {"deleted.bin", "emptygone", "added.bin", "emptynew"}
+    assert patch.count(b"GIT binary patch") == 2

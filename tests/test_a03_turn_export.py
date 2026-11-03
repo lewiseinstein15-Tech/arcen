@@ -32,8 +32,9 @@ def archive(entries):
                 entry.linkname = "file"
                 tar.addfile(entry)
             else:
-                entry.mode, entry.size = 0o644, len(value)
-                tar.addfile(entry, io.BytesIO(value))
+                content, mode = value if isinstance(value, tuple) else (value, 0o644)
+                entry.mode, entry.size = mode, len(content)
+                tar.addfile(entry, io.BytesIO(content))
     return stream.getvalue()
 
 
@@ -131,7 +132,15 @@ def test_real_turn_mock_exports_host_diff_and_can_apply(context, monkeypatch):
 
 @pytest.mark.parametrize(
     "candidate",
-    [archive({"link": None}), archive({"../escape": b"bad"}), b"x" * (MAX_PATCH_BYTES + 1)],
+    [
+        archive({"link": None}),
+        hardlink_archive(),
+        archive({"../escape": b"bad"}),
+        archive({"/absolute": b"bad"}),
+        archive({".env.local": b"must-not-save"}),
+        archive({"new-executable": (b"program", 0o755)}),
+        b"x" * (MAX_PATCH_BYTES + 1),
+    ],
 )
 def test_invalid_candidate_fails_closed_and_never_publishes_patch(context, monkeypatch, candidate):
     repo, home, _state, session = context
@@ -143,3 +152,46 @@ def test_invalid_candidate_fails_closed_and_never_publishes_patch(context, monke
     assert (repo / "file").read_text() == "before\n"
     if len(candidate) > MAX_PATCH_BYTES:
         assert fake.killed and "size limit" in events[-1]["message"]
+
+
+def test_fake_turn_deleted_new_binary_and_unchanged_executable_mode(context, monkeypatch):
+    repo, home, _state, session = context
+    (repo / "gone").write_text("delete\n")
+    (repo / "image.bin").write_bytes(b"\x00old\xff")
+    (repo / "tool").write_text("old\n")
+    (repo / "tool").chmod(0o755)
+    git(repo, "add", "gone", "image.bin", "tool")
+    git(repo, "commit", "-qm", "more baseline files")
+    candidate = archive(
+        {
+            "file": b"before\n",
+            "image.bin": b"\x00new\xff",
+            "tool": (b"new\n", 0o755),
+            "added": b"new file\n",
+        }
+    )
+    events, fake, _ = execute(
+        context, monkeypatch, [(candidate[:100], None), (candidate[100:], None)]
+    )
+    assert fake.closed and events[-1]["type"] == "run.done"
+    result = apply_artifact(session, target=repo, home=home)
+    assert set(result["files"]) == {"gone", "image.bin", "tool", "added"}
+    assert (repo / "gone").exists() and not (repo / "added").exists()
+    patch = (home / ".arcen" / "artifacts" / session / "patch.diff").read_bytes()
+    assert b"GIT binary patch" in patch
+    assert b"old mode" not in patch and b"new mode" not in patch
+    assert apply_artifact(session, target=repo, home=home, yes=True)["applied"]
+    assert not (repo / "gone").exists()
+    assert (repo / "image.bin").read_bytes() == b"\x00new\xff"
+    assert (repo / "tool").read_text() == "new\n"
+    assert (repo / "tool").stat().st_mode & 0o777 == 0o755
+    assert (repo / "added").read_text() == "new file\n"
+
+
+def test_fake_turn_executable_mode_change_is_rejected(context, monkeypatch):
+    repo, home, _state, session = context
+    candidate = archive({"file": (b"after\n", 0o755)})
+    events, fake, _ = execute(context, monkeypatch, [(candidate, None)])
+    assert fake.closed and events[-1]["code"] == "ARTIFACT_EXPORT_FAILED"
+    assert not (home / ".arcen" / "artifacts" / session / "patch.diff").exists()
+    assert (repo / "file").read_text() == "before\n"
