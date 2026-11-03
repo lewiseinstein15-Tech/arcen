@@ -32,3 +32,4 @@
 2026-11-03T14:25:25Z | RECOVERY-A05 | 8b38f32 | Next: run full regression, fix remaining lost A-04/A-07/A-09 changes before A-03a.
 2026-11-03T14:25:58Z | RECOVERY-A04 | 141203a | Next: run full suites; repair remaining missing changes before connecting A-03a export.
 2026-11-03T14:30:03Z | RECOVERY-A02 | b3cffe1 | Next: recover honest sandbox capability reporting and remaining audit/documentation files.
+2026-11-03T14:30:16Z | RECOVERY-A07 | f92b5ac | Next: restore surviving honesty documentation and unreviewed audit triage.

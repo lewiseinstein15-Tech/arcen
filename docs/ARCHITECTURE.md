@@ -12,7 +12,7 @@ ARCEN = Agentic reasoning + Code + Engineer. An agentic engineer that plans, bui
 | **FORGE** | Executor | Runs tools, one step at a time. Returns observations. |
 | **TEMPER** | Verifier | Tests adversarially. Reports pass/fail. |
 
-Only 3 core agents exist. Everything else — 500+ of them — is a sub-agent: spawned on demand, named for its task (`TEST-READER`, `MIGRATOR`), depth-capped, torn down when done.
+Only 3 core agent roles are defined. Sub-agent instances are spawned on demand, named for its task (`TEST-READER`, `MIGRATOR`), depth-capped, torn down when done.
 
 ## The 4-layer architecture
 
@@ -20,10 +20,10 @@ Only 3 core agents exist. Everything else — 500+ of them — is a sub-agent: s
 ┌──────────────────────────────────────────────────────┐
 │  L1 · AGENTS          DRAFT · FORGE · TEMPER          │   the only 3
 ├──────────────────────────────────────────────────────┤
-│  L2 · SUB-AGENTS      500+, spawned on demand         │   depth cap = 2
+│  L2 · SUB-AGENTS      task-named instances         │   depth cap = 2
 ├──────────────────────────────────────────────────────┤
-│  L3 · CAPABILITY      skills (10k+) · tools (1k+)     │
-│                       MCPs (300+) · plugins (100+)   │
+│  L3 · CAPABILITY      skills · registered tools     │
+│                       configured MCPs · plugins   │
 │                       memory (entity graph, SQLite)  │
 ├──────────────────────────────────────────────────────┤
 │  L4 · RUNTIME         Docker sandbox per session      │
