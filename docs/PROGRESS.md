@@ -24,3 +24,4 @@
 2026-11-03T14:17:41Z | RECOVERY | e2a35d9 | Next: restore missing intervening changes, then integrate A-03a baseline and tar export; old cbd7fe4 history remains unavailable.
 2026-11-03T14:18:41Z | RECOVERY | b52395b | Next: restore missing TEMPER verification; full backend collection currently fails.
 2026-11-03T14:18:50Z | RECOVERY | eb1b434 | Next: restore missing TEMPER verification; full backend collection still fails until then.
+2026-11-03T14:19:17Z | RECOVERY | ac8859e | Next: in /home/user/a03-salvaged restore missing TEMPER verify_sandbox_tests (backend collection ImportError), then recover other missing intervening changes and integrate A-03a; verified salvage bundle /home/user/000-000-004-A03-salvage.bundle requires 7af6cd0; docs/RECOVERY-STATUS.md has restore steps.

@@ -147,6 +147,7 @@ class VerifyStart:
     agent: str
     target: str
     ts: float = 0.0
+    status: str | None = None
     TYPE: ClassVar[str] = "verify.start"
 
 
@@ -158,6 +159,7 @@ class StepPass:
     step: int
     checks: list[str]
     ts: float = 0.0
+    evidence: dict[str, Any] | None = None
     TYPE: ClassVar[str] = "step.pass"
 
 
@@ -170,6 +172,7 @@ class StepFail:
     reason: str
     retry: int = 0
     ts: float = 0.0
+    evidence: dict[str, Any] | None = None
     TYPE: ClassVar[str] = "step.fail"
 
 
@@ -218,6 +221,7 @@ class RunDone:
     steps: int
     duration_s: float
     ts: float = 0.0
+    verification_status: str | None = None
     TYPE: ClassVar[str] = "run.done"
 
 
@@ -304,8 +308,9 @@ def to_dict(event: Event) -> dict[str, Any]:
     Key order: seq, type, payload..., ts (BACKEND-SPEC Part 9).
     """
     data = asdict(event)
-    if isinstance(event, FileDiff) and data["artifact"] is None:
-        del data["artifact"]
+    for key in ("artifact", "status", "evidence", "verification_status"):
+        if key in data and data[key] is None:
+            del data[key]
     # Absence preserves byte-identical legacy run.start events and replay.
     if isinstance(event, RunStart) and data["harness_ref"] is None:
         del data["harness_ref"]
@@ -346,6 +351,12 @@ def from_dict(data: dict[str, Any]) -> Event:
     optional = {"ts"}
     if cls is FileDiff:
         optional.add("artifact")
+    if cls is VerifyStart:
+        optional.add("status")
+    if cls in (StepPass, StepFail):
+        optional.add("evidence")
+    if cls is RunDone:
+        optional.add("verification_status")
     if cls is Usage:
         meta = {"measured", "usage_source", "cost_source"}
         optional.update(meta)
