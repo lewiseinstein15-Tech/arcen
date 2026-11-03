@@ -29,3 +29,4 @@
 2026-11-03T14:23:20Z | RECOVERY-A01 | d3e2eae | Next: wire verification into turn without replaying work; preserve unverified status and run regressions.
 2026-11-03T14:24:06Z | RECOVERY-A01 | cff7f40 | Next: restore visible unverified indicators and run complete regression suites.
 2026-11-03T14:24:53Z | RECOVERY-A01 | 0b9584c | Next: run full suites, repair remaining missing intervening changes, then connect A-03a export.
+2026-11-03T14:25:25Z | RECOVERY-A05 | 8b38f32 | Next: run full regression, fix remaining lost A-04/A-07/A-09 changes before A-03a.

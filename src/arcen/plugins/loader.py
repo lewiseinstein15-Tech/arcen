@@ -71,11 +71,14 @@ class PluginLoader:
         self.errors: list[dict] = []
 
     def load(self) -> dict[str, Plugin]:
-        """Import every plugin module under the paths, keep the enabled ones."""
+        """Import only enabled plugin filenames; enabled plugins remain trusted host code."""
+        names = {name.replace("-", "_") for name in self.enabled}
         for root in self.paths:
             if not root.is_dir():
                 continue
             for module_file in sorted(root.glob("*.py")):
+                if module_file.stem not in names:
+                    continue
                 module_name = f"arcen_plugin_{module_file.stem}"
                 try:
                     spec = importlib.util.spec_from_file_location(module_name, module_file)
