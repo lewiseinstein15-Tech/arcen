@@ -140,3 +140,48 @@ def load_baseline(session: str, *, home: Path | None = None) -> tuple[bytes, str
     ):
         raise ArtifactError("baseline hash mismatch")
     return snapshot, meta["base_commit"]
+
+
+def capture_workspace_baseline(
+    session: str, workspace: str | Path, *, home: Path | None = None
+) -> tuple[bytes, str]:
+    """Capture one Git-root working tree on the host before launching a turn.
+
+    The repository, Git executable and local configuration are trusted host
+    inputs. The returned bytes are exactly the bytes intended for container
+    import; the private saved baseline is never passed as a host mount.
+    """
+    import os
+
+    from arcen.harness.probe_workspace import _reject_configured_git_filters, _run_git
+    from arcen.sandbox.workspace import snapshot_workspace
+
+    try:
+        root = Path(workspace).expanduser().resolve(strict=True)
+        if not root.is_dir():
+            raise ArtifactError("workspace must be a Git root directory")
+        top = Path(
+            os.fsdecode(_run_git(root, ["rev-parse", "--show-toplevel"], max_bytes=4096)).strip()
+        )
+        if top.resolve(strict=True) != root:
+            raise ArtifactError("workspace must be the Git root directory")
+        _reject_configured_git_filters(root)
+        base = (
+            _run_git(root, ["rev-parse", "--verify", "HEAD^{commit}"], max_bytes=128)
+            .decode("ascii")
+            .strip()
+        )
+        if not _BASE.fullmatch(base):
+            raise ArtifactError("invalid workspace HEAD")
+        snapshot = snapshot_workspace(root, exclude_git=True)
+        after = (
+            _run_git(root, ["rev-parse", "--verify", "HEAD^{commit}"], max_bytes=128)
+            .decode("ascii")
+            .strip()
+        )
+        if after != base:
+            raise ArtifactError("workspace HEAD changed during baseline capture")
+        save_baseline(session, snapshot, base, home=home)
+        return snapshot, base
+    except (OSError, UnicodeError) as exc:
+        raise ArtifactError("workspace baseline capture failed") from exc
