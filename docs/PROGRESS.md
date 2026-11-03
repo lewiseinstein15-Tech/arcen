@@ -21,3 +21,4 @@
 2026-11-03T01:04:40Z | A-03a | 45bc308 | Next: in a03-session persist pre-turn baseline; connect bounded container tar to host diff and artifact event. Recovery bundles: /home/user/000-000-003-prior-base.bundle then /home/user/000-000-003-A03a-current.bundle.
 2026-11-03T01:13:54Z | A-03a | a7805f0 | Next: verify and reload host baseline, connect pre-turn capture and bounded post-turn container tar to artifact event.
 2026-11-03T01:14:19Z | A-03a | cbd7fe4 | Next: restore missing prerequisite 881c24c from ARCEN-phase-work.bundle (SHA-256 56c6254cd39a4ca8e5d8a7da1aaf0e7cf679dede308f5a8dae12d4b41f36847a), then fetch /home/user/000-000-003-A03a-resume.bundle and wire baseline/container tar/artifact event. Error: Repository lacks prerequisite commit 881c24c; temporary archive returned HTTP 404.
+2026-11-03T14:17:41Z | RECOVERY | e2a35d9 | Next: restore missing intervening changes, then integrate A-03a baseline and tar export; old cbd7fe4 history remains unavailable.
