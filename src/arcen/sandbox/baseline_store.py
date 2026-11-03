@@ -167,6 +167,25 @@ def capture_workspace_baseline(
         if top.resolve(strict=True) != root:
             raise ArtifactError("workspace must be the Git root directory")
         _reject_configured_git_filters(root)
+        # Gitlinks cannot be represented safely as ordinary working-tree files.
+        # Disable fsmonitor before reading the index so local config cannot run
+        # an external monitor; configuration and repository remain trusted.
+        entries = _run_git(
+            root,
+            ["-c", "core.fsmonitor=false", "ls-files", "--stage", "-z"],
+            max_bytes=5 * 1024 * 1024,
+        )
+        if entries and not entries.endswith(b"\0"):
+            raise ArtifactError("invalid workspace index")
+        for entry in entries.split(b"\0"):
+            if not entry:
+                continue
+            metadata, separator, _ = entry.partition(b"\t")
+            fields = metadata.split(b" ")
+            if not separator or len(fields) != 3 or fields[2] != b"0":
+                raise ArtifactError("unmerged or invalid workspace index")
+            if fields[0] == b"160000":
+                raise ArtifactError("submodule workspaces are not supported")
         base = (
             _run_git(root, ["rev-parse", "--verify", "HEAD^{commit}"], max_bytes=128)
             .decode("ascii")

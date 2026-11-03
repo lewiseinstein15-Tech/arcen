@@ -110,12 +110,15 @@ class ServerState:
         """
         st = execution_status(self.config)
         log.info(
-            "[sandbox] docker daemon: %s", "reachable" if st["docker_available"] else "not reachable"
+            "[sandbox] docker daemon: %s",
+            "reachable" if st["docker_available"] else "not reachable",
         )
         log.info(
             "[sandbox] image %s: %s",
             st["image"],
-            "present" if st["image_present"] else ("absent" if st["docker_available"] else "not checked"),
+            "present"
+            if st["image_present"]
+            else ("absent" if st["docker_available"] else "not checked"),
         )
         log.info("[sandbox] backend selected: %s", st["effective"])
         log.info("[sandbox] reason: %s", st["reason"])
@@ -239,7 +242,12 @@ def _turn_guard(goal: str, session_id: str, run_id: str, state: ServerState) -> 
 
 
 def run_turn(
-    goal: str, session_id: str, run_id: str, state: ServerState, *, workspace: str | None = None,
+    goal: str,
+    session_id: str,
+    run_id: str,
+    state: ServerState,
+    *,
+    workspace: str | None = None,
     harness_ref: str | None = None,
 ) -> None:
     """One narrated turn. DRAFT plans from the provider; without one a
@@ -278,7 +286,15 @@ def run_turn(
         # An explicitly requested workspace is never silently ignored, even
         # for direct-answer turns: validate and import it before planning.
         if workspace is not None:
-            isolated_registry = create_turn_registry(state.config, workspace=workspace)
+            from arcen.sandbox.baseline_store import capture_workspace_baseline
+            from arcen.sandbox.patch_validation import ArtifactError
+            from arcen.sandbox.workspace import WorkspaceError
+
+            try:
+                snapshot, _ = capture_workspace_baseline(session_id, workspace)
+            except (ArtifactError, WorkspaceError, OSError) as exc:
+                raise IsolationUnavailable(f"Workspace snapshot rejected: {exc}") from exc
+            isolated_registry = create_turn_registry(state.config, snapshot=snapshot)
 
         # DRAFT opens the turn — plan from the provider, or an honest
         # refusal when none is configured (never a fake bash plan, T-037)
@@ -288,8 +304,15 @@ def run_turn(
         if plan_events and plan_events[-1].TYPE == "answer":
             # conversational short-circuit: the greeting got its warm reply
             # on the stream — no plan, no tools, no verification (BUG 2 fix)
-            emit(RunDone(seq=0, status="ok", steps=0,
-                         duration_s=round(time.time() - turn_start, 4), ts=0.0))
+            emit(
+                RunDone(
+                    seq=0,
+                    status="ok",
+                    steps=0,
+                    duration_s=round(time.time() - turn_start, 4),
+                    ts=0.0,
+                )
+            )
             return
         steps = plan_events[-1].steps
 
@@ -303,8 +326,15 @@ def run_turn(
         # goal text is NEVER run as a command (T-037).
         def interrupted_done() -> bool:
             if interrupted.is_set():
-                emit(RunDone(seq=0, status="interrupted", steps=executed,
-                             duration_s=round(time.time() - turn_start, 4), ts=0.0))
+                emit(
+                    RunDone(
+                        seq=0,
+                        status="interrupted",
+                        steps=executed,
+                        duration_s=round(time.time() - turn_start, 4),
+                        ts=0.0,
+                    )
+                )
                 return True
             return False
 
@@ -385,8 +415,15 @@ def run_turn(
             )
         verified = verification_status == "pass"
 
-        emit(Memory(seq=0, op="write", entity=goal[:64],
-                    fact=f"turn {run_id}: {executed} steps, verified={verified}", ts=0.0))
+        emit(
+            Memory(
+                seq=0,
+                op="write",
+                entity=goal[:64],
+                fact=f"turn {run_id}: {executed} steps, verified={verified}",
+                ts=0.0,
+            )
+        )
 
         duration = round(time.time() - turn_start, 4)
         if failure is not None:
@@ -394,7 +431,11 @@ def run_turn(
             pending_summary = Answer(seq=0, text=f"Turn failed: {failure}", ts=0.0)
             emit(RunDone(seq=0, status="failed", steps=executed, duration_s=duration, ts=0.0))
         elif verified:
-            pending_summary = Answer(seq=0, text=f"Done. {executed} step(s) executed against: {goal}. Verification passed.", ts=0.0)
+            pending_summary = Answer(
+                seq=0,
+                text=f"Done. {executed} step(s) executed against: {goal}. Verification passed.",
+                ts=0.0,
+            )
             emit(RunDone(seq=0, status="ok", steps=executed, duration_s=duration, ts=0.0))
         else:
             text = (
@@ -403,8 +444,16 @@ def run_turn(
                 else f"Turn failed: verification did not pass after {executed} step(s)."
             )
             pending_summary = Answer(seq=0, text=text, ts=0.0)
-            emit(RunDone(seq=0, status="failed", steps=executed, duration_s=duration,
-                         verification_status=verification_status, ts=0.0))
+            emit(
+                RunDone(
+                    seq=0,
+                    status="failed",
+                    steps=executed,
+                    duration_s=duration,
+                    verification_status=verification_status,
+                    ts=0.0,
+                )
+            )
     except IsolationUnavailable as exc:
         emit(RunError(seq=0, code="SANDBOX_UNAVAILABLE", message=str(exc), ts=0.0))
     except ProviderError as exc:
@@ -417,6 +466,23 @@ def run_turn(
         emit(RunError(seq=0, code="TURN_FAILED", message=str(exc), ts=0.0))
     finally:
         if isolated_registry is not None:
+            if workspace is not None:
+                from arcen.sandbox.host_export import export_candidate
+                from arcen.sandbox.patch_validation import ArtifactError
+
+                try:
+                    candidate = isolated_registry.export_workspace()
+                    export_candidate(session_id, candidate, emit)
+                except Exception as exc:  # noqa: BLE001 — sandbox data and daemon are untrusted
+                    pending_summary = None
+                    # Only expose the known bounded collector error, never daemon text.
+                    message = (
+                        "Sandbox workspace export exceeded the size limit; no patch was saved."
+                        if isinstance(exc, ArtifactError)
+                        and str(exc).startswith("sandbox export exceeded ")
+                        else "Sandbox workspace export failed; inspect artifact storage before retrying."
+                    )
+                    emit(RunError(seq=0, code="ARTIFACT_EXPORT_FAILED", message=message, ts=0.0))
             try:
                 isolated_registry.close(strict=True)
             except Exception:  # noqa: BLE001 — untrusted daemon failures may contain secrets

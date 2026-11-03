@@ -2,7 +2,8 @@
 
 JSON is an envelope, not a second event protocol: the canonical wire events are
 embedded unchanged. Only the verified packaged adopted baseline may be selected;
-candidate refs remain blocked. Workspaces are input-only Docker snapshots.
+candidate refs remain blocked. Explicit Git-root workspaces are imported as
+snapshots; any patch is generated on the host and stored as a private artifact.
 """
 
 from __future__ import annotations

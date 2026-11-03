@@ -86,7 +86,7 @@ def build_host_patch(baseline_tar: bytes, candidate_tar: bytes) -> bytes:
     """Build and validate a patch in a disposable host Git repository.
 
     Only archive data is processed on the host; no workspace code is executed.
-    This helper is not connected to a container turn or artifact publication.
+    Turn integration uses this helper only after bounded container collection.
     """
     import shutil
     import subprocess
@@ -184,7 +184,7 @@ def export_candidate(session: str, candidate_tar: bytes, emit, *, home: Path | N
 
     The caller must obtain candidate_tar through the bounded container collector.
     This function processes archive data only and never executes candidate code.
-    It is not yet connected to real container turns.
+    The live turn calls this before container teardown.
     """
     from arcen.sandbox.artifact_store import publish_artifact
     from arcen.sandbox.baseline_store import load_baseline

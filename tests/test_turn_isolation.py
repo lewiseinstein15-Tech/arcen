@@ -477,7 +477,14 @@ def test_server_provider_failure_does_not_hide_cleanup_failure(tmp_path, monkeyp
             self.closed = True
             raise RuntimeError("secret-daemon-cleanup-failure")
 
+    from arcen.sandbox import baseline_store, host_export
+
     registry = FailingRegistry()
+    monkeypatch.setattr(
+        baseline_store, "capture_workspace_baseline", lambda *a, **kw: (b"baseline", "a" * 40)
+    )
+    monkeypatch.setattr(registry, "export_workspace", lambda: b"candidate", raising=False)
+    monkeypatch.setattr(host_export, "export_candidate", lambda *a, **kw: {})
     events, observed = _server_run_for_cleanup(
         tmp_path, monkeypatch, registry, workspace=str(tmp_path), provider_fails=True
     )

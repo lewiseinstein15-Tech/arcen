@@ -134,8 +134,8 @@ def publish_artifact(
 ) -> dict:
     """Save first, then notify using the existing file.diff event.
 
-    No event is emitted when validation or storage fails. This is not wired to
-    server turns until a trusted inside-container exporter exists.
+    No event is emitted when validation or storage fails. Container archives
+    remain untrusted and must be validated and diffed on the host first.
     """
     from arcen.stream.events import FileDiff
 

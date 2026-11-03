@@ -63,3 +63,11 @@ def test_symlink_refused_without_baseline(repo, tmp_path):
     with pytest.raises(WorkspaceError, match="symlink"):
         capture_workspace_baseline(str(uuid.uuid4()), repo, home=tmp_path)
     assert not (tmp_path / ".arcen").exists()
+
+
+def test_gitlink_is_refused_before_capture(repo, tmp_path):
+    base = git(repo, "rev-parse", "HEAD").decode().strip()
+    git(repo, "update-index", "--add", "--cacheinfo", f"160000,{base},vendor")
+    with pytest.raises(ArtifactError, match="submodule"):
+        capture_workspace_baseline(str(uuid.uuid4()), repo, home=tmp_path)
+    assert not (tmp_path / ".arcen").exists()

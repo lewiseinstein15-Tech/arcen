@@ -91,13 +91,22 @@ def test_explicit_workspace_is_passed_to_the_shared_boundary(monkeypatch, tmp_pa
     seen = []
     fake = FakeTurnRegistry()
 
-    def factory(config, *, workspace=None):
-        seen.append(workspace)
+    from arcen.sandbox import baseline_store, host_export
+
+    def capture(session, workspace):
+        assert workspace == str(tmp_path)
+        return b"protected baseline", "a" * 40
+
+    def factory(config, *, snapshot=None):
+        seen.append(snapshot)
         return fake
 
+    monkeypatch.setattr(baseline_store, "capture_workspace_baseline", capture)
+    monkeypatch.setattr(host_export, "export_candidate", lambda *a, **kw: {})
+    monkeypatch.setattr(fake, "export_workspace", lambda: b"candidate", raising=False)
     monkeypatch.setattr(app, "create_turn_registry", factory)
     result = execute("run the task", state=make_state(tmp_path, Planner()), workspace=str(tmp_path))
-    assert seen == [str(tmp_path)] and result["workspace_mode"] == "snapshot_requested"
+    assert seen == [b"protected baseline"] and result["workspace_mode"] == "snapshot_requested"
     assert result["status"] == "ok" and fake.closed
 
 
