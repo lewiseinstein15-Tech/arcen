@@ -74,3 +74,58 @@ def test_failed_metadata_write_removes_partial_artifact(tmp_path, monkeypatch):
     with pytest.raises(OSError, match="simulated write failure"):
         save_artifact(session, PATCH, BASE, home=tmp_path)
     assert not (tmp_path / ".arcen" / "artifacts" / session).exists()
+
+
+def _baseline(tmp_path, session, base=BASE):
+    from arcen.sandbox.baseline_store import save_baseline
+    from arcen.sandbox.workspace import snapshot_workspace
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(exist_ok=True)
+    (workspace / "file").write_text("baseline")
+    return save_baseline(
+        session, snapshot_workspace(workspace, exclude_git=True), base, home=tmp_path
+    )
+
+
+def test_publish_into_private_baseline_session(tmp_path):
+    from arcen.sandbox.baseline_store import load_baseline
+
+    session = str(uuid.uuid4())
+    baseline = _baseline(tmp_path, session)
+    result = save_artifact(session, PATCH, BASE, home=tmp_path, require_baseline=True)
+    assert (baseline.parent / "patch.diff").read_bytes() == PATCH
+    assert load_baseline(session, home=tmp_path)[1] == BASE
+    assert result["files"] == ["new.txt"]
+    with pytest.raises(ArtifactError, match="already exists"):
+        save_artifact(session, PATCH, BASE, home=tmp_path, require_baseline=True)
+    assert (baseline.parent / "patch.diff").read_bytes() == PATCH
+
+
+def test_baseline_base_mismatch_saves_no_patch(tmp_path):
+    session = str(uuid.uuid4())
+    baseline = _baseline(tmp_path, session)
+    with pytest.raises(ArtifactError, match="does not match"):
+        save_artifact(session, PATCH, "b" * 40, home=tmp_path, require_baseline=True)
+    assert sorted(p.name for p in baseline.parent.iterdir()) == ["baseline"]
+
+
+def test_partial_failure_preserves_baseline_and_existing_metadata(tmp_path):
+    session = str(uuid.uuid4())
+    baseline = _baseline(tmp_path, session)
+    meta = baseline.parent / "meta.json"
+    meta.write_text("existing")
+    with pytest.raises(ArtifactError, match="already exists"):
+        save_artifact(session, PATCH, BASE, home=tmp_path, require_baseline=True)
+    assert meta.read_text() == "existing"
+    assert not (baseline.parent / "patch.diff").exists()
+    assert (baseline / "snapshot.tar").exists()
+
+
+def test_tampered_baseline_refuses_publication(tmp_path):
+    session = str(uuid.uuid4())
+    baseline = _baseline(tmp_path, session)
+    (baseline / "snapshot.tar").write_bytes(b"tampered")
+    with pytest.raises(ArtifactError, match="mismatch"):
+        save_artifact(session, PATCH, BASE, home=tmp_path, require_baseline=True)
+    assert not (baseline.parent / "patch.diff").exists()
