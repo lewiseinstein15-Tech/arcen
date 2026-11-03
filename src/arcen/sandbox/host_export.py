@@ -177,3 +177,18 @@ def build_host_patch(baseline_tar: bytes, candidate_tar: bytes) -> bytes:
         )
         validate_patch(patch)
         return patch
+
+
+def export_candidate(session: str, candidate_tar: bytes, emit, *, home: Path | None = None) -> dict:
+    """Create and publish a host-generated diff using a verified private baseline.
+
+    The caller must obtain candidate_tar through the bounded container collector.
+    This function processes archive data only and never executes candidate code.
+    It is not yet connected to real container turns.
+    """
+    from arcen.sandbox.artifact_store import publish_artifact
+    from arcen.sandbox.baseline_store import load_baseline
+
+    baseline, base_commit = load_baseline(session, home=home)
+    patch = build_host_patch(baseline, candidate_tar)
+    return publish_artifact(session, patch, base_commit, emit, home=home, require_baseline=True)

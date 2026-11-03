@@ -124,7 +124,13 @@ def save_artifact(
 
 
 def publish_artifact(
-    session: str, patch: bytes, base_commit: str, emit, *, home: Path | None = None
+    session: str,
+    patch: bytes,
+    base_commit: str,
+    emit,
+    *,
+    home: Path | None = None,
+    require_baseline: bool = False,
 ) -> dict:
     """Save first, then notify using the existing file.diff event.
 
@@ -133,7 +139,9 @@ def publish_artifact(
     """
     from arcen.stream.events import FileDiff
 
-    result = save_artifact(session, patch, base_commit, home=home)
+    result = save_artifact(
+        session, patch, base_commit, home=home, require_baseline=require_baseline
+    )
     artifact = {"path": result["path"], "files": result["files"], "sha256": result["sha256"]}
     emit(FileDiff(seq=0, path=result["path"], patch="", artifact=artifact, ts=0.0))
     return result

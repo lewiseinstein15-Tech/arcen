@@ -35,3 +35,4 @@
 2026-11-03T14:30:16Z | RECOVERY-A07 | f92b5ac | Next: restore surviving honesty documentation and unreviewed audit triage.
 2026-11-03T14:30:23Z | RECOVERY-A09 | ffe3373 | Next: reconstruct unreviewed audit triage, then full backend and UI regression.
 2026-11-03T14:30:36Z | RECOVERY-A10 | 0aa19be | Next: integrate A-03a pre-turn host baseline, reconcile artifact store session directories, and export bounded tar through safe host diff/validator; backend 1786 passed/19 skipped, UI 87 passed; Docker unverified.
+2026-11-03T15:15:22Z | A-03a | 4309b4b | Next: build host export orchestration from protected baseline; wire capture and bounded tar into isolated turn.
