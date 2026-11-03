@@ -282,6 +282,9 @@ def execution_status(config) -> dict:
             "reason": reason,
             "degraded": False,
             "supported_tools": list(policy.execution.allowed_tools),
+            # Preflight is not evidence that an actual turn passed inspection.
+            "effective_tools": [],
+            "candidate_tools": list(policy.execution.allowed_tools),
             "policy": policy.snapshot(),
         }
     return {
@@ -291,6 +294,8 @@ def execution_status(config) -> dict:
         "reason": reason,
         "degraded": True,
         "supported_tools": list(policy.execution.allowed_tools),
+        "effective_tools": [],
+        "candidate_tools": [],
         "policy": policy.snapshot(),
     }
 
