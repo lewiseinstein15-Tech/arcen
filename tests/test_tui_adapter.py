@@ -234,3 +234,12 @@ def test_a08_old_and_unmeasured_usage_render_unknown():
     adapter.apply({"seq": 2, "type": "usage", "tokens": {"input": 0, "output": 0},
                    "cost_usd": 0.0, "measured": False, "usage_source": "unknown", "cost_source": "unknown"})
     assert "unknown" in render(rail.render())
+
+
+def test_unverified_verification_is_not_reported_as_pass():
+    adapter, narration, _, _, _ = setup_adapter()
+    adapter.apply({"type": "verify.start", "seq": 1, "ts": 0.0, "agent": "TEMPER", "target": "workspace", "status": "unverified"})
+    adapter.apply({"type": "run.done", "seq": 2, "ts": 0.0, "status": "failed", "steps": 1, "duration_s": 0.1, "verification_status": "unverified"})
+    text = "\n".join(render(item) for item in narration.items)
+    assert "unverified" in text.lower()
+    assert "verification passed" not in text.lower()

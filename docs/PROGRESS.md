@@ -27,3 +27,4 @@
 2026-11-03T14:19:17Z | RECOVERY | ac8859e | Next: in /home/user/a03-salvaged restore missing TEMPER verify_sandbox_tests (backend collection ImportError), then recover other missing intervening changes and integrate A-03a; verified salvage bundle /home/user/000-000-004-A03-salvage.bundle requires 7af6cd0; docs/RECOVERY-STATUS.md has restore steps.
 2026-11-03T14:22:48Z | RECOVERY-A01 | 46c6772 | Next: restore safe sandbox test discovery and verification without replaying work commands.
 2026-11-03T14:23:20Z | RECOVERY-A01 | d3e2eae | Next: wire verification into turn without replaying work; preserve unverified status and run regressions.
+2026-11-03T14:24:06Z | RECOVERY-A01 | cff7f40 | Next: restore visible unverified indicators and run complete regression suites.

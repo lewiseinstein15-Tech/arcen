@@ -200,7 +200,8 @@ class EventAdapter:
     def _verify_start(self, e):
         self.state.replanning = False
         target = str(e.get("target", "verification"))
-        model = self.registry.create("verify", [Check("target", target, status="active")])
+        unverified = e.get("status") == "unverified"
+        model = self.registry.create("verify", [Check("target", target, detail="unverified: no test command found" if unverified else "", status="pending" if unverified else "active")])
         self.state.verification = self._append("verify", model.render(), model)
         self._phase("TEMPER")
 
@@ -250,7 +251,10 @@ class EventAdapter:
         if status == "interrupted":
             self._append("interrupted", Text("  run interrupted", style=TOKENS["amber"]))
         elif status == "failed":
-            self._append("error", self.registry.create("error", "RUN FAILED", "The run failed."))
+            if e.get("verification_status") == "unverified":
+                self._append("unverified", Text("  unverified: no test command found", style=TOKENS["amber"]))
+            else:
+                self._append("error", self.registry.create("error", "RUN FAILED", "The run failed."))
         self.state.replanning = False
         if self.footer is not None:
             self.footer.set_live(False)

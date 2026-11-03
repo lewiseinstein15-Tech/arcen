@@ -62,6 +62,7 @@ export const VerifyBlock = memo(function VerifyBlock({
   }
 
   const target = event.type === 'verify.start' ? event.target : '';
+  const unverified = event.type === 'verify.start' && event.status === 'unverified';
   return (
     <article
       className={`block verify ${failed ? 'is-fail' : passed ? 'is-pass' : ''}`}
@@ -77,6 +78,7 @@ export const VerifyBlock = memo(function VerifyBlock({
         </span>
         <span className="who">{event.type === 'verify.start' ? event.agent : 'TEMPER'}</span>
         <span className="meta">{target}</span>
+        {unverified && <span className="meta">unverified · no test command found</span>}
         <Chevron open={open} />
       </button>
       {open &&
