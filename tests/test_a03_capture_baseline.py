@@ -71,3 +71,11 @@ def test_gitlink_is_refused_before_capture(repo, tmp_path):
     with pytest.raises(ArtifactError, match="submodule"):
         capture_workspace_baseline(str(uuid.uuid4()), repo, home=tmp_path)
     assert not (tmp_path / ".arcen").exists()
+
+
+@pytest.mark.parametrize("name", [".env.local", ".npmrc", "service.pem", "id_private", ".ssh"])
+def test_protected_credential_paths_are_refused_before_baseline(repo, tmp_path, name):
+    (repo / name).write_text("credential must not leave host")
+    with pytest.raises(ArtifactError, match="credential path"):
+        capture_workspace_baseline(str(uuid.uuid4()), repo, home=tmp_path)
+    assert not (tmp_path / ".arcen").exists()

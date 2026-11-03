@@ -8,10 +8,10 @@ output before teardown, and generates/validates the patch on the host. A
 an existing baseline is refused. The HTTP `/api/run` surface does not yet pass
 through a workspace; do not assume it exports artifacts.
 
-The workspace snapshot can include sensitive files, including ignored and
-untracked files. Use only a reviewed workspace containing no credentials or
-other private data inappropriate to give the sandboxed agent. The filename
-patch denylist does not scan file contents or guarantee confidentiality.
+The workspace snapshot includes ignored and untracked files. Common credential
+paths are rejected before starting the sandbox, but no filename denylist scans
+file contents or guarantees confidentiality. Use only a reviewed workspace
+containing no private data inappropriate to give the sandboxed agent.
 
 This is a reconstructed branch, not the missing original history. Fake runtime
 tests do not establish real Docker behavior. Docker-machine smoke, broader

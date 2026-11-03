@@ -151,7 +151,9 @@ def capture_workspace_baseline(
     inputs. The returned bytes are exactly the bytes intended for container
     import; the private saved baseline is never passed as a host mount.
     """
+    import io
     import os
+    import tarfile
 
     from arcen.guardrails import default_policy
     from arcen.harness.probe_workspace import _reject_configured_git_filters, _run_git
@@ -200,6 +202,30 @@ def capture_workspace_baseline(
             max_entries=limits.max_entries,
             max_file_bytes=limits.max_file_bytes,
         )
+        # Never expose common credential paths to the sandbox. A path denylist
+        # cannot discover arbitrary secrets, so the workspace still needs review.
+        with tarfile.open(fileobj=io.BytesIO(snapshot), mode="r:") as archive:
+            for entry in archive:
+                for part in entry.name.split("/"):
+                    name = part.lower()
+                    if (
+                        name.startswith((".env", "id_"))
+                        or name
+                        in {
+                            ".npmrc",
+                            ".pypirc",
+                            ".netrc",
+                            ".ssh",
+                            ".gnupg",
+                            ".aws",
+                            ".azure",
+                            ".kube",
+                            "credentials",
+                            "credentials.json",
+                        }
+                        or name.endswith((".key", ".p12", ".pfx", ".pem"))
+                    ):
+                        raise ArtifactError("workspace contains a protected credential path")
         after = (
             _run_git(root, ["rev-parse", "--verify", "HEAD^{commit}"], max_bytes=128)
             .decode("ascii")

@@ -40,3 +40,4 @@
 2026-11-03T15:32:09Z | A-03a | b96468a | Next: capture the Git-root host baseline before starting a turn, then connect container tar export and event publication.
 2026-11-03T15:32:39Z | A-03a | e2d440a | Next: wire capture_workspace_baseline into turn before container creation, import those exact bytes, export_workspace before teardown, and publish export_candidate; resolve UUID/session reuse and failure ordering; backend 1804 passed/19 skipped, UI 87 passed; Docker unverified.
 2026-11-03T15:41:51Z | A-03a | 27e7067 | Next: connect baseline capture and bounded export to server turn, keep terminal and cleanup ordering fail-closed.
+2026-11-03T15:44:21Z | A-03a | 4a27769 | Next: address workspace credential exposure and API workspace/session policy, expand fake integration cases and Docker smoke; do not mark A-03 done.
