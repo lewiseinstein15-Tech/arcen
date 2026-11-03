@@ -100,3 +100,61 @@ def test_new_executable_hidden_in_index_rejected():
     data = patch("tool").replace(b"index 0000000..1234567", b"index 0000000..1234567 100755")
     with pytest.raises(ArtifactError):
         validate_patch(data)
+
+
+def test_hunk_header_like_content_is_valid_and_applies(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "test"], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "user.email", "t@example.invalid"], check=True
+    )
+    path = tmp_path / "markers"
+    path.write_bytes(b"-- prior\nunchanged\n")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "markers"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "base"], check=True)
+    path.write_bytes(b"++ next\nunchanged\n")
+    data = subprocess.check_output(["git", "-C", str(tmp_path), "diff", "--binary"])
+    assert b"--- prior\n+++ next\n" in data
+    assert validate_patch(data) == ["markers"]
+    path.write_bytes(b"-- prior\nunchanged\n")
+    subprocess.run(["git", "-C", str(tmp_path), "apply", "--check", "-"], input=data, check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "apply", "-"], input=data, check=True)
+    assert path.read_bytes() == b"++ next\nunchanged\n"
+
+
+def test_rejects_header_smuggled_after_incomplete_hunk():
+    data = (
+        b"diff --git a/safe b/safe\nindex 1234567..abcdef0 100644\n"
+        b"--- a/safe\n+++ b/safe\n@@ -1 +1 @@\n-old\n"
+        b"diff --git a/other b/other\nnew file mode 100644\nindex 0000000..1234567\n"
+        b"--- /dev/null\n+++ b/other\n@@ -0,0 +1 @@\n+other\n"
+    )
+    with pytest.raises(ArtifactError, match="truncated"):
+        validate_patch(data)
+
+
+def test_rejects_extra_metadata_after_completed_hunk():
+    with pytest.raises(ArtifactError, match="unexpected metadata"):
+        validate_patch(patch("file") + b"--- a/other\n+++ b/other\n")
+
+
+def test_rejects_absurd_hunk_count():
+    data = patch("file").replace(b"-0,0", b"-0," + b"9" * 5000)
+    with pytest.raises(ArtifactError, match="size limit"):
+        validate_patch(data)
+
+
+def test_supports_two_hunks_and_no_newline_marker(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "test"], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "user.email", "t@example.invalid"], check=True
+    )
+    path = tmp_path / "multi"
+    path.write_bytes(b"old\n" + b"unchanged\n" * 20 + b"old")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "multi"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "base"], check=True)
+    path.write_bytes(b"new\n" + b"unchanged\n" * 20 + b"new")
+    data = subprocess.check_output(["git", "-C", str(tmp_path), "diff", "--binary"])
+    assert data.count(b"@@ -") == 2 and b"No newline at end of file" in data
+    assert validate_patch(data) == ["multi"]
