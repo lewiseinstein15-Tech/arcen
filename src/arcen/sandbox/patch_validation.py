@@ -30,8 +30,9 @@ def _path(raw: bytes) -> str:
         or any(part in ("", ".", "..") for part in parts)
         or any(part.lower() == ".git" for part in parts)
         or any(
-            (part.lower() == ".env" or part.lower().startswith(".env."))
-            or part.lower().endswith(".pem")
+            part.lower().startswith(".env")
+            or part.lower() in {".npmrc", ".pypirc", ".gitattributes", ".gitmodules"}
+            or part.lower().endswith((".pem", ".key", ".p12"))
             or part.lower().startswith("id_")
             for part in parts
         )
@@ -58,6 +59,7 @@ def validate_patch(patch: bytes) -> list[str]:
     current: bytes | None = None
     in_body = False
     minus = plus = False
+    executable = False
     for line in patch.splitlines():
         if line.startswith(b"diff --git "):
             match = _HEADER.fullmatch(line)
@@ -68,7 +70,7 @@ def validate_patch(patch: bytes) -> list[str]:
                 raise ArtifactError("duplicate patch path")
             files.append(path)
             current = match[1]
-            in_body = minus = plus = False
+            in_body = minus = plus = executable = False
             continue
         if current is None:
             raise ArtifactError("patch has data outside a file section")
@@ -97,11 +99,15 @@ def validate_patch(patch: bytes) -> list[str]:
             if mode != b"100644":
                 raise ArtifactError("symlinks, executables and submodules are not supported")
         elif line.startswith(b"index "):
-            if line.endswith((b" 120000", b" 160000", b" 100755")):
-                raise ArtifactError("symlinks, executables and submodules are not supported")
+            match = re.fullmatch(rb"index [0-9a-f]+\.\.[0-9a-f]+(?: (100644|100755))?", line)
+            if not match:
+                raise ArtifactError("unsupported index or file mode")
+            executable = match[1] == b"100755"
         elif line.startswith(b"--- "):
             if minus or line[4:] not in (b"a/" + current, b"/dev/null"):
                 raise ArtifactError("mismatched patch source path")
+            if line[4:] == b"/dev/null" and executable:
+                raise ArtifactError("new executable files are not supported")
             minus = True
         elif line.startswith(b"+++ "):
             if plus or not minus or line[4:] not in (b"b/" + current, b"/dev/null"):

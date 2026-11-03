@@ -46,7 +46,7 @@ class _StubProviderLLM:
         if "Return ONLY the word" in content:
             return LLMResponse(text="CODE", model="stub", tokens={"input": 1, "output": 1})
         goal_line = next((ln for ln in content.splitlines() if ln.startswith("Goal: ")), "")
-        goal = goal_line[len("Goal: "):].strip() or "true"
+        goal = goal_line[len("Goal: ") :].strip() or "true"
         plan = json.dumps(
             [
                 {"title": f"run: {goal[:40]}", "tool": "bash", "args": {"cmd": goal}},
@@ -110,7 +110,13 @@ def _new_session(client: httpx.Client, goal: str) -> str:
     return session
 
 
-def _stream_until(client: httpx.Client, session: str, want: str = "run.done", last_event_id: int | None = None, limit: int = 300) -> list[dict]:
+def _stream_until(
+    client: httpx.Client,
+    session: str,
+    want: str = "run.done",
+    last_event_id: int | None = None,
+    limit: int = 300,
+) -> list[dict]:
     headers = {"Last-Event-ID": str(last_event_id)} if last_event_id is not None else {}
     events: list[dict] = []
     with client.stream("GET", f"/api/stream?session={session}", headers=headers) as resp:
@@ -360,6 +366,7 @@ def test_interrupt_run(client) -> None:
 
 # -- T-038: sandbox backend configurability ----------------------------------
 
+
 def test_sandbox_status_endpoint(client, monkeypatch) -> None:
     """Settings fetches the sandbox picture from here; never raises.
 
@@ -378,6 +385,7 @@ def test_sandbox_status_endpoint(client, monkeypatch) -> None:
 
 
 # -- T-043: the docker-less machine is explicit and honest --------------------
+
 
 def test_boot_logs_sandbox_state_lines(caplog, monkeypatch) -> None:
     """Boot prints the four [sandbox] lines — daemon / image / selected /
@@ -462,6 +470,7 @@ def test_boot_quiet_when_backend_is_auto(caplog) -> None:
 
 # -- T-040: /api/sessions is the single source of truth for ordering ----------
 
+
 def test_sessions_sorted_newest_first(client) -> None:
     """created_at DESC — newest first, regardless of session id order."""
     for i, created in ((1, 500.0), (2, 900.0), (3, 100.0)):
@@ -476,6 +485,7 @@ def test_sessions_sorted_newest_first(client) -> None:
 
 
 # -- T-052: a fresh client-generated session is an empty truth, not a 404 ----
+
 
 def test_events_for_unknown_uuid_is_200_empty(client) -> None:
     session = str(uuid.uuid4())
@@ -520,6 +530,7 @@ def test_session_detail_known_session_returns_meta(client) -> None:
 
 # -- v0.1.6 BUG 2: the provider's cause lands on the stream and in Settings --
 
+
 class _DeadProviderLLM:
     """A provider whose every call dies with the spec wire error — what
     Client.complete now raises after its (bounded) retry policy."""
@@ -529,6 +540,7 @@ class _DeadProviderLLM:
 
     def complete(self, role, messages, **kwargs):
         raise ProviderError("provider error: 401 invalid api key", status=401)
+
 
 def test_run_provider_error_event_on_stream(client) -> None:
     """A dead provider must end the turn with run.error carrying the

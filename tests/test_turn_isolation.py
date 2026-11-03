@@ -188,7 +188,7 @@ def test_server_forge_and_temper_use_only_the_turn_registry(monkeypatch, tmp_pat
     server.run_turn("run test", "session-test", "r", state)
     events = state.emitters["session-test"].replay(0)
     assert events[-1]["type"] == "run.done" and events[-1]["status"] == "ok"
-    assert len(fake.calls) >= 2  # FORGE plus TEMPER rerun(s)
+    assert len(fake.calls) >= 3  # FORGE plus independent TEMPER discovery and test
     assert all(name == "bash" for name, _ in fake.calls)
     assert fake.closed
 

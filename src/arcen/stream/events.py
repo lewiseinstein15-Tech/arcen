@@ -135,6 +135,7 @@ class FileDiff:
     path: str
     patch: str
     ts: float = 0.0
+    artifact: dict[str, Any] | None = None
     TYPE: ClassVar[str] = "file.diff"
 
 
@@ -303,6 +304,8 @@ def to_dict(event: Event) -> dict[str, Any]:
     Key order: seq, type, payload..., ts (BACKEND-SPEC Part 9).
     """
     data = asdict(event)
+    if isinstance(event, FileDiff) and data["artifact"] is None:
+        del data["artifact"]
     # Absence preserves byte-identical legacy run.start events and replay.
     if isinstance(event, RunStart) and data["harness_ref"] is None:
         del data["harness_ref"]
@@ -341,6 +344,8 @@ def from_dict(data: dict[str, Any]) -> Event:
     if dropped:
         raise EventError(f"{etype}: unknown fields {sorted(dropped)}")
     optional = {"ts"}
+    if cls is FileDiff:
+        optional.add("artifact")
     if cls is Usage:
         meta = {"measured", "usage_source", "cost_source"}
         optional.update(meta)
@@ -351,8 +356,10 @@ def from_dict(data: dict[str, Any]) -> Event:
             if type(payload["measured"]) is not bool:
                 raise EventError("usage: measured must be boolean")
             sources = {"provider", "estimated", "unknown"}
-            if any(type(payload[name]) is not str or payload[name] not in sources
-                   for name in ("usage_source", "cost_source")):
+            if any(
+                type(payload[name]) is not str or payload[name] not in sources
+                for name in ("usage_source", "cost_source")
+            ):
                 raise EventError("usage: invalid measurement source")
             if not payload["measured"] and (
                 payload["usage_source"] != "unknown" or payload["cost_source"] != "unknown"
@@ -360,7 +367,9 @@ def from_dict(data: dict[str, Any]) -> Event:
                 raise EventError("usage: unmeasured sources must be unknown")
     if cls is RunStart:
         optional.add("harness_ref")
-        if "harness_ref" in payload and (type(payload["harness_ref"]) is not str or not payload["harness_ref"]):
+        if "harness_ref" in payload and (
+            type(payload["harness_ref"]) is not str or not payload["harness_ref"]
+        ):
             raise EventError("run.start: harness_ref must be a nonempty string")
     missing = {n for n in field_names if n not in payload and n not in optional}
     if missing:

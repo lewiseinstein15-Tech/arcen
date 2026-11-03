@@ -24,6 +24,13 @@ def patch(path: str, mode: str = "100644") -> bytes:
         "a/.git/x",
         ".env",
         ".env.local",
+        "dir/.environment",
+        "dir/.npmrc",
+        ".pypirc",
+        "secret.key",
+        "secret.p12",
+        ".gitattributes",
+        "dir/.gitmodules",
         "keys/server.pem",
         "home/id_rsa",
     ],
@@ -72,3 +79,24 @@ def test_accepts_real_git_binary_diff(tmp_path):
     subprocess.run(["git", "-C", str(tmp_path), "apply", "--check", "-"], input=data, check=True)
     subprocess.run(["git", "-C", str(tmp_path), "apply", "-"], input=data, check=True)
     assert (tmp_path / "binary.dat").read_bytes() == b"\x00new\xff"
+
+
+def test_existing_executable_content_change_allowed():
+    data = (
+        b"diff --git a/tool b/tool\nindex 1234567..abcdef0 100755\n"
+        b"--- a/tool\n+++ b/tool\n@@ -1 +1 @@\n-old\n+new\n"
+    )
+    assert validate_patch(data) == ["tool"]
+
+
+@pytest.mark.parametrize("old,new", [("100644", "100755"), ("100755", "100644")])
+def test_executable_mode_change_rejected(old, new):
+    data = f"diff --git a/tool b/tool\nold mode {old}\nnew mode {new}\n".encode()
+    with pytest.raises(ArtifactError):
+        validate_patch(data)
+
+
+def test_new_executable_hidden_in_index_rejected():
+    data = patch("tool").replace(b"index 0000000..1234567", b"index 0000000..1234567 100755")
+    with pytest.raises(ArtifactError):
+        validate_patch(data)

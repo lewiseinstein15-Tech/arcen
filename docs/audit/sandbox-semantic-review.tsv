@@ -1,0 +1,17 @@
+path	phase0_line	classification	finding
+src/arcen/sandbox/runtime.py	88	collapsed-probe	Docker probe returns None without diagnostic; callers see unavailable not exact cause.
+src/arcen/sandbox/runtime.py	105	collapsed-probe	Image inspection exceptions become image_present false; underlying cause is not surfaced.
+src/arcen/sandbox/runtime.py	275	logged-degradation	Legacy SandboxRuntime logs degradation then runs process backend; not an isolation boundary. Normal server turns use DockerTurnRegistry.
+src/arcen/sandbox/runtime.py	298	error-envelope	Docker exec failure returned as ok false with error string.
+src/arcen/sandbox/runtime.py	321	error-envelope	Process timeout returned as ok false with timeout string.
+src/arcen/sandbox/runtime.py	340	collapsed-probe	Image lookup failure silently selects trusted-pull decision; may hide a daemon error.
+src/arcen/sandbox/runtime.py	350	logged-failure	Image pull failure is logged and returned as false.
+src/arcen/sandbox/runtime.py	404	silent-cleanup-failure	Legacy destroy ignores container kill exceptions; cleanup is not confirmed.
+src/arcen/sandbox/runtime.py	408	silent-cleanup-failure	Legacy destroy ignores forced remove exceptions; orphan container is possible.
+src/arcen/sandbox/runtime.py	438	error-envelope	Path escape is returned as ok false with error string.
+src/arcen/sandbox/turn.py	72	fail-closed	Workspace snapshot rejection raises IsolationUnavailable with cause.
+src/arcen/sandbox/turn.py	140	fail-closed	Workspace import failure is wrapped; outer constructor rejects execution.
+src/arcen/sandbox/turn.py	142	fail-closed	Constructor cleans up or raises explicit unconfirmed cleanup error and refuses tool execution.
+src/arcen/sandbox/turn.py	146	logged-fail-closed	Failed strict cleanup logs and raises unconfirmed cleanup error.
+src/arcen/sandbox/turn.py	243	error-envelope	Turn dispatch failure returns ok false and error string.
+src/arcen/sandbox/turn.py	253	logged-conditional	Strict close logs and raises; non-strict close logs exception but does not confirm cleanup.
