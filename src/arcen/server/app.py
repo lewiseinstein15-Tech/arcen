@@ -217,7 +217,8 @@ def _boot_plugins(config: ArcenConfig) -> PluginLoader:
         loader._wire(instance)
     loader.load()
     try:
-        loader.fire("on_boot", config.model_dump())
+        # Hooks need no configuration; never send credentials or nested config.
+        loader.fire("on_boot", {})
     except Exception:  # noqa: BLE001 — fail-closed hooks may raise; boot continues
         pass
     return loader

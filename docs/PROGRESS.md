@@ -28,3 +28,4 @@
 2026-11-03T14:22:48Z | RECOVERY-A01 | 46c6772 | Next: restore safe sandbox test discovery and verification without replaying work commands.
 2026-11-03T14:23:20Z | RECOVERY-A01 | d3e2eae | Next: wire verification into turn without replaying work; preserve unverified status and run regressions.
 2026-11-03T14:24:06Z | RECOVERY-A01 | cff7f40 | Next: restore visible unverified indicators and run complete regression suites.
+2026-11-03T14:24:53Z | RECOVERY-A01 | 0b9584c | Next: run full suites, repair remaining missing intervening changes, then connect A-03a export.
