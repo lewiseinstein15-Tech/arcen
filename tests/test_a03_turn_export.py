@@ -195,3 +195,20 @@ def test_fake_turn_executable_mode_change_is_rejected(context, monkeypatch):
     assert fake.closed and events[-1]["code"] == "ARTIFACT_EXPORT_FAILED"
     assert not (home / ".arcen" / "artifacts" / session / "patch.diff").exists()
     assert (repo / "file").read_text() == "before\n"
+
+
+def test_same_workspace_session_cannot_replace_its_baseline_or_patch(context, monkeypatch):
+    repo, home, state, session = context
+    candidate = archive({"file": b"first\n"})
+    events, fake, _ = execute(context, monkeypatch, [(candidate, None)])
+    assert fake.closed and events[-1]["type"] == "run.done"
+    artifact = home / ".arcen" / "artifacts" / session
+    patch_before = (artifact / "patch.diff").read_bytes()
+    baseline_before = (artifact / "baseline" / "snapshot.tar").read_bytes()
+    calls = []
+    monkeypatch.setattr(server, "create_turn_registry", lambda *a, **kw: calls.append(True))
+    server.run_turn("second", session, "run", state, workspace=str(repo))
+    assert calls == []
+    assert state.emitter_for(session).replay(0)[-1]["code"] == "SANDBOX_UNAVAILABLE"
+    assert (artifact / "patch.diff").read_bytes() == patch_before
+    assert (artifact / "baseline" / "snapshot.tar").read_bytes() == baseline_before

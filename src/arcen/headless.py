@@ -113,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         "--harness-store", help="trusted local harness store (default: ~/.arcen/harness)"
     )
     parser.add_argument(
-        "--workspace", help="copy a bounded input-only workspace snapshot into the container"
+        "--workspace", help="import a reviewed Git-root snapshot and export a host-generated patch"
     )
     args = parser.parse_args(argv)
     if not args.goal.strip():
