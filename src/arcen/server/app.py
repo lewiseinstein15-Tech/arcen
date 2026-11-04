@@ -514,6 +514,26 @@ def post_run(payload: dict = Body(...)) -> dict:
     goal = str(payload.get("goal", "")).strip()
     if not goal:
         raise HTTPException(status_code=422, detail="goal is required")
+    # The unauthenticated HTTP API must not let remote clients choose host
+    # paths. Only the explicit local headless CLI can request a workspace.
+    if "workspace" in payload:
+        raise HTTPException(
+            status_code=422,
+            detail="workspace is not supported by /api/run; use the local headless CLI",
+        )
+    supplied_session = payload.get("session")
+    if supplied_session is None:
+        session_id = str(uuid.uuid4())
+    else:
+        try:
+            if (
+                not isinstance(supplied_session, str)
+                or str(uuid.UUID(supplied_session)) != supplied_session
+            ):
+                raise ValueError("noncanonical session")
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="invalid session id") from None
+        session_id = supplied_session
     # T-043: a docker-pinned sandbox with no daemon refuses BEFORE planning
     # — never a silent process fallback, never a 500 mid-turn.
     if STATE.config.sandbox.backend == "docker":
@@ -528,7 +548,6 @@ def post_run(payload: dict = Body(...)) -> dict:
                     "reachable. Start Docker and install the configured sandbox image."
                 ),
             )
-    session_id = payload.get("session") or f"s-{uuid.uuid4().hex[:8]}"
     run_id = f"r-{uuid.uuid4().hex[:6]}"
     STATE.run_flags[run_id] = threading.Event()
     STATE.emitter_for(session_id)

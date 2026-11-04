@@ -43,3 +43,4 @@
 2026-11-03T15:44:21Z | A-03a | 4a27769 | Next: address workspace credential exposure and API workspace/session policy, expand fake integration cases and Docker smoke; do not mark A-03 done.
 2026-11-03T15:44:45Z | A-03a | ae69859 | Next: finish A-03a fake tests (absolute/hardlink, delete/binary/modes), review API workspace/session reuse and hunk parser, then Docker-machine smoke and A-03b apply checks; backend 1816 passed/19 skipped, UI 87 passed; content secrets unscanned, Docker unverified.
 2026-11-03T15:53:17Z | A-03a | a6a0074 | Next: exercise deletion, binary and executable modes plus malicious archive paths in fake turn integration.
+2026-11-03T15:53:56Z | A-03a | 0623883 | Next: review HTTP workspace/session reuse without enabling unsafe host reads, update Docker-only test for Git-root workspace, and write Docker-machine smoke; then A-03b apply E2E; backend 1828 passed/19 skipped, UI 87 passed; Docker unverified.
