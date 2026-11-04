@@ -1,4 +1,5 @@
 """Deterministic in-memory fake for server pipeline tests; never executes commands."""
+
 import time
 
 
@@ -12,6 +13,12 @@ class FakeTurnRegistry:
     def dispatch(self, name, args):
         self.calls.append((name, args))
         cmd = args.get("cmd", "")
+        if cmd.startswith("python -I -c "):
+            return {
+                "ok": True,
+                "error": None,
+                "result": {"stdout": '{"command": "python -m pytest -q"}\n', "stderr": "", "exit": 0},
+            }
         if cmd.startswith("sleep "):
             time.sleep(0.6)
         if cmd.startswith("exit "):
@@ -19,9 +26,15 @@ class FakeTurnRegistry:
             return {"ok": False, "error": f"exit {code}: ", "result": {"exit": code}}
         if name != "bash":
             return {"ok": False, "error": "unsupported in fake", "result": None}
-        return {"ok": True, "error": None,
-                "result": {"stdout": cmd[5:] + "\n" if cmd.startswith("echo ") else "",
-                           "stderr": "", "exit": 0}}
+        return {
+            "ok": True,
+            "error": None,
+            "result": {
+                "stdout": cmd[5:] + "\n" if cmd.startswith("echo ") else "",
+                "stderr": "",
+                "exit": 0,
+            },
+        }
 
     def close(self, *, strict=False):
         self.closed = True

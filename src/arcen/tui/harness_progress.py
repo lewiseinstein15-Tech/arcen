@@ -24,8 +24,8 @@ def _card(event: dict):
         body.append(f"{event['candidate_count']} candidate(s) · sequential manual comparison\n")
         body.append("Progress is unsigned, best-effort metadata.", style=TOKENS["muted"])
     elif kind == "harness.policy":
-        title = "candidate · static review"
-        body.append(f"{event['candidate_id'][:12]} · reviewed, not approved")
+        title = "candidate · reported static review"
+        body.append(f"{event['candidate_id'][:12]} · unverified, not approval")
     elif kind == "harness.probe.start":
         title = "trial · started"
         body.append(f"{event['role']} · {event['candidate_id'][:12]}")
@@ -43,14 +43,18 @@ def _card(event: dict):
     elif kind == "harness.review":
         title = "review · pending"
         body.append(f"Candidate {event['candidate_id'][:12]} · review {event['review_id'][:12]}\n")
-        body.append("Human attention required. No adoption occurred.", style=TOKENS["muted"])
+        body.append("Unverified review; this view performs no adoption.", style=TOKENS["muted"])
         accent = TOKENS["amber"]
     else:
-        title = "campaign · finished" if event["status"] == "completed" else "campaign · stopped"
+        title = (
+            "campaign · reported finished"
+            if event["status"] == "completed"
+            else "campaign · reported stopped"
+        )
         body.append(f"{event['completed']} candidate(s) recorded")
         if event["reason"]:
             body.append(f" · {event['reason']}")
-        body.append("\nNo candidate was adopted.", style=TOKENS["muted"])
+        body.append("\nThis view performs no adoption.", style=TOKENS["muted"])
         accent = TOKENS["emerald"] if event["status"] == "completed" else TOKENS["amber"]
     return spine_card(body, title, accent)
 

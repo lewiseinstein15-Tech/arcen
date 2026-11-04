@@ -19,7 +19,12 @@ from .durable_budget import DurableBudget
 from .manifest import default_manifest
 from .policy import review_candidate
 from .probe import ProbeUnavailable
-from .probe_execution import _CanaryCommands, _reviewed_config, _run_bound_probe
+from .probe_execution import (
+    _CanaryCommands,
+    _matches_bound_probe,
+    _reviewed_config,
+    _run_bound_probe,
+)
 from .probe_model import bind_probe_model
 from .probe_workspace import snapshot_git_commit
 from .resolver import HarnessError
@@ -41,10 +46,14 @@ def _commands(case: CanaryCase) -> _CanaryCommands:
         "import os,stat,sys\n"
         f"p={path!r}; expected={case.expected!r}\n"
         "try:\n"
-        " s=os.lstat(p)\n"
-        " if not stat.S_ISREG(s.st_mode) or s.st_size != len(expected): sys.exit(1)\n"
-        " with open(p,'rb') as f: actual=f.read(len(expected)+1)\n"
-        " sys.exit(0 if actual == expected else 1)\n"
+        " if not hasattr(os,'O_NOFOLLOW') or not hasattr(os,'O_NONBLOCK'): sys.exit(2)\n"
+        " fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)\n"
+        " try:\n"
+        "  s=os.fstat(fd)\n"
+        "  if not stat.S_ISREG(s.st_mode) or s.st_size != len(expected): sys.exit(1)\n"
+        "  actual=os.read(fd,len(expected)+1)\n"
+        "  sys.exit(0 if actual == expected else 1)\n"
+        " finally: os.close(fd)\n"
         "except OSError: sys.exit(1)\n"
     )
     return _CanaryCommands(
@@ -121,7 +130,10 @@ def run_manual_canaries(
         raise HarnessError("canaries require the unchanged packaged baseline")
     review_candidate(store, baseline_id, candidate_id)
     cfg = _reviewed_config(config, True)
-    budget.checkpoint()
+    # This is a non-reserving snapshot, not a runtime or spending guarantee.
+    # Require enough admissions for every built-in reference/candidate pair
+    # before preparing a workspace or starting any provider/container work.
+    budget.require_available(trials=2 * len(CASES), model_calls=2 * len(CASES), judge_calls=0)
     models = tuple(
         (
             bind_probe_model(store, baseline_id, baseline_id, case.task, cfg, budget=budget),
@@ -149,7 +161,10 @@ def run_manual_canaries(
         except (ProbeUnavailable, BudgetExhausted):
             findings.append(CanaryFinding(case.id, "inconclusive", "not-run"))
             return report("inconclusive")
-        if reference.status == "error" or reference.canary_passed is None:
+        if not _matches_bound_probe(reference, snapshot, reference_model):
+            findings.append(CanaryFinding(case.id, "inconclusive", "not-run"))
+            return report("inconclusive")
+        if reference.status == "error" or type(reference.canary_passed) is not bool:
             findings.append(CanaryFinding(case.id, "inconclusive", "not-run"))
             return report("inconclusive")
         if reference.status != "ok" or reference.canary_passed is not True:
@@ -160,7 +175,10 @@ def run_manual_canaries(
         except (ProbeUnavailable, BudgetExhausted):
             findings.append(CanaryFinding(case.id, "passed", "inconclusive"))
             return report("inconclusive")
-        if candidate.status == "error" or candidate.canary_passed is None:
+        if not _matches_bound_probe(candidate, snapshot, candidate_model):
+            findings.append(CanaryFinding(case.id, "passed", "inconclusive"))
+            return report("inconclusive")
+        if candidate.status == "error" or type(candidate.canary_passed) is not bool:
             findings.append(CanaryFinding(case.id, "passed", "inconclusive"))
             return report("inconclusive")
         if candidate.status != "ok" or candidate.canary_passed is not True:

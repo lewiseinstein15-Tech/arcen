@@ -1,0 +1,28 @@
+path	line	category	line (candidate only)
+scripts/dev.sh	32	suppression-candidate	pid="$(lsof -ti tcp:$port 2>/dev/null || true)"
+scripts/dev.sh	35	suppression-candidate	kill -9 $pid 2>/dev/null || true
+scripts/dev.sh	43	suppression-candidate	trap 'kill "$BACKEND_PID" 2>/dev/null || true' EXIT
+scripts/setup_terminal_shot.sh	12	suppression-candidate	SHELL_BIN="$(ls -d "${HOME}"/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell 2>/dev/null | head -1 || true)"
+scripts/setup_terminal_shot.sh	17	suppression-candidate	missing() { LD_LIBRARY_PATH="${LIBDIR}" ldd "$1" 2>/dev/null | grep "not found" || true; }
+scripts/terminal_assets/xterm/xterm.js	1	catch-candidate	!function(e,t){if("object"==typeof exports&&"object"==typeof module)module.exports=t();else if("function"==typeof define&&define.amd)define([],t);else{var i=t();for(var s in i)("object"==typeof exports?exports:e)[s]=i[s]}}(self,(()=>(()=>{"
+scripts/terminal_assets/xterm/xterm.js	5	catch-candidate	",e.SSA="",e.ESA="",e.HTS="",e.HTJ="",e.VTS="",e.PLD="",e.PLU="",e.RI="",e.SS2="",e.SS3="",e.DCS="",e.PU1="",e.PU2="",e.STS="",e.CCH="",e.MW="",e.SPA="",e.EPA="",e.SOS="",e.SGCI="",e.SCI="",e.CSI="",e.ST="",e.OSC="",
+ui/src/components/ChatView.tsx	71	catch-candidate	} catch {
+ui/src/components/ChatView.tsx	72	catch-candidate	// keep polling — the next tick may catch up
+ui/src/components/ChatView.tsx	95	catch-candidate	} catch (err) {
+ui/src/components/ChatView.tsx	143	catch-candidate	} catch {
+ui/src/components/ChatView.tsx	193	catch-candidate	// catch up on anything emitted between POST and now (server truth),
+ui/src/components/ChatView.tsx	206	catch-candidate	} catch {
+ui/src/components/ChatView.tsx	207	catch-candidate	// best-effort catch-up; the live stream covers the rest
+ui/src/components/ChatView.tsx	211	catch-candidate	.catch((err) => {
+ui/src/components/SettingsView.tsx	82	catch-candidate	} catch (err) {
+ui/src/components/SettingsView.tsx	93	catch-candidate	} catch {
+ui/src/components/SettingsView.tsx	161	catch-candidate	} catch (err) {
+ui/src/components/SettingsView.tsx	199	catch-candidate	} catch (err) {
+ui/src/markdown/Code.tsx	62	catch-candidate	} catch {
+ui/src/markdown/Mermaid.tsx	41	catch-candidate	.catch(() => {
+ui/src/state/sessionStore.ts	50	catch-candidate	} catch {
+ui/src/stream/reader.ts	63	catch-candidate	} catch (err) {
+ui/src/stream/reader.ts	75	catch-candidate	} catch (err) {
+ui/src/stream/reader.ts	95	catch-candidate	} catch {
+ui/src/stream/useAutoScroll.ts	5	catch-candidate	// Content growth and programmatic catch-up both push scrollTop DOWN toward
+ui/src/stream/useAutoScroll.ts	9	catch-candidate	//   * everything else       → growth / catch-up mid-flight: never yank

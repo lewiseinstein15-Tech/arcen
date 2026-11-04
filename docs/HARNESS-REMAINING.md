@@ -1,6 +1,6 @@
 # Harness²: remaining work and safety status
 
-Status as of 31 October 2026. This is a work-in-progress implementation, not a claim
+Status as of 2 November 2026. This is a work-in-progress implementation, not a claim
 that the Harness² roadmap is complete. The earlier Omarchy Docker runs covered
 the then-current isolation and manual-campaign foundations, using mocked models
 and judges. Newer editor, CLI, canary and cleanup paths have not all been
@@ -20,20 +20,48 @@ the exact evidence and revisions.
 - Content-addressed manifests/objects, local lineage and review metadata,
   baseline selection, candidate diff inspection and strict static policy review.
   Explicit-key signed packages can be verified and manually imported as objects;
-  unregistered objects can be inspected without changing refs. Neither operation
-  establishes signer trust, safety, execution authorization or adoption.
+  unregistered objects can be inspected without changing refs. A signed package
+  can also be verified or interactively imported directly from a specific local
+  Git commit, with no checkout or ref change; this is not a complete Git-backed
+  object store. None establishes signer trust, safety, execution authorization
+  or adoption. Static review also fails if the code-defined tier and editable
+  sets overlap or fail to cover the shipped components; optional read-only
+  inspection reports changed tiers. Neither is an authoritative policy gate
+  or a safety/authorization decision.
   Doctor also performs SQLite quick-check and schema validation for present
   auxiliary databases; this does not validate all records or evidence.
 - Explicit interactive manual proposal generation or patch import; a
   reviewed sequential baseline/candidate campaign with local human A/B judging,
   unsigned pending reviews and no automatic adoption. A guided single-terminal
   flow connects editor, optional manual syntactic composition, up to five
-  human-selected sequential comparisons and pending reviews. Metadata-only,
+  human-selected sequential comparisons and pending reviews. Campaigns,
+  paired comparisons and manual canaries now check each result's local
+  baseline, candidate, commit, workspace and terminal status binding before
+  further judging or recording. The local sequence check also rejects malformed
+  event envelopes or earlier terminal events; paired review recording uses the
+  same check. Mismatches stop the current operation; they do not authenticate
+  the executor, validate all event payloads or close a shared budget. Metadata-only,
   best-effort CLI progress reports are not a persistent or authenticated stream.
   A Python-only opt-in bridge can stamp seven existing metadata events onto a
-  session emitter, and the offline demo renders them through a registered TUI
-  adapter. The live server/CLI are not wired to this bridge, which does not
-  provide the full v2 contract, durable history, authorization or resume.
+  session emitter. The offline demo and an opt-in live TUI reader can render
+  them, including on replay, but the actual server and campaign CLI are not
+  wired to produce these events. This bridge does not provide the full v2
+  contract, durable history, authorization or resume. The live client drops
+  duplicate-key NDJSON and invalid type/sequence envelopes, and applies the
+  envelope check to replay. Successful live streams accept only identity
+  encoding and hold at most 1 MiB of an incomplete NDJSON line; the TUI halts
+  instead of skipping an oversized line. Session replay requests are bounded to
+  an 8 MiB raw body and 10,000 top-level events, and reject compressed, malformed,
+  duplicate-key or non-finite JSON. Initial session restore halts on these
+  replay protocol failures rather than proceeding to a live stream; a manual
+  session change leaves the existing session in place. These limits do not
+  bound HTTP transport allocations, decoded JSON expansion, replay duration,
+  other endpoint bodies, rendering or total memory. The event limit is checked
+  after parsing. Live-stream HTTP error bodies are closed unread, and an
+  unresolved 409 compaction halts after at most one restart with a resume
+  hint. The client's 404 retries still have no delay. These measures do not
+  authenticate events, validate complete payloads, stop a running agent or
+  provide safe campaign resume.
   A separate command can compose human-selected candidates from a completed
   campaign's local summaries.
 - Durable journal and shared admission counts; optional stop at stage
@@ -45,6 +73,15 @@ the exact evidence and revisions.
   cap across cooperating local processes using the reviewed parallel Python API;
   other APIs can bypass it, and crashed or uncertain slots are never reclaimed
   automatically. A later stop, expiry or competing consumer may still interrupt.
+- The shared Git object reader now disables promisor lazy fetch for probe
+  snapshots as well as signed-package reads. Missing objects and Git versions
+  without `--no-lazy-fetch` fail closed; the local Git executable, repository,
+  configuration and filesystem remain trusted. Probe snapshots also reject any
+  effective local Git filter configuration before archive because Git can run
+  configured smudge/process filters on the host. This conservative check rejects
+  harmless filters too, and is subject to configuration changes between check
+  and archive. It is not an OS-level execution/network boundary and does not
+  authenticate commits or scan for all secrets.
 - Reviewed trial archives reject exact occurrences of the configured provider
   key before Docker or provider calls. Paired/manual campaigns also check
   explicitly supplied sensitive values. Paired/campaign model inputs and
@@ -54,7 +91,15 @@ the exact evidence and revisions.
   secrets and most injections are not detected; inputs still require review.
   See `HARNESS-PROBE-HYGIENE.md`.
 - Two experimental, public and gameable behavioral canaries, with exact file
-  checks, not an adoption gate or security proof. An optional advisory combines
+  checks, not an adoption gate or security proof. The manual API checks for the
+  momentary minimum admissions for the complete bank before Git or trial work;
+  the interactive CLI checks before confirmation and repeats the check after.
+  The minimum is not reserved and is not sufficient to guarantee completion,
+  since probes may consume additional model calls or other users may spend the
+  capacity. Non-boolean verifier flags are inconclusive, not regressions. The
+  verifier also uses a no-follow, nonblocking descriptor to close a final-path
+  lstat/open symlink swap; it does not prevent shared-workspace interference or
+  establish evidence authenticity. An optional advisory combines
   a matching canary result with an unsigned paired review; it does not authorize
   adoption or establish baseline freshness.
 - An explicitly confirmed two-image portability comparison can run baseline
@@ -107,8 +152,13 @@ the exact evidence and revisions.
    authenticated or safe against all prompt injections. The task bank is a
    manual storage foundation only. A reviewed Python API can now run one
    reference followed by bounded parallel candidate waves with an in-process
-   or opt-in durable budget and cooperative persisted trial slots. Results have
-   no judging, persistence, CLI, or recovery. The user reported a narrow
+   or opt-in durable budget and cooperative persisted trial slots. Identity and
+   terminal consistency are checked; a mismatch stops scheduling and retains
+   an affected durable slot. This does not authenticate evidence, and a budget
+   stop may fail if its database fails. The parallel result reports whether
+   this invocation's stop calls returned without error; that does not prove a
+   persistent or universal stop. Results have no judging, persistence, CLI, or
+   recovery. The user reported a narrow
    real-Docker smoke passing at `51d971a`, with the provider mocked; live
    providers remain untested for this path. There is no
    autonomous reflector, full safe experience-guidance, durable parallel
@@ -133,9 +183,12 @@ the exact evidence and revisions.
    for purposes of future automation. Model pin names do not authenticate model
    weights, and local hashes/review labels are not signatures.
 7. **H-20–22: surface, portability and release.** A clearly labelled offline
-   simulated Harness² TUI demo renders example progress, but there is no live
-   integrated campaign TUI or approval surface. Cross-platform/install checks,
-   a remotely verified CI run, a real end-to-end demo and complete operator
+   simulated Harness² TUI demo renders example progress. An opt-in live client
+   can render compatible progress events from a stream, but ARCEN's server does
+   not yet produce campaign events and there is no integrated campaign control
+   or approval surface. GitHub CI passed for baseline `4cb3e1a`, but later
+   local changes and the expanded workflow have not been verified remotely.
+   Cross-platform/install checks, a real end-to-end demo and complete operator
    documentation still need work. New real-Docker paths and any paid-provider integration require
    validation on suitable systems; mock tests are not that validation.
 

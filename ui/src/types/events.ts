@@ -118,6 +118,7 @@ export interface VerifyStartEvent {
   ts: number;
   agent: string;
   target: string;
+  status?: 'running' | 'fail' | 'unverified';
 }
 
 export interface StepPassEvent {
@@ -159,6 +160,9 @@ export interface UsageEvent {
   ts: number;
   tokens: { input: number; output: number };
   cost_usd: number;
+  measured?: boolean;
+  usage_source?: 'provider' | 'estimated' | 'unknown';
+  cost_source?: 'provider' | 'estimated' | 'unknown';
 }
 
 export interface RunDoneEvent {
@@ -168,6 +172,7 @@ export interface RunDoneEvent {
   status: 'ok' | 'failed' | 'interrupted';
   steps: number;
   duration_s: number;
+  verification_status?: 'pass' | 'fail' | 'unverified';
 }
 
 export interface RunErrorEvent {

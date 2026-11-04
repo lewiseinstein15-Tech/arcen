@@ -32,6 +32,9 @@ from arcen.tui.client import (
     TERMINAL_EVENTS,
     ArcenAPIError,
     ArcenClient,
+    ArcenReplayProtocolError,
+    ArcenStreamProtocolError,
+    is_app_event,
     new_session_id,
 )
 from arcen.tui.composer import COMMANDS, Composer
@@ -63,9 +66,20 @@ class LiveApp(ArcenApp):
         Binding("ctrl+end", "narration_live", "Back to live", priority=True),
     ]
 
-    def __init__(self, *, base_url: str = DEFAULT_BASE_URL, session_id: str | None = None,
-                 client: ArcenClient | None = None, retry_seconds: float = RETRY_SECONDS):
+    def __init__(
+        self,
+        *,
+        base_url: str = DEFAULT_BASE_URL,
+        session_id: str | None = None,
+        client: ArcenClient | None = None,
+        retry_seconds: float = RETRY_SECONDS,
+        harness_progress: bool = False,
+    ):
+        if type(harness_progress) is not bool:
+            raise ValueError("harness_progress must be a boolean")
         super().__init__()
+        self.harness_progress_enabled = harness_progress
+        self.harness_progress_view = None
         self._auto_exit = False
         self.client = client or ArcenClient(base_url)
         self._owns_client = client is None
@@ -74,6 +88,7 @@ class LiveApp(ArcenApp):
         self._restore_session = bool(session_id)
         self.retry_seconds = retry_seconds
         self.online = False
+        self._stream_halted = False
         self.busy = False
         self.run_id: str | None = None
         self._reader_task: asyncio.Task | None = None
@@ -103,9 +118,18 @@ class LiveApp(ArcenApp):
     def on_mount(self) -> None:
         super().on_mount()
         self.narration.bind_stream(self.query_one(StreamView))
-        self.adapter = EventAdapter(self.narration, self.rail, self.header, self.footer)
+        self.adapter = self._create_adapter()
         self.query_one(Composer).focus()
         self._reader_task = asyncio.create_task(self._boot_and_stream())
+
+    def _create_adapter(self) -> EventAdapter:
+        adapter = EventAdapter(self.narration, self.rail, self.header, self.footer)
+        self.harness_progress_view = None
+        if self.harness_progress_enabled:
+            from arcen.tui.harness_progress import register_v2_progress
+
+            self.harness_progress_view = register_v2_progress(adapter)
+        return adapter
 
     async def on_unmount(self) -> None:
         self._closing = True
@@ -143,7 +167,10 @@ class LiveApp(ArcenApp):
             self._notice("a turn is already running; draft preserved")
             return
         if not self.online:
-            self._notice("server offline; draft preserved")
+            if self._stream_halted:
+                self._notice("replay or stream halted; inspect server and reopen session; draft preserved")
+            else:
+                self._notice("server offline; draft preserved")
             return
         self.busy = True
         self._submit_task = asyncio.create_task(self._submit_goal(value))
@@ -273,10 +300,11 @@ class LiveApp(ArcenApp):
             self.header.set_phase("IDLE")
             self.footer.set_live(False)
             self.rail.apply_state({"steps_done": 0, "steps_total": 0, "phase_idx": 0,
-                                   "tokens": 0, "cost_usd": 0.0, "tools": [], "replanning": False})
+                                   "tokens": 0, "cost_usd": 0.0, "usage_measured": False,
+                                   "cost_known": False, "tools": [], "replanning": False})
             self.narration.items.clear()
             self.narration._sync()
-            self.adapter = EventAdapter(self.narration, self.rail, self.header, self.footer)
+            self.adapter = self._create_adapter()
             for event in events:
                 self._apply_event(event)
             self._stream_started.clear()
@@ -357,12 +385,21 @@ class LiveApp(ArcenApp):
             try:
                 for event in await self.client.session_events(self.session_id):
                     self._apply_event(event)
+            except ArcenReplayProtocolError as exc:
+                self.online = False
+                self._stream_halted = True
+                self.header.update_meta(quarantine="replay halted · blocked")
+                self.footer.set_live(False)
+                self._notice(f"session replay halted: {exc}; inspect server before reconnecting")
+                return
             except (ArcenAPIError, httpx.HTTPError, OSError) as exc:
                 self._notice(f"session replay unavailable: {exc}")
         await self._stream_loop()
 
     def _apply_event(self, event: dict) -> bool:
-        seq = event.get("seq")
+        if not is_app_event(event):
+            return False
+        seq = event["seq"]
         last = self.adapter.state.last_seq
         if isinstance(seq, int) and not isinstance(seq, bool) and seq > last + 1:
             self._notice(f"event gap: expected {last + 1}, received {seq}")
@@ -373,6 +410,7 @@ class LiveApp(ArcenApp):
 
     async def _stream_loop(self) -> None:
         """Reconnect after an abnormal EOF; terminal events end this pump."""
+        self._stream_halted = False
         reconnecting = False
         while not self._closing:
             self.online = await self.client.health()
@@ -412,6 +450,13 @@ class LiveApp(ArcenApp):
                     self.online = True
                     return
                 self._notice("stream disconnected; reconnecting")
+            except ArcenStreamProtocolError as exc:
+                self.online = False
+                self._stream_halted = True
+                self.header.update_meta(quarantine="stream halted · blocked")
+                self.footer.set_live(False)
+                self._notice(f"stream halted: {exc}; inspect server before reconnecting")
+                return
             except (ArcenAPIError, httpx.HTTPError, OSError) as exc:
                 self._notice(f"stream disconnected; reconnecting: {exc}")
             reconnecting = True
@@ -423,6 +468,11 @@ def run(argv: list[str] | None = None) -> int:
     parser.add_argument("--url", default=os.environ.get("ARCEN_SERVER_URL", DEFAULT_BASE_URL))
     parser.add_argument("--session", default=None)
     parser.add_argument("--no-serve", action="store_true")
+    parser.add_argument(
+        "--harness-progress",
+        action="store_true",
+        help="render untrusted, advisory harness progress if supplied by the server",
+    )
     args = parser.parse_args(argv)
     if args.session:
         try:
@@ -433,7 +483,7 @@ def run(argv: list[str] | None = None) -> int:
 
     url, manager = ensure_server(args.url, serve=not args.no_serve)
     try:
-        LiveApp(base_url=url, session_id=args.session).run()
+        LiveApp(base_url=url, session_id=args.session, harness_progress=args.harness_progress).run()
     finally:
         if manager is not None:
             manager.stop()

@@ -35,8 +35,21 @@ def test_validation_workflow_has_matrix_wheel_and_explicit_docker_opt_in():
         "run"
     ]
     assert "cd /tmp" in selected and "--import-mode=importlib" in selected
+    assert "test_git_package.py" in selected
+    assert "test_harness_static_policy_inspection.py" in selected
+    assert "test_probe_terminal_consistency.py" in selected
+    assert "test_harness_canary_safety.py" in selected
+    assert "test_harness_canary_nofollow.py" in selected
+    assert "test_probe_snapshot_offline.py" in selected
+    assert "test_probe_git_filters.py" in selected
+    assert "test_tui_stream_bounds.py" in selected
+    assert "test_tui_replay_bounds.py" in selected
+    assert "test_tui_stream_errors.py" in selected
     assert "test_harness_tui_demo.py" in selected and "test_harness_doctor_aux.py" in selected
     assert "test_harness_stream_v2.py" in selected
+    assert "test_harness_live_progress.py" in selected
+    assert "test_probe_result_binding.py" in selected
+    assert "test_tui_stream_hygiene.py" in selected
     assert "test_harness_portability.py" in selected and "test_portability_cli.py" in selected
     assert "test_harness_conflict_resolution.py" in selected
     assert "test_harness_conflict_cli.py" in selected
@@ -45,6 +58,8 @@ def test_validation_workflow_has_matrix_wheel_and_explicit_docker_opt_in():
     assert "test_harness_reflection_cli.py" in selected
     assert "test_harness_experience_editor.py" in selected
     assert "test_harness_parallel_trials.py" in selected
+    assert "test_parallel_result_binding.py" in selected
+    assert "test_parallel_stop_reporting.py" in selected
     assert "test_durable_trial_slots.py" in selected
     assert "test_h17e_docker.py" in selected
     docker = data["jobs"]["docker-isolation"]

@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from .comparison import ReviewedComparison
 from .judge import Judgment
 from .policy import review_candidate
-from .probe_execution import ReviewedProbeResult
+from .probe_execution import ReviewedProbeResult, _has_consistent_terminal
 from .resolver import HarnessError
 from .store import HarnessStore
 
@@ -172,12 +172,7 @@ class ReviewLedger:
             ref.status != "ok"
             or cand.status != "ok"
             or any(
-                type(result.events) is not tuple
-                or not result.events
-                or type(result.events[-1]) is not dict
-                or result.events[-1].get("type") != "run.done"
-                or result.events[-1].get("status") != "ok"
-                for result in (ref, cand)
+                not _has_consistent_terminal(result.events, result.status) for result in (ref, cand)
             )
             or ref.candidate_id != baseline_id
             or cand.baseline_id != baseline_id

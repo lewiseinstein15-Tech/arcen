@@ -39,12 +39,13 @@ from pydantic import ValidationError
 
 from arcen.agents.draft import DraftPlanner
 from arcen.agents.forge import ForgeExecutor
-from arcen.agents.temper import TemperVerifier
+from arcen.agents.temper import verify_sandbox_tests
 from arcen.config import ArcenConfig, default_config_path, load_config, resolve_secrets, save_config
 from arcen.guardrails import default_policy
 from arcen.harness import HarnessError
 from arcen.harness.manifest import check_model_pin, default_manifest
 from arcen.llm.bridge import build_llm_client
+from arcen.llm.usage import MeteredClient, UsageAccumulator
 from arcen.llm.client import ProviderError, classify_provider_failure, format_provider_error
 from arcen.plugins.loader import PluginLoader
 from arcen.sandbox.turn import IsolationUnavailable, create_turn_registry, execution_status
@@ -109,12 +110,15 @@ class ServerState:
         """
         st = execution_status(self.config)
         log.info(
-            "[sandbox] docker daemon: %s", "reachable" if st["docker_available"] else "not reachable"
+            "[sandbox] docker daemon: %s",
+            "reachable" if st["docker_available"] else "not reachable",
         )
         log.info(
             "[sandbox] image %s: %s",
             st["image"],
-            "present" if st["image_present"] else ("absent" if st["docker_available"] else "not checked"),
+            "present"
+            if st["image_present"]
+            else ("absent" if st["docker_available"] else "not checked"),
         )
         log.info("[sandbox] backend selected: %s", st["effective"])
         log.info("[sandbox] reason: %s", st["reason"])
@@ -216,7 +220,8 @@ def _boot_plugins(config: ArcenConfig) -> PluginLoader:
         loader._wire(instance)
     loader.load()
     try:
-        loader.fire("on_boot", config.model_dump())
+        # Hooks need no configuration; never send credentials or nested config.
+        loader.fire("on_boot", {})
     except Exception:  # noqa: BLE001 — fail-closed hooks may raise; boot continues
         pass
     return loader
@@ -237,7 +242,12 @@ def _turn_guard(goal: str, session_id: str, run_id: str, state: ServerState) -> 
 
 
 def run_turn(
-    goal: str, session_id: str, run_id: str, state: ServerState, *, workspace: str | None = None,
+    goal: str,
+    session_id: str,
+    run_id: str,
+    state: ServerState,
+    *,
+    workspace: str | None = None,
     harness_ref: str | None = None,
 ) -> None:
     """One narrated turn. DRAFT plans from the provider; without one a
@@ -251,6 +261,8 @@ def run_turn(
     isolated_registry = None
     pending_terminal = None
     pending_summary = None
+    usage = UsageAccumulator()
+    usage_emitted = False
 
     def emit_now(event) -> None:
         wire = emitter.emit(event)
@@ -258,7 +270,10 @@ def run_turn(
         state.store.append(session_id, wire)
 
     def emit(event) -> None:
-        nonlocal pending_terminal
+        nonlocal pending_terminal, usage_emitted
+        if event.TYPE in {"run.done", "run.error"} and not usage_emitted:
+            usage_emitted = True
+            emit_now(Usage(seq=0, **usage.result(), ts=0.0))
         # A terminal event must not claim success before container removal has
         # been confirmed. Preserve the normal event order on clean teardown.
         if isolated_registry is not None and event.TYPE in {"run.done", "run.error"}:
@@ -271,17 +286,33 @@ def run_turn(
         # An explicitly requested workspace is never silently ignored, even
         # for direct-answer turns: validate and import it before planning.
         if workspace is not None:
-            isolated_registry = create_turn_registry(state.config, workspace=workspace)
+            from arcen.sandbox.baseline_store import capture_workspace_baseline
+            from arcen.sandbox.patch_validation import ArtifactError
+            from arcen.sandbox.workspace import WorkspaceError
+
+            try:
+                snapshot, _ = capture_workspace_baseline(session_id, workspace)
+            except (ArtifactError, WorkspaceError, OSError) as exc:
+                raise IsolationUnavailable(f"Workspace snapshot rejected: {exc}") from exc
+            isolated_registry = create_turn_registry(state.config, snapshot=snapshot)
 
         # DRAFT opens the turn — plan from the provider, or an honest
         # refusal when none is configured (never a fake bash plan, T-037)
-        draft = DraftPlanner(llm=state.llm, emit=emit)
+        turn_llm = MeteredClient(state.llm, usage) if state.llm is not None else None
+        draft = DraftPlanner(llm=turn_llm, emit=emit)
         plan_events = draft.open_turn(goal)
         if plan_events and plan_events[-1].TYPE == "answer":
             # conversational short-circuit: the greeting got its warm reply
             # on the stream — no plan, no tools, no verification (BUG 2 fix)
-            emit(RunDone(seq=0, status="ok", steps=0,
-                         duration_s=round(time.time() - turn_start, 4), ts=0.0))
+            emit(
+                RunDone(
+                    seq=0,
+                    status="ok",
+                    steps=0,
+                    duration_s=round(time.time() - turn_start, 4),
+                    ts=0.0,
+                )
+            )
             return
         steps = plan_events[-1].steps
 
@@ -295,8 +326,15 @@ def run_turn(
         # goal text is NEVER run as a command (T-037).
         def interrupted_done() -> bool:
             if interrupted.is_set():
-                emit(RunDone(seq=0, status="interrupted", steps=executed,
-                             duration_s=round(time.time() - turn_start, 4), ts=0.0))
+                emit(
+                    RunDone(
+                        seq=0,
+                        status="interrupted",
+                        steps=executed,
+                        duration_s=round(time.time() - turn_start, 4),
+                        ts=0.0,
+                    )
+                )
                 return True
             return False
 
@@ -369,18 +407,23 @@ def run_turn(
                 break
             pending = list(new_steps)  # corrected steps replace the remainder
 
-        # TEMPER verifies adversarially — smoke-check re-runs the last command
-        verified = False
+        # Discover tests in the same sandbox; never replay a work command.
+        verification_status = "unverified"
         if failure is None and last_cmd is not None and last_ok:
-            tool, cmd_args = last_cmd
-            check = cmd_args.get("cmd", "true") if tool == "bash" else "true"
-            temper = TemperVerifier(run_registry, emit=emit, adversarial=True, reruns=1)
-            verdict = temper.verify(step=executed, target=goal[:64], checks=[check])
-            verified = verdict[-1].TYPE == "step.pass"
+            verification_status = verify_sandbox_tests(
+                run_registry, step=executed, target=goal[:64], emit=emit
+            )
+        verified = verification_status == "pass"
 
-        emit(Memory(seq=0, op="write", entity=goal[:64],
-                    fact=f"turn {run_id}: {executed} steps, verified={verified}", ts=0.0))
-        emit(Usage(seq=0, tokens={"input": 0, "output": 0}, cost_usd=0.0, ts=0.0))
+        emit(
+            Memory(
+                seq=0,
+                op="write",
+                entity=goal[:64],
+                fact=f"turn {run_id}: {executed} steps, verified={verified}",
+                ts=0.0,
+            )
+        )
 
         duration = round(time.time() - turn_start, 4)
         if failure is not None:
@@ -388,11 +431,29 @@ def run_turn(
             pending_summary = Answer(seq=0, text=f"Turn failed: {failure}", ts=0.0)
             emit(RunDone(seq=0, status="failed", steps=executed, duration_s=duration, ts=0.0))
         elif verified:
-            pending_summary = Answer(seq=0, text=f"Done. {executed} step(s) executed against: {goal}. Verification passed.", ts=0.0)
+            pending_summary = Answer(
+                seq=0,
+                text=f"Done. {executed} step(s) executed against: {goal}. Verification passed.",
+                ts=0.0,
+            )
             emit(RunDone(seq=0, status="ok", steps=executed, duration_s=duration, ts=0.0))
         else:
-            pending_summary = Answer(seq=0, text=f"Turn failed: verification did not pass after {executed} step(s).", ts=0.0)
-            emit(RunDone(seq=0, status="failed", steps=executed, duration_s=duration, ts=0.0))
+            text = (
+                f"Work executed, but verification is unverified: no test command found after {executed} step(s)."
+                if verification_status == "unverified"
+                else f"Turn failed: verification did not pass after {executed} step(s)."
+            )
+            pending_summary = Answer(seq=0, text=text, ts=0.0)
+            emit(
+                RunDone(
+                    seq=0,
+                    status="failed",
+                    steps=executed,
+                    duration_s=duration,
+                    verification_status=verification_status,
+                    ts=0.0,
+                )
+            )
     except IsolationUnavailable as exc:
         emit(RunError(seq=0, code="SANDBOX_UNAVAILABLE", message=str(exc), ts=0.0))
     except ProviderError as exc:
@@ -405,6 +466,23 @@ def run_turn(
         emit(RunError(seq=0, code="TURN_FAILED", message=str(exc), ts=0.0))
     finally:
         if isolated_registry is not None:
+            if workspace is not None:
+                from arcen.sandbox.host_export import export_candidate
+                from arcen.sandbox.patch_validation import ArtifactError
+
+                try:
+                    candidate = isolated_registry.export_workspace()
+                    export_candidate(session_id, candidate, emit)
+                except Exception as exc:  # noqa: BLE001 — sandbox data and daemon are untrusted
+                    pending_summary = None
+                    # Only expose the known bounded collector error, never daemon text.
+                    message = (
+                        "Sandbox workspace export exceeded the size limit; no patch was saved."
+                        if isinstance(exc, ArtifactError)
+                        and str(exc).startswith("sandbox export exceeded ")
+                        else "Sandbox workspace export failed; inspect artifact storage before retrying."
+                    )
+                    emit(RunError(seq=0, code="ARTIFACT_EXPORT_FAILED", message=message, ts=0.0))
             try:
                 isolated_registry.close(strict=True)
             except Exception:  # noqa: BLE001 — untrusted daemon failures may contain secrets
@@ -436,6 +514,26 @@ def post_run(payload: dict = Body(...)) -> dict:
     goal = str(payload.get("goal", "")).strip()
     if not goal:
         raise HTTPException(status_code=422, detail="goal is required")
+    # The unauthenticated HTTP API must not let remote clients choose host
+    # paths. Only the explicit local headless CLI can request a workspace.
+    if "workspace" in payload:
+        raise HTTPException(
+            status_code=422,
+            detail="workspace is not supported by /api/run; use the local headless CLI",
+        )
+    supplied_session = payload.get("session")
+    if supplied_session is None:
+        session_id = str(uuid.uuid4())
+    else:
+        try:
+            if (
+                not isinstance(supplied_session, str)
+                or str(uuid.UUID(supplied_session)) != supplied_session
+            ):
+                raise ValueError("noncanonical session")
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="invalid session id") from None
+        session_id = supplied_session
     # T-043: a docker-pinned sandbox with no daemon refuses BEFORE planning
     # — never a silent process fallback, never a 500 mid-turn.
     if STATE.config.sandbox.backend == "docker":
@@ -450,7 +548,6 @@ def post_run(payload: dict = Body(...)) -> dict:
                     "reachable. Start Docker and install the configured sandbox image."
                 ),
             )
-    session_id = payload.get("session") or f"s-{uuid.uuid4().hex[:8]}"
     run_id = f"r-{uuid.uuid4().hex[:6]}"
     STATE.run_flags[run_id] = threading.Event()
     STATE.emitter_for(session_id)

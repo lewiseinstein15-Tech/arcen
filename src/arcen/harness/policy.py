@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .editor import EDITABLE
-from .manifest import default_manifest
+from .manifest import COMPONENT_PATHS, default_manifest
 from .resolver import HarnessError, HarnessResolver
 from .store import HarnessStore
 
@@ -37,8 +37,27 @@ class Review:
     adoption_available: bool = False
 
 
+def _validate_tier_partition() -> None:
+    """Fail closed if the code-defined tier and editable allowlists drift."""
+    tiers = (TIER_0, TIER_1, TIER_2)
+    if (
+        any(type(tier) is not frozenset for tier in tiers)
+        or type(COMPONENT_PATHS) is not frozenset
+        or type(EDITABLE) is not frozenset
+        or any(type(path) is not str for tier in tiers for path in tier)
+        or not all(tiers)
+        or TIER_0 & TIER_1
+        or TIER_0 & TIER_2
+        or TIER_1 & TIER_2
+        or TIER_0 | TIER_1 | TIER_2 != COMPONENT_PATHS
+        or EDITABLE != TIER_1 | TIER_2
+    ):
+        raise HarnessError("static harness tier definitions are inconsistent")
+
+
 def review_candidate(store: HarnessStore, baseline_id: str, candidate_id: str) -> Review:
     """Check immutable core and candidate prompts; permit review, not adoption."""
+    _validate_tier_partition()
     baseline = store.get_manifest(baseline_id)
     candidate = store.get_manifest(candidate_id)
     packaged = default_manifest()

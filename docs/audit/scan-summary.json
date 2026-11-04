@@ -1,0 +1,16 @@
+{
+  "binary_files": 34,
+  "files:.github": 2,
+  "files:docker": 1,
+  "files:scripts": 40,
+  "files:src/arcen": 134,
+  "files:tests": 133,
+  "files:ui": 104,
+  "js_catch_lines": 22,
+  "python_except_handlers": 338,
+  "python_parsed": 288,
+  "python_suppress_blocks": 3,
+  "shell_mask_lines": 5,
+  "text_files": 380,
+  "tracked_files": 414
+}

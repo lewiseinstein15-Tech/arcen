@@ -1,5 +1,75 @@
 # Verification screenshots
 
+## H-16c — canary verifier final-path symlink race
+
+Fresh installed-wheel PTY → xterm.js → Chromium captures:
+
+- `H-16c-real-verifier-tests.png`: actual local Python verifier with a
+  deterministic test-injected symlink swap. A positive control reproduces the
+  old `lstat`/open false pass; the installed no-follow verifier rejects it and
+  rejects a FIFO without blocking. The installed-wheel test file reports
+  **11 passed**. This is a local filesystem test, not a real-Docker run.
+- `H-16c-real-tui-fixture.png`: actual installed TUI with explicitly
+  **simulated** events narrating the local test. It does not demonstrate live
+  integration, authenticated evidence, approval or adoption.
+
+The full source suite passed **1652 tests, 19 skipped**; focused installed-wheel
+suites passed **150 tests, 1 skipped** each on Python 3.12 and 3.13. This fix
+only closes the final-path symlink swap; concurrent writes, hard links,
+compromised execution environments and public-task gaming remain possible.
+H-16 remains open.
+
+## H-16b — canary admission and result safeguards
+
+Fresh PTY → xterm.js → Chromium captures using installed Python 3.13 commands:
+
+- `H-16b-real-canary-refusal.png`: actual interactive canary command refuses
+  a fixture with only three trial admissions; `budget status` confirms zero
+  trial/model admissions and an open budget. No provider or Docker was used.
+- `H-16b-real-canary-tests.png`: installed-wheel canary safeguard tests
+  outside the checkout: **18 passed**; trial/provider boundaries are mocked.
+- `H-16b-real-tui-fixture.png`: actual installed TUI with explicitly
+  **simulated** events narrating a real local admission refusal. This is not
+  live campaign integration, approval, adoption, or a safety proof.
+
+The full source suite passed **1641 tests, 19 skipped**; broader selected
+installed-wheel suites passed **172 tests, 1 skipped** each on Python 3.12 and
+3.13. The minimum is non-reserving and H-16 remains open.
+
+## H-11k — local terminal-event consistency
+
+Fresh installed-command PTY → xterm.js → Chromium captures:
+
+- `H-11k-real-terminal-test.png` runs the installed Python 3.13 wheel against
+  deliberately fabricated conflicting events, showing actual paired-review
+  refusal and zero created records. Its focused installed-wheel test run passed
+  **24 tests**.
+- `H-11k-real-tui-fixture.png` is the actual installed TUI receiving explicitly
+  **simulated** events that narrate that real local refusal. It is not live
+  campaign integration, authenticated evidence, an approval, or adoption.
+
+The full source suite passed **1623 tests, 19 skipped**. The broader focused
+installed-wheel suite passed **160 tests, 1 skipped** on each of Python 3.12
+and 3.13. This check does not prove isolation or event authenticity; H-11 stays
+open.
+
+## H-15a — advisory static policy inspection
+
+Fresh PTY → xterm.js → Chromium captures using the installed Python 3.13
+wheel:
+
+- `H-15a-real-static-inspection.png`: actual `arcen harness inspect
+  --static-policy` output for a local fixture with Tier 1 and Tier 2 changes.
+- `H-15a-real-static-tests.png`: the new installed-wheel inspection tests,
+  outside the checkout: **26 passed**.
+- `H-15a-real-tui-fixture.png`: actual installed TUI, with explicitly
+  **simulated** server events narrating a real local static-review result.
+  It does not demonstrate live TUI integration or an approval/adoption.
+
+The full source suite passed **1581 tests, 19 skipped**; focused installed-wheel
+suites passed **42 tests** on each of Python 3.12 and 3.13. The static report
+is advisory, and H-15 remains open.
+
 Standing convention for the TUI redesign (TUI-01…18) and ARCEN² harness
 rebuild (H-01…22): **every ticket ends with a screenshot of its verification
 test**, saved here as `<TICKET>.png` (with the source `.svg` alongside).
@@ -1293,4 +1363,239 @@ are in `docs/HARNESS-H12D-LAPTOP-TEST.md`.
 - Fresh local full suites on Python 3.12.16 and 3.13 each reported **1,352
   passed, 19 skipped**. `CI-real-runner-determinism-tests.png` shows a fresh
   installed-package Python 3.12 PTY run of nine focused tests, rendered using
-  xterm.js/Chromium. GitHub validation of the follow-up commit is pending.
+  xterm.js/Chromium. GitHub Harness validation run `41356481120` subsequently
+  passed on Python 3.12, Python 3.13 and real Docker.
+
+### H-20b — opt-in live progress reader (partial)
+
+- `H-20b-real-live-fixture.png` is a fresh capture of the installed
+  `arcen-tui --no-serve --url ... --harness-progress` running in a real PTY,
+  rendered by xterm.js/Chromium. Its local HTTP endpoint was a clearly labelled
+  simulated fixture producing fabricated NDJSON metadata. No actual ARCEN
+  campaign, sandbox, provider, approval or adoption was exercised.
+- Python 3.13 full source suite: **1,358 passed, 19 skipped**. Selected
+  installed-wheel tests: **91 passed** each on Python 3.12.16 and 3.13.
+  Changed-file Ruff, wheel contents, docs and diff checks passed; `live.py` was
+  already not wholly Ruff-formatted on the parent commit. Updated GitHub CI has
+  not yet run remotely.
+- The live reader is off by default, validates the seven v2 progress schemas,
+  reinstalls its handler on session replacement, and provides read-only,
+  unauthenticated narration. It does not wire a producer to the real ARCEN
+  server or CLI and adds no campaign controls, approval, adoption or safe
+  resume. Full H-20 remains open.
+
+### H-19f — malformed TUI stream envelope handling (partial)
+
+- `H-19f-real-stream-fixture.png` is a fresh installed `arcen-tui --no-serve
+  --url ... --harness-progress` capture from a real PTY using xterm.js/Chromium.
+  A labelled simulated local HTTP fixture sent fabricated progress interspersed
+  with duplicate-key, invalid-sequence and invalid-type frames. It did not run
+  a campaign, Docker, provider, approval or adoption. The image shows the
+  client running, not by itself proof of every rejected frame.
+- `H-19f-real-stream-tests.png` shows **13 passed** on a fresh installed-wheel
+  run with mock HTTP and replay, using the same PTY capture method. The Python
+  3.13 full source suite reported **1,371 passed, 19 skipped**; selected
+  installed-wheel tests reported **103 passed** on each of Python 3.12.16 and
+  3.13. Changed-file Ruff, wheel contents, docs and diff checks passed. Updated
+  GitHub CI has not yet run remotely.
+- Live NDJSON now rejects duplicate JSON keys and app frames without a nonempty
+  string type and positive non-boolean integer sequence. The same envelope
+  check protects replay, but duplicate keys in replay JSON are not detected.
+  Invalid frames do not advance the transport's reconnect cursor. This is not
+  complete legacy-payload validation, stream authentication, resource bounding
+  or safe resume; validly shaped malicious records and cursor jumps remain
+  possible. H-19 remains open.
+
+### H-11j / H-21g — probe-result attribution checks (partial)
+
+- `H-11j-real-mock-campaign.png` is a fresh installed `arcen-tui --no-serve
+  --url ... --harness-progress` PTY capture rendered by xterm.js/Chromium. A
+  labelled simulated HTTP fixture replayed progress from the actual manual
+  campaign code after its candidate result was deliberately altered. Docker,
+  provider and the fixture server were mocked; no real isolation, external
+  model, approval or adoption was exercised.
+- `H-11j-real-probe-tests.png` shows **63 passed** on a fresh installed-wheel
+  PTY test run. Python 3.13 full source suite: **1,434 passed, 19 skipped**.
+  Selected installed-wheel suites: **195 passed, 5 skipped** on Python 3.12.16
+  and 3.13. Changed-file Ruff/format, wheel, docs and diff checks passed.
+  Updated GitHub CI has not yet run remotely.
+- The manual campaign, paired comparison and manual canary now check local
+  result type, baseline/candidate IDs, commit, workspace hash and terminal
+  status against bound inputs before further processing. Mismatches stop the
+  current campaign, prevent the paired judge or produce an inconclusive canary.
+  Prior pending records can remain, and the shared budget is not automatically
+  stopped. These checks are not authenticated evidence, a sandbox proof, a
+  guarantee that a canary case actually ran, or safe resume. Earlier strict v2
+  readers may drop the two newly added mismatch stop reasons. H-11, H-16 and
+  H-21 remain open.
+
+### H-14c — parallel result consistency and slot retention (partial)
+
+- `H-14c-real-mock-parallel.png` is a fresh installed `arcen-tui --no-serve`
+  PTY capture rendered by xterm.js/Chromium. A clearly simulated HTTP fixture
+  formatted the result of a real parallel API invocation using a mocked
+  executor and local SQLite; the parallel API does not emit TUI events. No
+  real Docker, provider, campaign adoption or safe resume was exercised.
+- `H-14c-real-parallel-tests.png` shows **20 passed** on a fresh
+  installed-wheel PTY test run. Python 3.13 full source suite: **1,454 passed,
+  19 skipped**. Selected installed-wheel suites: **235 passed, 6 skipped** on
+  Python 3.12.16 and 3.13. Changed-file Ruff/format, wheel, docs and diff
+  checks passed. Updated GitHub CI has not yet run remotely.
+- Parallel results must now match the bound baseline, candidate, snapshot and
+  terminal status. A mismatch halts later scheduling and attempts to stop the
+  budget; a durable slot is retained on the uncertain result. A concurrent
+  already-started peer is awaited, not canceled. Budget storage failure may
+  prevent a persistent stop. The checks do not authenticate results or prove
+  isolation; no automatic slot recovery, selection or adoption is provided.
+  Full H-14 and H-17 remain open.
+
+### H-17f — budget-stop failure reporting (partial)
+
+- `H-17f-real-mock-stop.png` is a fresh installed `arcen-tui --no-serve` PTY
+  capture rendered by xterm.js/Chromium. A clearly simulated HTTP fixture
+  formatted a real parallel API result with a mocked executor and a deliberately
+  failing stop method over local SQLite. The parallel API itself does not emit
+  TUI events. No real Docker, external provider, adoption or resume was used.
+- `H-17f-real-stop-tests.png` shows **9 passed** on a fresh installed-wheel PTY
+  run. Python 3.13 full source suite: **1,463 passed, 19 skipped**. Selected
+  installed-wheel suites: **244 passed, 6 skipped** on both Python 3.12.16 and
+  3.13. Changed-file Ruff/format, wheel, docs and diff checks passed. The
+  expanded GitHub workflow has not yet run remotely.
+- The parallel result reports `budget_stop_call_succeeded`: `None` means no
+  outer stop call, `True` means all outer calls returned without exception,
+  and `False` means at least one raised. Failure ends scheduling in this
+  invocation and awaits already-started peers, but a durable stop may not be
+  recorded. Success is not independent read-back, a universal kill switch or
+  protection from callers bypassing the budget. Durable uncertain slots remain
+  occupied; no automatic recovery or safe resume is provided. H-17 remains open.
+
+### H-05a — signed package transport from local Git (partial)
+
+- `H-05a-real-git-package.png` captures a fresh installed `arcen harness
+  package verify-git` command in a real PTY rendered by xterm.js/Chromium. The
+  committed package and key are test fixtures; no actual signer trust or
+  adoption is claimed.
+- `H-05a-real-git-tests.png` shows a fresh installed-wheel PTY test run:
+  **31 passed** with one pytest configuration warning (plugin autoload was
+  disabled for this focused, synchronous test). Python 3.13 full source suite:
+  **1,494 passed, 19 skipped**. Selected installed-wheel suites: **68 passed**
+  on each of Python 3.12.16 and 3.13.16, including a real local promisor control
+  test showing normal Git lazy-fetches a removed blob while ARCEN refuses it.
+- `H-05a-real-tui-demo.png` is a fresh installed `arcen-tui --demo` PTY frame,
+  also rendered by xterm.js/Chromium. Its simulated session is **not** a Git
+  package integration, real Docker run, real model call or proof of isolation.
+- This is manual signed-package transport, not a Git-backed adoption store or
+  authenticated Git history. The local Git executable, repository, filesystem
+  and separately supplied key must be trusted. A commit ID is not a signature;
+  H-05 remains open. The expanded GitHub workflow has not yet run remotely.
+
+### H-19g — bounded live NDJSON lines (partial)
+
+- `H-19g-real-live-overflow.png` is a fresh installed `arcen-tui --no-serve`
+  PTY captured through xterm.js/Chromium. A local HTTP fixture sent two small
+  valid events followed by a line exceeding 1 MiB; the real TUI displayed the
+  halt and did not repeatedly reconnect. The fixture is explicitly simulated;
+  no Docker, model, real campaign or adoption was involved. A halted stream
+  does **not** mean a remote run has stopped.
+- `H-19g-real-boundary-tests.png` shows **14 passed** from a fresh installed
+  wheel PTY run. Full Python 3.13 source suite: **1,508 passed, 19 skipped**.
+  Focused installed-wheel TUI/client/workflow suite: **45 passed** on each of
+  Python 3.12.16 and 3.13.16. The new GitHub workflow selection has not yet run
+  remotely.
+- The line limit applies only to successful identity-encoded live NDJSON; it
+  prevents this parser from retaining more than 1 MiB for one partial line.
+  Oversized frames and encoded responses halt that stream; malformed UTF-8 is
+  skipped. At H-19g it did not bound replay; H-19h adds a separate replay
+  limit. It does not bound HTTP transport allocations, all error bodies,
+  rendering, or total process memory. It is not authentication,
+  full payload validation, safe campaign resume or a safety/adoption gate.
+  H-19 remains open.
+
+### H-19h — bounded and strict session replay (partial)
+
+- `H-19h-real-replay-rejection.png` captures a fresh installed `arcen-tui
+  --no-serve --session ...` PTY rendered through xterm.js/Chromium. A local
+  simulated HTTP fixture served a replay containing duplicate JSON keys; the
+  TUI rejected the entire replay, displayed a blocked state, and did not attach
+  the live stream. The fixture did not run Docker, a model, a real campaign or
+  adoption. A halted replay does not prove any remote run stopped.
+- `H-19h-real-replay-tests.png` shows **20 passed** from a fresh installed-wheel
+  PTY run. Full Python 3.13 source suite: **1,528 passed, 19 skipped**.
+  Focused installed-wheel TUI/client/workflow suite: **65 passed** on each of
+  Python 3.12.16 and 3.13.16. The expanded GitHub workflow has not run remotely.
+- Successful session replay is read incrementally with an 8 MiB byte cap, an
+  identity-encoding requirement and a 10,000 top-level event cap checked after
+  JSON parsing. Duplicate fields, invalid UTF-8, malformed JSON, non-finite
+  numbers and non-array roots fail without returning a partial replay. A failed
+  initial restore on these protocol errors does not automatically start the
+  stream; a failed manual session change leaves the existing session in place.
+  Other replay failures retain existing behavior. This does not bound transport
+  chunk allocation, JSON object expansion, replay duration, other endpoint
+  responses or total TUI memory. It does not authenticate or fully validate
+  events, or establish safe campaign resume. H-19 remains open.
+
+### H-19i — bounded live-stream error handling (partial)
+
+- `H-19i-real-compaction.png` is a fresh installed `arcen-tui --no-serve
+  --session ...` PTY, rendered by xterm.js/Chromium. A clearly simulated local
+  HTTP fixture provided a replay and repeated 409 compaction responses; the TUI
+  halted instead of spinning. No Docker, model, real campaign or adoption was
+  involved. A halted stream does not prove a remote run stopped.
+- `H-19i-real-error-tests.png` shows **11 passed** from a fresh installed-wheel
+  PTY test run. Full Python 3.13 source suite: **1,539 passed, 19 skipped**.
+  Focused installed-wheel TUI/client/workflow suite: **76 passed** on each of
+  Python 3.12.16 and 3.13.16. The expanded GitHub workflow has not run remotely.
+- 404, 409 and other error responses on the live-stream route are closed without
+  reading their bodies. One 409 with a resume hint retries without the hint; a
+  repeated or no-hint 409 halts. A transport failure during reset does not
+  restore the old cursor. Server error details on this route are not displayed.
+  This is not a global HTTP memory limit or safe resume: other endpoints and
+  transport allocations remain outside this scope; the client's bounded 404
+  retries have no delay. H-19 remains open.
+
+### H-19j — disable Git promisor lazy fetch for probe snapshots (partial)
+
+- `H-19j-real-snapshot-refusal.png` is a fresh installed `arcen-tui --no-serve`
+  PTY rendered through xterm.js/Chromium. A simulated local HTTP fixture narrated
+  an actual installed snapshot-reader refusal for a missing local promisor blob.
+  The TUI events are fixture-generated; no real campaign, Docker or model ran.
+- `H-19j-real-snapshot-tests.png` shows **6 passed** on a fresh installed-wheel
+  PTY run. Python 3.13 full source suite: **1,545 passed, 19 skipped**. Selected
+  installed-wheel Git/package/probe/workflow suites: **70 passed, 2 skipped**
+  on each of Python 3.12.16 and 3.13.16. The workflow change has not run on
+  GitHub yet. Docker/provider were mocked or skipped.
+- Real local promisor fixtures removed a commit, tree or blob in turn; the
+  snapshot refused each. Controls verified that an unguarded Git archive did
+  fetch the missing object from a local promisor. A reviewed-probe test checks
+  that a missing blob prevents trial admission, Docker and provider calls.
+  SHA-256 Git repositories and unsupported-flag failure were also tested.
+- The shared runner now uses Git's `--no-lazy-fetch`, including package reads.
+  Older Git versions without that flag and repositories with missing required
+  objects fail closed. This blocks Git's promisor lazy fetch, not arbitrary
+  execution or network access from malicious local Git/configuration. It is not
+  authentication, a secret scan or a replacement for Docker isolation; H-19
+  remains open.
+
+### H-19k — reject configured Git filters before probe archive (partial)
+
+- `H-19k-real-filter-refusal.png` is a fresh installed `arcen-tui --no-serve`
+  PTY rendered by xterm.js/Chromium. A simulated local HTTP fixture narrated a
+  real installed snapshot-reader refusal of a configured smudge filter before
+  its marker command executed. The TUI events are fixture-generated; no real
+  campaign, Docker or model ran.
+- `H-19k-real-filter-tests.png` shows **10 passed** on a fresh installed-wheel
+  PTY run. Python 3.13 full source suite: **1,555 passed, 19 skipped**. Selected
+  installed-wheel Git/package/probe/workflow suites: **80 passed, 2 skipped**
+  on each of Python 3.12.16 and 3.13.16. The workflow change has not run on
+  GitHub yet. Docker/provider were mocked or skipped.
+- A real local Git fixture confirmed that unguarded `git archive` executes a
+  configured smudge filter, whereas the snapshot reader refuses before the
+  marker executes. Tests also cover process and unused filters, included config,
+  size and malformed config failures, normal `export-ignore` semantics, and
+  failure before budget admission, Docker and provider calls.
+- This deliberately conservative preflight rejects any effective `filter.*`
+  config, including harmless filters and Git LFS settings. The check is separate
+  from archive execution and can race with concurrent configuration changes;
+  local Git, its configuration and filesystem must remain trusted and stable.
+  It is not an OS execution/network sandbox or comprehensive Git hardening.
+  H-19 remains open.

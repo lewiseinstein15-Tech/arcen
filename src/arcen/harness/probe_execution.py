@@ -54,6 +54,46 @@ class ReviewedProbeResult:
     canary_passed: bool | None = None
 
 
+def _has_consistent_terminal(events: object, status: object) -> bool:
+    """Require one terminal event, at the end, consistent with the claimed status.
+
+    This checks local event envelopes only; it neither authenticates a result
+    nor validates the contents of non-terminal events.
+    """
+    if (
+        type(events) is not tuple
+        or not events
+        or type(status) is not str
+        or status not in {"ok", "failed", "error"}
+    ):
+        return False
+    for event in events[:-1]:
+        if (
+            type(event) is not dict
+            or type(event.get("type")) is not str
+            or event["type"] in ("run.done", "run.error")
+        ):
+            return False
+    terminal = events[-1]
+    if type(terminal) is not dict or type(terminal.get("type")) is not str:
+        return False
+    if status == "error":
+        return terminal["type"] == "run.error"
+    return terminal["type"] == "run.done" and terminal.get("status") == status
+
+
+def _matches_bound_probe(result: object, snapshot: GitSnapshot, model: BoundProbeModel) -> bool:
+    """Check local result attribution, not authenticity, isolation or correctness."""
+    return (
+        type(result) is ReviewedProbeResult
+        and result.baseline_id == model.plan.baseline_id
+        and result.candidate_id == model.plan.candidate_id
+        and result.commit == snapshot.commit
+        and result.workspace_sha256 == snapshot.sha256
+        and _has_consistent_terminal(result.events, result.status)
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _CanaryCommands:
     """Trusted, code-defined commands; not a public verifier authority."""

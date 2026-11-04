@@ -42,6 +42,10 @@ merely because a sub-scope is complete.
       human A/B judge and pending-review workflow; no adoption or safe resume.
 - [x] Operator-chosen syntactic composition, including from unsigned local
       campaign summaries; resulting candidates require separate testing.
+- [x] H-05a: inspect or interactively import an explicitly signed v1 package
+      from a full local Git commit without checkout, hooks, ref changes or
+      adoption. The key and repository are trusted; this is not a complete
+      Git-backed store, authenticated lineage or full H-05.
 - [x] H-04a: disabled harnessing configuration rejects unsupported settings and
       non-boolean values; validated config updates fail without side effects.
       H-04 package, signatures and trust remain incomplete.
@@ -61,20 +65,39 @@ merely because a sub-scope is complete.
 - [x] H-11g: guided selection of one to five candidates for a single manually
       confirmed sequential campaign, with lower-bound admission checks. This
       completes only this sub-scope, not H-11, H-14 or the Governor.
+- [x] H-17f: parallel-probe error handling reports whether its budget-stop calls
+      returned without error; failed stops end local scheduling and are not
+      presented as successful global stops. Mock-tested; no in-flight kill,
+      universal budget enforcement or complete H-17.
+- [x] H-14c: parallel probes reject mismatched or malformed result attribution
+      and terminal status; an uncertain durable trial retains its slot. Mocked
+      Docker/provider tests only. In-flight work may continue; H-14 remains open.
 - [x] H-14b: reviewed Python-only bounded parallel probe waves over one
       reference and two to five candidates, using an in-process shared budget.
       Mock-verified only; no judge, persistence, selection, adoption, automatic
       resume, durable concurrency, or cross-process guarantees. H-14 remains open.
+- [x] H-11k: reviewed probe results require exactly one final terminal event,
+      consistent with claimed status; malformed event envelopes and earlier
+      terminals are rejected in campaign, comparison, canary and parallel
+      attribution, and paired review recording. This does not authenticate
+      events, validate their payloads, prove isolation, or enable adoption or
+      recovery. H-11 remains open.
+- [x] H-11j / H-21g: manual campaigns, reviewed paired comparisons and manual
+      canaries reject locally misattributed probe results before judging or
+      recording them. Tests mock provider and Docker. This checks result shape
+      and bindings, not authenticity, sandbox integrity, adoption or recovery.
+      H-11 and H-21 remain open.
 - [x] H-11i: opt-in metadata-only v2 progress bridge on the existing session
       emitter, with strict decoding and optional TUI registration. The offline
-      demo exercises it; the live server and CLI do not. It is not the complete
-      v2 contract, durable evidence, approval or recovery. H-11 remains open.
+      demo and opt-in live reader use it; the server and CLI do not emit it.
+      It is not the complete v2 contract, durable evidence, approval or recovery.
+      H-11 remains open.
 - [x] H-11h: metadata-only best-effort manual campaign progress in the CLI
       and trusted callback API. Not durable, authenticated, replayable, or
       integrated into the session NDJSON stream; safe resume remains absent.
-- [x] H-21a: CI workflow configuration for installed-wheel and opt-in Docker
-      validation, structurally tested locally. A remote run is still required;
-      this does not complete portability, CI verification or H-21.
+- [x] H-21a: CI workflow for installed-wheel and real-Docker validation. GitHub
+      run 41356481120 passed for the earlier `4cb3e1a` baseline; later workflow
+      changes have not been run remotely. This does not complete H-21.
 - [x] H-19a: reviewed trial snapshots reject exact configured provider keys;
       comparisons and campaigns also reject explicitly supplied known values
       before trial admission. Not a complete secret or injection scanner.
@@ -87,6 +110,44 @@ merely because a sub-scope is complete.
 - [x] H-19d: extra caller-provided known values are checked in model-bound
       inputs and best-effort redacted from reviewed model/tool evidence.
       This is not comprehensive secret detection; H-19 remains open.
+- [x] H-16c: the fixed canary verifier opens its final output path with
+      no-follow/nonblocking flags and checks/reads the same descriptor, closing
+      an lstat-then-open symlink race. Local Linux tests only; shared-workspace
+      interference, hard links, compromised images, authenticity, adoption and
+      rollback remain out of scope. H-16 stays open.
+- [x] H-16b: manual canaries reject obvious admission shortfalls before Git,
+      provider or Docker work and treat non-boolean verifier flags as
+      inconclusive. This is a non-reserving snapshot, not a guarantee of
+      completion, spend or safety; no adoption or rollback. H-16 remains open.
+- [x] H-15a: static review fails on inconsistent code-defined tier/editable
+      allowlists, and optional read-only inspection reports changed tiers.
+      This is advisory only; no policy authority, approval, adoption or runtime
+      candidate selection. H-15 remains open.
+- [x] H-19k: probe snapshots reject any effective local Git filter configuration
+      before `git archive`, including included config and inert filters. Real
+      smudge-filter control tested; local Git/config/filesystem must be trusted
+      and stable. This is not an OS-level execution sandbox; H-19 remains open.
+- [x] H-19j: the shared local Git object reader disables promisor lazy fetch
+      for probe snapshots and signed-package reads, and fails if Git lacks that
+      option or needed objects are absent. This trusts local Git, repository and
+      configuration; it is not OS-level egress isolation. H-19 remains open.
+- [x] H-19i: TUI live-stream HTTP error bodies are closed without being read;
+      a 409 compaction reset occurs at most once with a resume hint, and an
+      unresolved compaction halts the stream. No global HTTP, retry, total
+      memory or remote-run control guarantee; H-19 remains open.
+- [x] H-19h: the TUI bounds the raw body and top-level event count of session
+      replay; rejects compressed, invalid, duplicate-key and non-finite JSON;
+      and halts initial restore on these protocol errors. Transport chunks,
+      parsed-object expansion, other endpoints and total UI memory are not
+      bounded; no authenticity or safe campaign resume is established.
+- [x] H-19g: the TUI's successful live NDJSON reader bounds each pending line
+      to 1 MiB, refuses encoded streams and halts on oversized lines without
+      skipping forward or retrying automatically. Replay, error bodies,
+      transport chunks and total UI memory remain unbounded; H-19 remains open.
+- [x] H-19f: the TUI discards malformed event envelopes in live streams and
+      session replay, and duplicate-key JSON in live NDJSON. H-19h adds replay
+      duplicate-key rejection. Neither is authentication, complete payload
+      validation, comprehensive resource bounding or safe resume; H-19 remains open.
 - [x] H-19e: Docker inspection rejects disabled, contradictory or malformed
       no-new-privileges options and unconfirmed key isolation fields. Mocked
       verification only; real-Docker validation remains outstanding.
@@ -95,9 +156,14 @@ merely because a sub-scope is complete.
       cross-database or authorization verification; rollback remains disabled.
 - [x] H-20a / H-22a: a clearly simulated offline harness TUI demo and read-only
       renderer for local progress metadata. No live stream, approval or adoption.
+- [x] H-20b: opt-in live TUI rendering of validated, unsigned v2 progress
+      received from a compatible stream, including reconnect and session replay.
+      Mock-server tested; the real server does not yet emit campaign progress.
+      No campaign controls, approval, adoption or complete H-20.
 - [x] H-21b: CI configuration checks installed import origin and runs selected
       installed-wheel harness/TUI tests outside the checkout; wheel contents
-      include the new modules. Remote execution has not been verified.
+      include the new modules. The earlier CI baseline passed remotely; the
+      subsequently expanded selected suite has not yet run remotely.
 - [x] H-21c: interactive and Python two-image baseline/candidate comparisons
       share a budget and reject a changed second workspace snapshot. Local
       Docker/provider are mocked; images and evidence remain untrusted claims,

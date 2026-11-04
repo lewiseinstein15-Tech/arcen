@@ -188,7 +188,7 @@ def test_server_forge_and_temper_use_only_the_turn_registry(monkeypatch, tmp_pat
     server.run_turn("run test", "session-test", "r", state)
     events = state.emitters["session-test"].replay(0)
     assert events[-1]["type"] == "run.done" and events[-1]["status"] == "ok"
-    assert len(fake.calls) >= 2  # FORGE plus TEMPER rerun(s)
+    assert len(fake.calls) >= 3  # FORGE plus independent TEMPER discovery and test
     assert all(name == "bash" for name, _ in fake.calls)
     assert fake.closed
 
@@ -477,7 +477,14 @@ def test_server_provider_failure_does_not_hide_cleanup_failure(tmp_path, monkeyp
             self.closed = True
             raise RuntimeError("secret-daemon-cleanup-failure")
 
+    from arcen.sandbox import baseline_store, host_export
+
     registry = FailingRegistry()
+    monkeypatch.setattr(
+        baseline_store, "capture_workspace_baseline", lambda *a, **kw: (b"baseline", "a" * 40)
+    )
+    monkeypatch.setattr(registry, "export_workspace", lambda: b"candidate", raising=False)
+    monkeypatch.setattr(host_export, "export_candidate", lambda *a, **kw: {})
     events, observed = _server_run_for_cleanup(
         tmp_path, monkeypatch, registry, workspace=str(tmp_path), provider_fails=True
     )
@@ -559,3 +566,32 @@ def test_docker_null_binds_and_tmpfs_mount_are_accepted():
     registry = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
     registry.close(strict=True)
     assert docker.container.removed
+
+
+def test_captured_snapshot_is_imported_unchanged_and_export_is_bounded(monkeypatch):
+    from arcen.sandbox import turn
+
+    docker = FakeDocker()
+    seen = []
+    monkeypatch.setattr(turn, "import_workspace", lambda client, container, data: seen.append(data))
+    registry = DockerTurnRegistry(ArcenConfig(), docker_client=docker, snapshot=b"host baseline")
+    assert seen == [b"host baseline"]
+    docker.output = [(b"candidate tar", None)]
+    assert registry.export_workspace() == b"candidate tar"
+    assert docker.run_args["volumes"] == {} and docker.run_args["network_mode"] == "none"
+    registry.close(strict=True)
+
+
+def test_ambiguous_or_oversized_prepared_workspace_rejected_before_docker():
+    from arcen.sandbox.patch_validation import MAX_PATCH_BYTES
+
+    docker = FakeDocker()
+    with pytest.raises(IsolationUnavailable, match="either"):
+        DockerTurnRegistry(
+            ArcenConfig(), docker_client=docker, workspace="unused", snapshot=b"data"
+        )
+    with pytest.raises(IsolationUnavailable, match="oversized"):
+        DockerTurnRegistry(
+            ArcenConfig(), docker_client=docker, snapshot=b"x" * (MAX_PATCH_BYTES + 1)
+        )
+    assert docker.run_args is None

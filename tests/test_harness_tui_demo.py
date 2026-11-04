@@ -40,7 +40,7 @@ def test_simulated_events_follow_local_schema_and_show_non_authoritative_review(
     text = rendered(narration.items)
     assert adapter.accepted == 9
     assert "pending" in text and "uncalibrated" in text.lower()
-    assert "not an adoption decision" in text and "No candidate was adopted" in text
+    assert "not an adoption decision" in text and "This view performs no adoption" in text
     assert "bbbbbbbbbbbb" in text and "cccccccccccc" in text
 
 
@@ -85,7 +85,7 @@ async def test_demo_completes_headlessly_without_network_or_external_calls(monke
         assert all(event["ts"] > 0 for event in app.demo_emitter.replay(0))
         text = rendered(app.narration.items)
         assert "SIMULATED" in text and "no real execution" in text
-        assert "No candidate was adopted" in text
+        assert "This view performs no adoption" in text
         assert app.header.phase == "DEMO"
         footer = rendered([app.footer.render()])
         assert "SIMULATED" in footer and "LIVE" not in footer

@@ -6,11 +6,12 @@ import { GLYPHS } from './render';
 
 export const Footer = memo(function Footer({ event }: { event: RunDoneEvent }) {
   const { glyph, color } = GLYPHS['run.done'];
+  const status = event.verification_status === 'unverified' ? 'unverified' : event.status;
   return (
     <footer
       className="stream-footer"
       data-seq={event.seq}
-      aria-label={`turn complete, ${event.steps} steps, ${event.status}`}
+      aria-label={`turn complete, ${event.steps} steps, ${status}`}
     >
       <span className="glyph" style={{ color }}>
         {glyph}
@@ -18,7 +19,7 @@ export const Footer = memo(function Footer({ event }: { event: RunDoneEvent }) {
       <span className="meta">
         {event.steps} steps · {event.duration_s}s
       </span>
-      <span className={`status ${event.status}`}>{event.status}</span>
+      <span className={`status ${event.status}`}>{status}</span>
     </footer>
   );
 });

@@ -22,7 +22,11 @@ class WorkspaceError(ValueError):
 
 
 def snapshot_workspace(
-    path: str | Path, *, max_entries: int | None = None, max_file_bytes: int | None = None
+    path: str | Path,
+    *,
+    max_entries: int | None = None,
+    max_file_bytes: int | None = None,
+    exclude_git: bool = False,
 ) -> bytes:
     max_entries = MAX_FILES if max_entries is None else max_entries
     max_file_bytes = MAX_BYTES if max_file_bytes is None else max_file_bytes
@@ -44,6 +48,9 @@ def snapshot_workspace(
         for current, dirs, files, dirfd in os.fwalk(root, follow_symlinks=False, onerror=fail_walk):
             dirs.sort()
             files.sort()
+            if exclude_git:
+                dirs[:] = [name for name in dirs if name.lower() != ".git"]
+                files = [name for name in files if name.lower() != ".git"]
             for name in dirs + files:
                 count += 1
                 if count > max_entries:

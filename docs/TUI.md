@@ -86,11 +86,32 @@ use the web Settings interface or configuration file instead.
 The client opens a held NDJSON stream before submitting a goal, buffers partial
 lines, ignores transport heartbeats, and resumes on disconnect using
 `Last-Event-ID`. The adapter de-duplicates replayed sequence numbers and shows
-an event-gap notice. HTTP 409 compaction triggers a replay from zero. The
-server's `run.done` or `run.error` ends the stream for that turn. The client
+an event-gap notice. HTTP 409 compaction with a resume hint triggers at most
+one restart from zero; a repeated or no-hint 409 halts that stream. Stream HTTP
+error bodies are closed unread, so server-provided details are not shown for
+this route. The client's bounded 404 retries have no delay; the TUI's outer
+reconnect loop does delay. The server's `run.done` or `run.error` ends the
+stream for that turn. The client
 also reports offline and blocked-sandbox states; the sandbox modal shows the
 selected backend and reason. A process backend is not an isolation boundary;
 tool execution remains blocked unless Docker isolation is available.
+
+For successful live NDJSON responses, the client requests identity encoding,
+rejects compressed responses, and caps each pending line at 1 MiB (UTF-8 bytes,
+excluding the newline). An oversized line stops that connection rather than
+skipping to later events; the TUI reports the error and stops automatic
+reconnection for that stream. Inspect the server before reopening a session or
+restarting the TUI. A halted stream does not prove the run stopped. Malformed
+UTF-8 is discarded. Session replay separately requests identity encoding and
+accepts at most 8 MiB of response bytes and 10,000 top-level events. It rejects
+compressed responses, invalid UTF-8 or JSON, duplicate keys and non-finite
+numbers; replay is all-or-nothing. On these protocol errors, initial restoration
+halts before attaching the stream, while opening another session leaves the
+current session unchanged. A halted replay does not stop a remote run. The
+limits do not bound HTTP transport chunks, parsed JSON expansion, other endpoint
+bodies, replay duration, accumulated UI events or total process memory. The
+event-count check happens after JSON parsing. These limits are not event
+authentication, a safety guarantee or safe campaign resume.
 
 Interrupt sends `DELETE /api/run/{run_id}` **only after confirmation**. The
 server cooperatively stops between steps, so an in-progress step may finish

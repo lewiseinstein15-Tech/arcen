@@ -54,6 +54,8 @@ class RailState:
     tokens: int = 0
     token_limit: int = DEFAULT_TOKEN_LIMIT
     cost_usd: float = 0.0
+    usage_measured: bool = True  # standalone/demo rail compatibility
+    cost_known: bool = True
     tools: list[str] = field(default_factory=list)
     sandbox: str = "—"
     network: str = "—"
@@ -226,11 +228,13 @@ class RunStateRail(Static):
 
         grid.add_row(Text("CONTEXT WINDOW", style=f"bold {MUTED}"))
         grid.add_row(self._meter(s.tokens / max(s.token_limit, 1), CYAN))
-        grid.add_row(Text(f"{s.tokens:,} / {s.token_limit:,} tok", style=MUTED))
+        context_text = f"{s.tokens:,} / {s.token_limit:,} tok" if s.usage_measured else "tokens unknown"
+        grid.add_row(Text(context_text, style=MUTED))
         grid.add_row(Text(""))
 
         grid.add_row(Text("SPEND", style=f"bold {MUTED}"))
-        grid.add_row(Text(f"${s.cost_usd:.4f}", style=BODY))
+        spend_text = f"${s.cost_usd:.4f}" if s.usage_measured and s.cost_known else "unknown"
+        grid.add_row(Text(spend_text, style=BODY))
         grid.add_row(Text(""))
 
         grid.add_row(Text("TOOLS", style=f"bold {MUTED}"))

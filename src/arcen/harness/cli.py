@@ -105,7 +105,9 @@ def _diff_objects(
     return "".join(output) if output else "No differences.\n"
 
 
-def _inspect_manifest(root: str, identifier: str, *, show_diff: bool = False) -> str:
+def _inspect_manifest(
+    root: str, identifier: str, *, show_diff: bool = False, show_static_policy: bool = False
+) -> str:
     """Inspect unregistered objects without modifying refs or authorizing use."""
     store, lineage = _existing(root)
     baseline_id = lineage.resolve("refs/heads/adopted")
@@ -114,6 +116,11 @@ def _inspect_manifest(root: str, identifier: str, *, show_diff: bool = False) ->
     # Prepare the entire output before printing, so corrupt objects or failed
     # decoding cannot yield a misleading partial inspection.
     diff = _diff_objects(store, baseline_id, identifier, max_lines=2048) if show_diff else None
+    policy_review = None
+    if show_static_policy:
+        from .policy import review_candidate
+
+        policy_review = review_candidate(store, baseline_id, identifier)
     lines = [
         f"Stored manifest: {identifier}",
         f"Local adopted baseline: {baseline_id}",
@@ -129,6 +136,16 @@ def _inspect_manifest(root: str, identifier: str, *, show_diff: bool = False) ->
             "No refs, approval, execution or adoption were changed.",
         ]
     )
+    if policy_review is not None:
+        from .policy import TIER_1
+
+        lines.append("Static policy review: passed for current code-defined checks only.")
+        lines.append(f"Highest changed tier: {policy_review.highest_tier}; human review required.")
+        for path in policy_review.changed_paths:
+            tier = 1 if path in TIER_1 else 2
+            lines.append(f"  tier {tier}: {path}")
+        lines.append("Advisory only: this does not approve execution or authorize adoption.")
+        lines.append("The baseline may change later; no approval or review record was created.")
     if diff is not None:
         lines.append("Untrusted sanitized diff (may contain sensitive data):")
         lines.append(diff.rstrip("\n"))
@@ -423,6 +440,9 @@ def main(argv: list[str] | None = None) -> int:
     inspect.add_argument(
         "--diff", action="store_true", help="also show a sanitized diff; may reveal plaintext"
     )
+    inspect.add_argument(
+        "--static-policy", action="store_true", help="run advisory static checks; never approves"
+    )
     rollback = commands.add_parser("rollback", help="unavailable until adoption gates exist")
     rollback.add_argument("ref", help="target ref (not applied yet)")
     attestation = commands.add_parser(
@@ -437,7 +457,7 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--public-key", required=True, help="trusted raw Ed25519 public key as hex")
     package = commands.add_parser("package", help="export, inspect or import objects; no adoption")
     package_commands = package.add_subparsers(dest="package_command", required=True)
-    for action in ("export", "verify", "import"):
+    for action in ("export", "verify", "import", "verify-git", "import-git"):
         command = package_commands.add_parser(action, help=f"{action} a detached signed package")
         command.add_argument("--manifest", required=True, help="expected manifest SHA-256")
         command.add_argument(
@@ -446,6 +466,10 @@ def main(argv: list[str] | None = None) -> int:
         if action == "export":
             command.add_argument("--attestation", required=True, help="detached signature file")
             command.add_argument("--output", required=True, help="new output path; never overwrite")
+        elif action in ("verify-git", "import-git"):
+            command.add_argument("--repo", required=True, help="trusted local Git repository")
+            command.add_argument("--commit", required=True, help="full lowercase Git commit ID")
+            command.add_argument("--path", required=True, help="literal committed package path")
         else:
             command.add_argument("--file", required=True, help="package file to inspect")
     baseline = commands.add_parser("pin-baseline", help="create an unadopted fixed-model baseline")
@@ -640,7 +664,15 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "diff":
             print(_diff(args.store, args.ref), end="")
         elif args.command == "inspect":
-            print(_inspect_manifest(args.store, args.manifest, show_diff=args.diff), end="")
+            print(
+                _inspect_manifest(
+                    args.store,
+                    args.manifest,
+                    show_diff=args.diff,
+                    show_static_policy=args.static_policy,
+                ),
+                end="",
+            )
         elif args.command == "attestation":
             from .attestation import MAX_ATTESTATION_BYTES, verify_attestation
             from .manual_cli import _read_text
@@ -680,18 +712,25 @@ def main(argv: list[str] | None = None) -> int:
                 write_new_package(args.output, data)
                 print("Signed package written to new file; contents are plaintext.")
             else:
-                if args.package_command == "import" and (
+                if args.package_command in ("import", "import-git") and (
                     not sys.stdin.isatty() or not sys.stdout.isatty()
                 ):
                     raise HarnessError("package import requires an interactive terminal")
-                data = _read_text(args.file, MAX_PACKAGE_BYTES).encode("utf-8")
+                if args.package_command in ("verify-git", "import-git"):
+                    from .git_package import read_git_package
+
+                    data = read_git_package(args.repo, args.commit, args.path)
+                else:
+                    data = _read_text(args.file, MAX_PACKAGE_BYTES).encode("utf-8")
             result = verify_package(data, args.manifest, public_key)
+            if args.package_command in ("verify-git", "import-git"):
+                print(f"Committed package: {args.commit}:{args.path}")
             print(f"Verified manifest: {result.attestation.manifest}")
             print(f"Signer public-key SHA-256: {result.attestation.public_key_sha256}")
             print(f"Signed parent claim: {result.attestation.parent or 'none'}")
             print(f"Components: {result.component_count}; unique objects: {result.unique_objects}")
             print("Key trust, lineage, safety and authorization are not established.")
-            if args.package_command == "import":
+            if args.package_command in ("import", "import-git"):
                 store, _ = _existing(args.store)
                 print(
                     "Import writes plaintext objects only; failures may leave unreferenced objects."

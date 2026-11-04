@@ -20,6 +20,7 @@ from .judge import Judgment, Trajectory, compare
 from .probe import ProbeUnavailable
 from .probe_execution import (
     ReviewedProbeResult,
+    _matches_bound_probe,
     _reviewed_config,
 )
 from .probe_hygiene import _reject_snapshot_secrets
@@ -115,9 +116,13 @@ def run_reviewed_comparison(
     _reject_snapshot_secrets(snapshot, hidden)
     executor = NativeDockerProbeExecutor()
     reference = executor.execute(snapshot, cfg, reference_model)
+    if not _matches_bound_probe(reference, snapshot, reference_model):
+        raise ProbeUnavailable("reference result did not match reviewed inputs")
     if reference.status == "error":
         return ReviewedComparison(reference, None, None)
     candidate = executor.execute(snapshot, cfg, candidate_model)
+    if not _matches_bound_probe(candidate, snapshot, candidate_model):
+        raise ProbeUnavailable("candidate result did not match reviewed inputs")
     if candidate.status == "error":
         return ReviewedComparison(reference, candidate, None)
 

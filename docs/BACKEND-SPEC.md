@@ -30,13 +30,13 @@ Three core agents only: **DRAFT** (planner), **FORGE** (executor), **TEMPER** (v
 │        └────── re-plan ◀─┴──── fail ────────┘                     │
 ├────────────────────────────────────────────────────────────────────┤
 │  L2 · SUB-AGENT POOL                                               │
-│   500+ sub-agents, spawned on demand, named for their task         │
+│   Task-named sub-agents, spawned on demand         │
 │   TEST-READER · RESEARCH · MIGRATOR · BENCH · DOC-WRITER · ...     │
 │   depth-capped (default 2), concurrency-capped (default 8)         │
 ├────────────────────────────────────────────────────────────────────┤
 │  L3 · CAPABILITY LAYER                                             │
-│   skills (10,000+) · tools (1,000+) · MCPs (300+)                  │
-│   plugins (100+) · memory (entity graph)                           │
+│   skills · registered tools · configured MCPs                  │
+│   trusted plugins · memory (entity graph)                           │
 ├────────────────────────────────────────────────────────────────────┤
 │  L4 · RUNTIME                                                      │
 │   Docker sandbox per session · FastAPI server · NDJSON stream      │
@@ -66,7 +66,7 @@ Every component borrows from a named source. "What to edit" is the full allowed 
 | 2 | FORGE executor | [OpenHands](https://github.com/All-Hands-AI/OpenHands) | `controller/agent.py` + `tools/` — agent state machine | Reduce to step-at-a-time; emit `command`/`command.done`; route through registry |
 | 3 | TEMPER verifier | [SWE-agent](https://github.com/SWE-agent/SWE-agent) | `reviewer.py` — adversarial review pass | Output → binary pass/fail + reasons; emit `verify.start`/`step.pass`/`step.fail` |
 | 4 | Sub-agents | [CrewAI](https://github.com/crewAIInc/crewAI) | `agent.py` + `task.py` — spawn/task model | Add depth cap, concurrency cap, per-sub-agent naming, spawn events |
-| 5 | Skills | [Anthropic Skills](https://github.com/anthropics/skills) | loader + registry pattern (`loader.py`, `registry.py` equivalent) | Progressive loading: index frontmatter at boot, body on match |
+| 5 | Skills | [Anthropic Skills](https://github.com/anthropics/skills) | loader + registry pattern (`loader.py`, `registry.py` equivalent) | Index reads the complete file; only metadata is retained, and body is read again on load |
 | 6 | Tools | [OpenHands](https://github.com/All-Hands-AI/OpenHands) | `tools/` package — bash, file, search, browse, code | Wrap each in the frozen Tool schema (Part 3); sandbox routing |
 | 7 | Tool registry | ToolRegistry pattern | `registry.py` — schema generation + lookup | JSON Schema auto-gen from type hints; TOML registry file |
 | 8 | MCPs | [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) | `client/` — stdio + HTTP transports | Add lazy state machine (Part 6); config-driven declaration |
@@ -359,13 +359,13 @@ Each configured MCP server is always in exactly one of three states:
 
 ## Part 7 — Plugin Lifecycle
 
-Plugins are Python modules exposing a `Plugin` subclass with decorated hooks. Hooks are synchronous by default; a hook may declare `async def` and the loader runs it on the loop. A hook that raises is a plugin bug: the error is emitted as an event and the pipeline continues without that plugin (fail-open), except `before_tool` which fails-closed for safety hooks.
+Plugins are trusted host Python modules exposing a `Plugin` subclass with decorated hooks. Only files whose stem matches an enabled plugin name (hyphens normalized to underscores) are imported; enabled modules can execute arbitrary host code. Hooks are synchronous by default; a hook may declare `async def` and the loader runs it on the loop. A hook that raises is a plugin bug: the error is emitted as an event and the pipeline continues without that plugin (fail-open), except `before_tool` which fails-closed for safety hooks.
 
 **Frozen hook list (6):**
 
 | Hook | Fires | May do |
 |---|---|---|
-| `on_boot` | Once, after config + registry, before server listens | mutate config, register tools, warm caches |
+| `on_boot` | Once, after config + registry, before server listens | receives an empty payload; may warm plugin-local caches. Config and credentials are not passed. Third-party plugins execute as trusted host code. |
 | `before_tool` | Before each tool `execute()` | inspect/mutate args, deny (fail-closed) |
 | `after_tool` | After each tool result | inspect/mutate result (redaction), meter |
 | `on_spawn` | When a sub-agent is spawned | rename, re-scope, deny depth violations |
@@ -468,6 +468,8 @@ JSON shapes (representative, one line each as they appear on the wire):
 {"seq":17,"type":"run.error","code":"SANDBOX_UNAVAILABLE","message":"docker daemon not reachable","ts":1727500006.430}
 ```
 
+**Usage measurement (A-08).** The event type remains `usage` and the existing numeric `tokens.input`, `tokens.output`, and `cost_usd` fields remain present. New producers also emit `measured` (boolean), `usage_source` and `cost_source` (each `provider`, `estimated`, or `unknown`). When usage is unknown the numeric placeholders are zero, `measured` is false and both sources are `unknown`; consumers must display unknown and must not add placeholders to totals. Known provider token counts with no provider cost use LiteLLM's token pricing map for an estimated cost; an unavailable price uses `cost_source: "unknown"`, not a free-cost claim. A turn containing any call with missing usage is unmeasured as a whole. Failed/retried provider requests can have unreported costs and therefore make the turn unmeasured. When `measured` is true but `cost_source` is unknown, display the tokens but display cost as unknown. Benchmark aggregation must report how many runs were skipped; a sum containing only measured runs is not a full-population total. Old event payloads without the three fields still parse and render; their provenance is unknown. Old strict consumers may need updating to accept additive fields.
+
 **Resume.** The stream is replayable by `seq`. A reconnecting client sends:
 
 ```
@@ -490,7 +492,7 @@ Twelve steps, in order. Each step is observable: boot logs to stderr and, once t
 3. **Open session store** — ensure `~/.arcen/sessions/` exists; create the new session's `<id>.jsonl`, append-only.
 4. **Open memory** — open `~/.arcen/memory.db` (SQLite, WAL), run migrations if schema version differs.
 5. **Load tool registry** — parse `registry.toml`, import tool classes, generate JSON Schemas, validate the Protocol; count must equal expected core tools (40 for v0.1).
-6. **Index skills** — walk skill paths, parse each `SKILL.md` frontmatter into the index; bodies stay on disk (progressive loading).
+6. **Index skills** — walk skill paths and read each complete `SKILL.md`; retain frontmatter metadata in the index and read the file again when loading the body.
 7. **Declare MCPs** — apply state machine: `disabled` stays down, everything else `declarative`; zero network I/O.
 8. **Load plugins** — import enabled plugins, validate hook signatures, fire `on_boot`.
 9. **Build LLM bridge** — configure LiteLLM with per-role models (agent override → provider.model inheritance) and resolved credentials; probe nothing (first call is the probe).

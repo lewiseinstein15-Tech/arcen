@@ -20,8 +20,20 @@ reservation of the whole batch; actual per-call and per-trial admission can
 stop subsequent work. Set the budget's concurrency cap separately if sharing
 it with other jobs. A failed wave prevents scheduling later waves, but all
 already-submitted work is awaited and cannot be canceled by this primitive.
-An uncertain executor or scheduler failure stops that budget and returns a
-sanitized status. A stop between waves prevents further submissions.
+An uncertain executor or scheduler failure attempts to stop that budget and
+returns a sanitized status. `budget_stop_call_succeeded` is `None` if this
+invocation made no outer stop call, `True` if all such calls returned without
+exception, and `False` if any raised. A successful return is not an independent
+read-back or a global-stop guarantee; other APIs may bypass the budget. A failed
+stop is unconfirmed, and an operator must investigate before reusing it. Before accepting a result, the API checks its local baseline,
+candidate, commit, workspace digest and terminal status against the bound
+trial. A mismatch is unavailable, stops the current scheduling path and
+attempts to stop the budget. For a durable budget it retains the suspect slot,
+because successful cleanup is not established by an inconsistent result. These
+checks do not authenticate the executor or its evidence. A stop between waves
+prevents further submissions; a failed budget-database update can prevent a
+persistent stop. Stop-call exceptions in this parallel path are suppressed and
+reported by the flag; other database operations can still fail or raise.
 
 A durable slot is released only after a successful body and cleanup. An
 exception retains the slot and makes a best-effort attempt to stop the durable

@@ -85,6 +85,7 @@ class EventAdapter:
         s = self.state
         self.rail.apply_state({"steps_total": s.steps_total, "steps_done": s.steps_done,
             "phase": s.phase, "tokens": s.tokens, "cost_usd": s.cost_usd,
+            "usage_measured": s.usage_measured, "cost_known": s.cost_known,
             "tools": list(s.tools), "replanning": s.replanning})
 
     def _phase(self, phase: str) -> None:
@@ -199,7 +200,8 @@ class EventAdapter:
     def _verify_start(self, e):
         self.state.replanning = False
         target = str(e.get("target", "verification"))
-        model = self.registry.create("verify", [Check("target", target, status="active")])
+        unverified = e.get("status") == "unverified"
+        model = self.registry.create("verify", [Check("target", target, detail="unverified: no test command found" if unverified else "", status="pending" if unverified else "active")])
         self.state.verification = self._append("verify", model.render(), model)
         self._phase("TEMPER")
 
@@ -239,6 +241,8 @@ class EventAdapter:
         tokens = e.get("tokens") if isinstance(e.get("tokens"), dict) else {}
         self.state.tokens = int(tokens.get("input", 0)) + int(tokens.get("output", 0))
         self.state.cost_usd = float(e.get("cost_usd", 0))
+        self.state.usage_measured = e.get("measured") is True
+        self.state.cost_known = self.state.usage_measured and e.get("cost_source") in {"provider", "estimated"}
         self._sync_rail()
 
     def _run_done(self, e):
@@ -247,7 +251,10 @@ class EventAdapter:
         if status == "interrupted":
             self._append("interrupted", Text("  run interrupted", style=TOKENS["amber"]))
         elif status == "failed":
-            self._append("error", self.registry.create("error", "RUN FAILED", "The run failed."))
+            if e.get("verification_status") == "unverified":
+                self._append("unverified", Text("  unverified: no test command found", style=TOKENS["amber"]))
+            else:
+                self._append("error", self.registry.create("error", "RUN FAILED", "The run failed."))
         self.state.replanning = False
         if self.footer is not None:
             self.footer.set_live(False)

@@ -30,10 +30,67 @@ from typing import Self
 import httpx
 
 DEFAULT_BASE_URL = "http://127.0.0.1:3002"
+# Maximum UTF-8 bytes in one live NDJSON line, not including its newline.
+MAX_LIVE_LINE_BYTES = 1024 * 1024
+# Replay limits bound the accumulated body and number of top-level events only.
+MAX_REPLAY_BYTES = 8 * 1024 * 1024
+MAX_REPLAY_EVENTS = 10_000
 # Transport frames (BACKEND-SPEC Part 9): no ``seq`` — the app ignores them.
 # stream.ping is an idle keepalive; stream.done is the clean close marker.
 TRANSPORT_FRAMES = frozenset({"stream.ping", "stream.done"})
 TERMINAL_EVENTS = frozenset({"run.done", "run.error"})
+
+
+def is_app_event(value: object) -> bool:
+    """Check the minimal live/replay envelope, not the event payload or origin."""
+    return (
+        type(value) is dict
+        and type(value.get("type")) is str
+        and bool(value["type"])
+        and type(value.get("seq")) is int
+        and value["seq"] > 0
+    )
+
+
+def _unique_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON field")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError("non-finite JSON number")
+
+
+async def _bounded_live_lines(response: httpx.Response) -> AsyncIterator[bytes]:
+    """Frame identity-encoded NDJSON without retaining an unbounded partial line.
+
+    Reject an oversized frame rather than skipping it and silently advancing
+    the resume cursor past an event the TUI did not see. This bounds only this
+    parser's pending-line buffer, not HTTP transport allocation or replay.
+    """
+    pending = bytearray()
+    async for chunk in response.aiter_bytes():
+        start = 0
+        while start < len(chunk):
+            end = chunk.find(b"\n", start)
+            if end < 0:
+                end = len(chunk)
+                complete = False
+            else:
+                complete = True
+            if len(pending) + end - start > MAX_LIVE_LINE_BYTES:
+                raise ArcenStreamProtocolError("live stream frame exceeds byte limit")
+            pending.extend(memoryview(chunk)[start:end])
+            if complete:
+                yield bytes(pending)
+                pending.clear()
+            start = end + 1
+    if pending:
+        yield bytes(pending)
 
 
 class ArcenAPIError(RuntimeError):
@@ -43,6 +100,20 @@ class ArcenAPIError(RuntimeError):
         self.status = status
         self.detail = detail
         super().__init__(detail or f"ARCEN server returned HTTP {status}")
+
+
+class ArcenStreamProtocolError(ArcenAPIError):
+    """A stream must be stopped until the peer's protocol issue is corrected."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(0, detail)
+
+
+class ArcenReplayProtocolError(ArcenAPIError):
+    """Replay was not safely readable; no partial events are returned."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(0, detail)
 
 
 def new_session_id() -> str:
@@ -141,9 +212,38 @@ class ArcenClient:
         return data if isinstance(data, list) else []
 
     async def session_events(self, session: str) -> list[dict]:
-        """Full replay of one session (empty list for a fresh UUID — never 404)."""
-        data = await self._get_json(f"/api/sessions/{session}/events")
-        return data if isinstance(data, list) else []
+        """Read one bounded, identity-encoded replay; never return a partial list.
+
+        Bounds cover the accumulated response body and top-level event count,
+        not transport chunks, parsed-object expansion or total UI memory.
+        """
+        async with self._http.stream(
+            "GET", f"/api/sessions/{session}/events", headers={"Accept-Encoding": "identity"}
+        ) as response:
+            if response.status_code >= 400:
+                # Don't buffer a potentially unbounded error body for this route.
+                raise ArcenAPIError(response.status_code, "session replay request failed")
+            encoding = response.headers.get("content-encoding", "identity").strip().lower()
+            if encoding not in ("", "identity"):
+                raise ArcenReplayProtocolError("encoded session replay is not supported")
+            body = bytearray()
+            async for chunk in response.aiter_bytes():
+                if len(body) + len(chunk) > MAX_REPLAY_BYTES:
+                    raise ArcenReplayProtocolError("session replay exceeds byte limit")
+                body.extend(chunk)
+        try:
+            data = json.loads(
+                body.decode("utf-8", errors="strict"),
+                object_pairs_hook=_unique_pairs,
+                parse_constant=_reject_json_constant,
+            )
+        except (UnicodeDecodeError, ValueError, RecursionError):
+            raise ArcenReplayProtocolError("invalid session replay JSON") from None
+        if type(data) is not list:
+            raise ArcenReplayProtocolError("session replay must be a JSON array")
+        if len(data) > MAX_REPLAY_EVENTS:
+            raise ArcenReplayProtocolError("session replay exceeds event limit")
+        return data
 
     async def get_config(self) -> dict:
         data = await self._get_json("/api/config")
@@ -168,21 +268,27 @@ class ArcenClient:
         *,
         max_hold_retries: int = 100,
     ) -> AsyncIterator[dict]:
-        """Yield app events from the held NDJSON stream, forever-resumable.
+        """Yield app events from held NDJSON; retry transport errors when allowed.
 
-        Contract honored (same as the TypeScript reader):
+        Live-stream framing and reconnect behavior:
 
-        - malformed JSON lines are skipped, never fatal;
+        - malformed UTF-8 or duplicate-key JSON lines are skipped;
+        - oversized lines and non-identity content encodings fail the stream;
+        - app events require a nonempty string type and positive integer seq;
         - seq-less transport frames (``stream.ping``) are invisible;
         - ``stream.done`` ends the iteration cleanly;
-        - a 404 hold race is retried with backoff instead of surfacing;
-        - HTTP 409 (Last-Event-ID compacted away) restarts once from zero;
+        - a 404 hold race is retried up to the retry limit (no backoff here);
+        - HTTP 409 with a resume hint restarts at most once from zero;
+        - error responses are closed without buffering their bodies;
         - ``run.done`` / ``run.error`` are yielded and then the stream is
           expected to close; an unexpected EOF just ends the iterator.
         """
-        headers = {"Last-Event-ID": str(last_event_id)} if last_event_id is not None else {}
+        headers = {"Accept-Encoding": "identity"}
+        if last_event_id is not None:
+            headers["Last-Event-ID"] = str(last_event_id)
         url = f"/api/stream?session={session}"
         retries = 0
+        compacted_once = False
         seen_seq = last_event_id  # advances as events render → resume cursor
 
         while True:
@@ -195,44 +301,43 @@ class ArcenClient:
                         retries += 1
                         if retries > max_hold_retries:
                             raise ArcenAPIError(404, "session never became streamable")
-                        await response.aread()
+                        # The response context closes without reading an untrusted body.
                         continue
                     if response.status_code == 409:
-                        # Compaction horizon: drop the resume hint, replay fresh.
-                        headers.pop("Last-Event-ID", None)
-                        await response.aread()
+                        # Only one restart with a real resume hint is meaningful.
+                        # Repeated/no-hint 409 must not spin or mask a bad peer.
+                        if compacted_once or "Last-Event-ID" not in headers:
+                            raise ArcenStreamProtocolError(
+                                "stream compaction could not be resolved"
+                            )
+                        compacted_once = True
+                        headers.pop("Last-Event-ID")
+                        seen_seq = None
                         continue
                     if response.status_code >= 400:
-                        await response.aread()
-                        raise ArcenAPIError(
-                            response.status_code,
-                            self._detail(response) or "stream connection failed",
-                        )
+                        # The status is available without buffering an arbitrary
+                        # server-supplied (possibly compressed) error body.
+                        raise ArcenAPIError(response.status_code, "stream connection failed")
 
-                    buffer = ""
-                    async for chunk in response.aiter_text():
-                        buffer += chunk
-                        parts = buffer.split("\n")
-                        buffer = parts.pop()  # keep the partial line across chunks
-                        for line in parts:
-                            event = self._parse_line(line)
-                            if event is None:
-                                continue
-                            if event.get("type") == "stream.done":
-                                return
-                            if "seq" not in event:
-                                continue  # stream.ping and any future keepalive
-                            seen_seq = int(event.get("seq", seen_seq or 0))
-                            yield event
-                    if buffer.strip():
-                        event = self._parse_line(buffer)
-                        if (
-                            event is not None
-                            and event.get("type") != "stream.done"
-                            and "seq" in event
-                        ):
-                            seen_seq = int(event.get("seq", seen_seq or 0))
-                            yield event
+                    # Do not allow HTTP decompression to expand a small wire
+                    # chunk before the parser can apply its line limit.
+                    encoding = response.headers.get("content-encoding", "identity").strip().lower()
+                    if encoding not in ("", "identity"):
+                        raise ArcenStreamProtocolError("encoded live stream is not supported")
+                    async for raw_line in _bounded_live_lines(response):
+                        try:
+                            line = raw_line.decode("utf-8", errors="strict")
+                        except UnicodeDecodeError:
+                            continue
+                        event = self._parse_line(line)
+                        if event is None:
+                            continue
+                        if event.get("type") == "stream.done":
+                            return
+                        if not is_app_event(event):
+                            continue  # keepalives and malformed envelopes
+                        seen_seq = event["seq"]
+                        yield event
                     return
             except httpx.HTTPError as exc:
                 # Connection dropped mid-turn: reconnect and resume from the
@@ -251,7 +356,7 @@ class ArcenClient:
         if not line:
             return None
         try:
-            data = json.loads(line)
-        except json.JSONDecodeError:
+            data = json.loads(line, object_pairs_hook=_unique_pairs)
+        except (ValueError, RecursionError):
             return None
         return data if isinstance(data, dict) else None

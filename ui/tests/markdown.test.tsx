@@ -43,12 +43,16 @@ describe('F-09: markdown pipeline', () => {
   });
 
   it('copy button writes the RAW source and flips to copied for 1.5s', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
+    let resolveWrite!: () => void;
+    const pendingWrite = new Promise<void>((resolve) => { resolveWrite = resolve; });
+    const writeText = vi.fn().mockReturnValue(pendingWrite);
     Object.assign(navigator, { clipboard: { writeText } });
     render(<CopyButton text={'print("hello")\n'} />);
     fireEvent.click(screen.getByTestId('copy-btn'));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith('print("hello")\n'));
-    expect(screen.getByText('copied')).toBeInTheDocument();
+    expect(writeText).toHaveBeenCalledWith('print("hello")\n');
+    expect(screen.getByText('copy')).toBeInTheDocument();
+    resolveWrite();
+    expect(await screen.findByText('copied')).toBeInTheDocument();
     // reverts after 1.5s
     await waitFor(
       () => expect(screen.getByText('copy')).toBeInTheDocument(),

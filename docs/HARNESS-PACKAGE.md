@@ -59,6 +59,39 @@ The current runtime does not consume this package. The canonical package can be
 replayed and copied. Other guardrails, Docker-only isolation and all future
 trust/adoption gates remain mandatory.
 
+## Reading a signed package from local Git (H-05a, partial)
+
+A package may be manually committed as a plaintext file in a trusted local
+Git repository. This feature does not create commits or change any Git refs.
+Supply a **full lowercase Git commit ID**, a literal repository-relative ASCII
+path, the independently authenticated manifest ID and public key:
+
+```sh
+# Commit the exported file through your normal, reviewed Git workflow first.
+arcen harness package verify-git --repo /trusted/repo --commit "$COMMIT" \
+  --path packages/candidate.json --manifest "$MANIFEST" --public-key "$PUBLIC_KEY"
+
+# Optional: import objects only into an already initialized local store.
+arcen harness --store /trusted/destination package import-git \
+  --repo /trusted/repo --commit "$COMMIT" --path packages/candidate.json \
+  --manifest "$MANIFEST" --public-key "$PUBLIC_KEY"
+# Type exactly: IMPORT <the full manifest SHA-256>
+```
+
+The reader uses bounded local Git object reads, rejects symbolic/abbreviated
+refs, non-regular committed entries, pathspec syntax and packages over 10 MiB,
+then verifies the existing canonical package signature. It reads the committed
+blob, not the working tree, performs no checkout and does not invoke Git hooks
+or initiate network access. Every Git read requires `--no-lazy-fetch`; older
+Git versions that do not support it fail closed, and missing promisor objects
+are not fetched. `verify-git` creates no store; `import-git` requires
+TTY confirmation and retains the exact verified bytes across the prompt. The
+Git executable, repository and parent filesystem paths must be trusted against
+concurrent hostile mutation. A Git commit ID, parent claim or supplied key is
+not itself authenticated. The imported objects are plaintext and may remain as
+orphans on failure; neither Git nor ARCEN refs, lineage or adoption are changed.
+This is not a Git-backed object store, a trust root, or full H-05.
+
 ## Import boundary and failure behavior
 
 The CLI verifies the complete bounded package and signature using the supplied

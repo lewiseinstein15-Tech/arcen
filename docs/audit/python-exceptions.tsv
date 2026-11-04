@@ -1,0 +1,342 @@
+path	line	caught	flow-nodes	body (static syntax; not a verdict)
+scripts/repro_held_stream.py	68	Exception		reader_err.append(repr(exc)) | print(f'[reader] EXC {exc!r}', flush=True)
+scripts/repro_held_stream.py	88	Exception		print(f'  RAW {ln[:80]}')
+scripts/retake_04.py	31	Exception		time.sleep(0.3)
+scripts/retake_04.py	104	Exception		proc.kill()
+scripts/screenshots_v01.py	39	Exception		time.sleep(0.3)
+scripts/screenshots_v01.py	205	Exception	Pass	pass
+scripts/screenshots_v011.py	40	Exception		time.sleep(0.3)
+scripts/screenshots_v011.py	167	Exception		p.kill()
+scripts/screenshots_v012.py	58	urllib.error.HTTPError	Return	return True
+scripts/screenshots_v012.py	62	Exception		time.sleep(0.3)
+scripts/screenshots_v012.py	114	screenshot_guard.StaleTurnError	Return	check(f'{shot} guard: fresh turn', False, e.reason) | REFUSALS.append(shot) | print(f'  [REFUSED] {shot} screenshot — {e.reason}') | return
+scripts/screenshots_v012.py	258	Exception		p.kill()
+scripts/screenshots_v013.py	66	urllib.error.HTTPError	Return	return True
+scripts/screenshots_v013.py	68	Exception		time.sleep(0.3)
+scripts/screenshots_v013.py	100	Exception		events = []
+scripts/screenshots_v013.py	171	StaleTurnError	Return	check(f'{shot} guard: fresh turn', False, e.reason) | REFUSALS.append(shot) | print(f'  [REFUSED] {shot} screenshot — {e.reason}') | return False
+scripts/screenshots_v013.py	279	StaleTurnError		check('02 guard refuses a stale capture → exit non-zero', 'did not grow past baseline' in e.reason, e.reason[:110])
+scripts/screenshots_v013.py	329	Exception		p.kill()
+scripts/screenshots_v014.py	68	urllib.error.HTTPError	Return	return True
+scripts/screenshots_v014.py	70	Exception		time.sleep(0.3)
+scripts/screenshots_v014.py	86	Exception		events = []
+scripts/screenshots_v014.py	125	StaleTurnError	Return	check(f'{shot} guard: fresh turn', False, e.reason) | REFUSALS.append(shot) | print(f'  [REFUSED] {shot} screenshot — {e.reason}') | return False
+scripts/screenshots_v014.py	142	Exception	Pass	pass
+scripts/screenshots_v014.py	197	Exception	Pass	pass
+scripts/screenshots_v014.py	204	Exception		p.kill()
+scripts/screenshots_v014.py	339	Exception		outcome = f'no probe outcome at all ({type(e).__name__})'
+scripts/terminal_shot.py	88	EOFError	Return	await ws.close() | return
+scripts/terminal_shot.py	107	ProcessLookupError	Pass	pass
+scripts/tui_mock_sessions.py	43	ConnectionResetError	Break	break
+scripts/tui_mock_settings.py	55	ConnectionResetError	Break	break
+scripts/verify_shot.py	81	ImportError		print('cairosvg not installed — SVG written only', file=sys.stderr)
+scripts/verify_stream_fix.py	65	Exception		time.sleep(0.2)
+scripts/verify_stream_fix.py	121	Exception		time.sleep(0.5)
+scripts/verify_stream_fix.py	242	Exception	Pass	pass
+scripts/verify_stream_fix.py	248	subprocess.TimeoutExpired		vite.kill()
+scripts/verify_t031.py	46	Exception		time.sleep(0.3)
+scripts/verify_t031.py	200	Exception	Pass	pass
+scripts/verify_t032.py	38	Exception		time.sleep(0.3)
+scripts/verify_t032.py	170	Exception	Pass	pass
+scripts/verify_t033.py	34	Exception		time.sleep(0.3)
+scripts/verify_t033.py	128	Exception	Pass	pass
+scripts/verify_t034.py	38	Exception		time.sleep(0.3)
+scripts/verify_t034.py	164	Exception	Pass	pass
+scripts/verify_t035.py	34	Exception		time.sleep(0.3)
+scripts/verify_t035.py	136	Exception	Pass	pass
+scripts/verify_t036.py	35	Exception		time.sleep(0.3)
+scripts/verify_t036.py	141	Exception	Pass	pass
+scripts/verify_t037.py	40	Exception		time.sleep(0.2)
+scripts/verify_t037.py	85	Exception		p.kill()
+scripts/verify_t038.py	68	SandboxBackendError		check('no docker daemon' in str(exc) and 'sandbox.backend' in str(exc), 'backend=docker without docker → clear error naming the fix')
+scripts/verify_t038.py	73	Exception		check(False, f'backend=docker without docker → wrong error type: {exc}')
+scripts/verify_t038.py	106	Exception		time.sleep(0.2)
+scripts/verify_t038.py	119	Exception		proc.kill()
+scripts/verify_t055.py	199	Exception		ok_probe = False
+scripts/verify_v016.py	63	urllib.error.HTTPError	Return	return True
+scripts/verify_v016.py	65	Exception		time.sleep(0.3)
+scripts/verify_v016.py	272	Exception		baseline_seq = 0
+scripts/verify_v016.py	376	Exception		p.kill()
+src/arcen/agents/draft.py	197	ProviderError	Raise	raise
+src/arcen/agents/draft.py	199	Exception	Pass	pass
+src/arcen/agents/draft.py	321	ProviderError	Raise	raise
+src/arcen/agents/draft.py	323	Exception	Pass	pass
+src/arcen/agents/draft.py	389	ProviderError	Raise	raise
+src/arcen/agents/draft.py	391	Exception	Pass	pass
+src/arcen/agents/draft.py	395	ProviderError	Raise	raise
+src/arcen/agents/draft.py	397	Exception	Return	return None
+src/arcen/agents/forge.py	37	OSError	Return	return None
+src/arcen/config.py	366	ValidationError	Raise	if any((error['loc'] and error['loc'][0] == 'harnessing' for error in exc.errors(include_input=False))):     raise ValueError('invalid harnessing configuration: only enabled: false is supported') from None | raise
+src/arcen/config.py	380	OSError		warnings.warn(f'seeded config could not be written to {file}: {exc}', UserWarning, stacklevel=2)
+src/arcen/guardrails/policy.py	132	OSError	Raise	raise PolicyError('cannot read guardrail policy') from exc
+src/arcen/guardrails/policy.py	151	PolicyError	Raise	raise
+src/arcen/guardrails/policy.py	153	(UnicodeDecodeError, yaml.YAMLError, ValidationError, ValueError)	Raise	raise PolicyError(f'invalid guardrail policy: {exc}') from exc
+src/arcen/harness/attestation.py	41	ImportError	Raise	raise HarnessError('attestation requires the arcen[attestation] extra') from None
+src/arcen/harness/attestation.py	95	(UnicodeError, json.JSONDecodeError, RecursionError)	Raise	raise HarnessError('invalid attestation') from None
+src/arcen/harness/attestation.py	136	(invalid_signature, ValueError)	Raise	raise HarnessError('attestation signature verification failed') from None
+src/arcen/harness/budget.py	124	BaseException	Raise	self.stop() | raise
+src/arcen/harness/campaign_journal.py	75	FileExistsError	Raise	if not stat.S_ISREG(self.path.lstat().st_mode):     raise HarnessError('campaign database must be a regular file')
+src/arcen/harness/campaign_journal.py	78	OSError	Raise	raise HarnessError('cannot create campaign database') from None
+src/arcen/harness/campaign_journal.py	219	sqlite3.Error	Raise	raise HarnessError('cannot open campaign database') from None
+src/arcen/harness/campaign_journal.py	251	UnicodeError	Raise	raise HarnessError('invalid campaign task') from None
+src/arcen/harness/campaign_journal.py	352	(TypeError, ValueError)	Raise	raise HarnessError('invalid campaign record') from None
+src/arcen/harness/canary.py	147	(OSError, ValueError)	Raise	raise HarnessError('cannot prepare reviewed Git snapshot') from None
+src/arcen/harness/canary.py	161	(ProbeUnavailable, BudgetExhausted)	Return	findings.append(CanaryFinding(case.id, 'inconclusive', 'not-run')) | return report('inconclusive')
+src/arcen/harness/canary.py	175	(ProbeUnavailable, BudgetExhausted)	Return	findings.append(CanaryFinding(case.id, 'passed', 'inconclusive')) | return report('inconclusive')
+src/arcen/harness/cli.py	94	UnicodeDecodeError	Raise	raise HarnessError(f'non-UTF-8 component: {name}') from exc
+src/arcen/harness/cli.py	197	EOFError	Raise	raise HarnessError('review decision cancelled') from None
+src/arcen/harness/cli.py	321	(EOFError, KeyboardInterrupt)	Raise	raise HarnessError('task creation cancelled') from None
+src/arcen/harness/cli.py	741	(EOFError, KeyboardInterrupt)	Raise	raise HarnessError('package import cancelled') from None
+src/arcen/harness/cli.py	841	(HarnessError, OSError, sqlite3.Error)	Return	print(f'harness: {exc}', file=sys.stderr) | return 1
+src/arcen/harness/comparison.py	142	Exception	Raise	raise ProbeUnavailable('comparison judge failed; no judgment accepted') from None
+src/arcen/harness/conflict_resolution.py	81	Exception	Raise	raise HarnessError('conflict editor failed; no draft accepted') from None
+src/arcen/harness/conflict_resolution.py	92	(ValueError, UnicodeError, HarnessError)	Raise	raise HarnessError('conflict editor returned an invalid replacement') from None
+src/arcen/harness/database_audit.py	41	FileNotFoundError	Continue	continue
+src/arcen/harness/database_audit.py	43	OSError	Raise	raise HarnessError(f'cannot inspect auxiliary database: {name}') from None
+src/arcen/harness/database_audit.py	79	(sqlite3.Error, OSError, HarnessError)	Raise	raise HarnessError(f'invalid auxiliary database: {name}') from None
+src/arcen/harness/durable_budget.py	124	FileExistsError	Raise	if not stat.S_ISREG(self.path.lstat().st_mode):     raise HarnessError('budget database must be a regular file')
+src/arcen/harness/durable_budget.py	127	OSError	Raise	raise HarnessError('cannot create budget database') from None
+src/arcen/harness/durable_budget.py	194	sqlite3.Error	Raise	raise HarnessError('cannot open budget database') from None
+src/arcen/harness/durable_trial_slots.py	96	FileExistsError	Pass	pass
+src/arcen/harness/durable_trial_slots.py	98	OSError	Raise	raise HarnessError('cannot create durable trial slot database') from None
+src/arcen/harness/durable_trial_slots.py	139	(sqlite3.Error, OSError)	Raise	raise HarnessError('durable trial slot database unavailable') from None
+src/arcen/harness/durable_trial_slots.py	212	BaseException	Raise	try:     self._release(token) except BaseException:     with suppress(Exception):         self.budget.stop()     raise | raise
+src/arcen/harness/durable_trial_slots.py	215	BaseException	Raise	with suppress(Exception):     self.budget.stop() | raise
+src/arcen/harness/durable_trial_slots.py	216	SUPPRESS		suppress(Exception)
+src/arcen/harness/durable_trial_slots.py	222	BaseException	Raise	with suppress(Exception):     self.budget.stop() | raise
+src/arcen/harness/durable_trial_slots.py	223	SUPPRESS		suppress(Exception)
+src/arcen/harness/durable_trial_slots.py	229	BaseException	Raise	with suppress(Exception):     self.budget.stop() | raise
+src/arcen/harness/durable_trial_slots.py	230	SUPPRESS		suppress(Exception)
+src/arcen/harness/editor.py	54	UnicodeDecodeError	Raise	raise HarnessError('component must be UTF-8') from exc
+src/arcen/harness/editor.py	190	(json.JSONDecodeError, ValueError)	Raise	raise HarnessError('invalid editor JSON') from exc
+src/arcen/harness/evidence_composition.py	103	UnicodeError	Raise	raise HarnessError('candidate component is not UTF-8') from None
+src/arcen/harness/experience.py	54	UnicodeError	Raise	raise HarnessError('lesson must be valid UTF-8') from None
+src/arcen/harness/experience.py	138	(ValueError, TypeError, ArithmeticError, KeyError)	Raise	raise HarnessError('invalid experience record') from None
+src/arcen/harness/experience.py	164	(ValueError, TypeError)	Raise	raise HarnessError('invalid experience record') from None
+src/arcen/harness/experience_cli_store.py	60	FileNotFoundError	Return	return False
+src/arcen/harness/experience_cli_store.py	96	ImportError	Raise	raise HarnessError('experience CLI requires filesystem locking support') from None
+src/arcen/harness/experience_cli_store.py	106	OSError	Raise	raise HarnessError('cannot open experience lock') from None
+src/arcen/harness/experience_cli_store.py	113	OSError	Raise	raise HarnessError('experience database is busy; retry later') from None
+src/arcen/harness/experience_cli_store.py	123	OSError	Raise	raise HarnessError('cannot create experience database') from None
+src/arcen/harness/git_package.py	81	HarnessError	Raise	raise
+src/arcen/harness/git_package.py	83	(WorkspaceError, OSError, UnicodeError, ValueError, RuntimeError)	Raise	raise HarnessError('cannot read committed package') from None
+src/arcen/harness/judge.py	152	(json.JSONDecodeError, ValueError)	Raise	raise HarnessError('invalid judge JSON') from exc
+src/arcen/harness/lineage.py	91	FileExistsError	Raise	if not stat.S_ISREG(self.path.lstat().st_mode):     raise HarnessError('lineage database must be a regular file')
+src/arcen/harness/lineage.py	94	OSError	Raise	raise HarnessError('cannot create lineage database') from exc
+src/arcen/harness/lineage.py	114	sqlite3.Error	Raise	raise HarnessError('cannot open lineage database') from exc
+src/arcen/harness/lineage.py	236	sqlite3.IntegrityError	Raise	raise HarnessError('lineage edge already recorded') from exc
+src/arcen/harness/lineage.py	301	(ValueError, TypeError)	Raise	raise HarnessError('invalid lineage metadata') from exc
+src/arcen/harness/manifest.py	51	OSError	Raise	raise HarnessError(f'cannot read manifest resource: {name}') from exc
+src/arcen/harness/manifest.py	76	(UnicodeDecodeError, tomllib.TOMLDecodeError)	Raise	raise HarnessError('invalid harness manifest') from exc
+src/arcen/harness/manual_campaign.py	205	CampaignStopped	Return	return result('stopped')
+src/arcen/harness/manual_campaign.py	207	SensitiveSnapshot	Return	return result('workspace_sensitive')
+src/arcen/harness/manual_campaign.py	209	Exception	Raise	if journal is not None:     journal.fail(campaign_id) | raise
+src/arcen/harness/manual_campaign.py	217	TrialConcurrencyFull	Return	return result('concurrency_full')
+src/arcen/harness/manual_campaign.py	219	BudgetExhausted	Return	return result('budget_closed')
+src/arcen/harness/manual_campaign.py	221	ProbeUnavailable	Return	progress.emit('harness.probe.done', candidate_id=baseline_id, role='reference', status='unavailable') | return result('reference_isolation_failed')
+src/arcen/harness/manual_campaign.py	243	CampaignStopped	Return	return result('stopped')
+src/arcen/harness/manual_campaign.py	252	CampaignStopped	Return	return result('stopped', candidate)
+src/arcen/harness/manual_campaign.py	254	TrialConcurrencyFull	Return	return result('concurrency_full', candidate)
+src/arcen/harness/manual_campaign.py	256	BudgetExhausted	Return	return result('budget_closed', candidate)
+src/arcen/harness/manual_campaign.py	258	ProbeUnavailable	Return	progress.emit('harness.probe.done', candidate_id=candidate, role='candidate', status='unavailable') | return result('candidate_isolation_failed', candidate)
+src/arcen/harness/manual_campaign.py	282	CampaignStopped	Return	return result('stopped', candidate)
+src/arcen/harness/manual_campaign.py	297	Exception	Return	return result('budget_closed' if budget.snapshot().stopped else 'judge_failed', candidate)
+src/arcen/harness/manual_campaign.py	314	CampaignStopped	Return	return result('stopped', candidate)
+src/arcen/harness/manual_campaign.py	316	BudgetExhausted	Return	return result('budget_closed', candidate)
+src/arcen/harness/manual_campaign.py	318	Exception	Return	return result('review_record_failed', candidate)
+src/arcen/harness/manual_cli.py	45	OSError	Raise	raise HarnessError('cannot read input file') from None
+src/arcen/harness/manual_cli.py	51	UnicodeError	Raise	raise HarnessError('input file must be UTF-8') from None
+src/arcen/harness/manual_cli.py	80	Exception	Raise	raise HarnessError('invalid campaign configuration') from None
+src/arcen/harness/manual_cli.py	88	(EOFError, KeyboardInterrupt)	Raise	raise HarnessError('campaign cancelled') from None
+src/arcen/harness/manual_cli.py	198	ProbeModelError	Raise	raise HarnessError('model preflight rejected sensitive or invalid input') from None
+src/arcen/harness/manual_cli.py	202	ValueError	Raise	raise HarnessError('invalid provider endpoint') from None
+src/arcen/harness/manual_cli.py	265	(EOFError, KeyboardInterrupt)	Raise	raise HarnessError('judge cancelled') from None
+src/arcen/harness/manual_cli.py	374	ProbeModelError	Raise	raise HarnessError('model preflight rejected sensitive or invalid input') from None
+src/arcen/harness/manual_cli.py	383	Exception	Raise	raise HarnessError('editor input contains invalid or sensitive component data') from None
+src/arcen/harness/manual_cli.py	421	ProbeModelError	Raise	raise HarnessError('selected experience contains sensitive or invalid data') from None
+src/arcen/harness/manual_cli.py	428	ValueError	Raise	raise HarnessError('invalid provider endpoint') from None
+src/arcen/harness/manual_cli.py	482	Exception	Raise	raise HarnessError('editor generation failed; inspect budget usage before retrying') from None
+src/arcen/harness/manual_cli.py	569	WorkspaceError	Raise	raise HarnessError('repository/commit preflight failed; inspect the Git snapshot') from None
+src/arcen/harness/manual_cli.py	607	(EOFError, KeyboardInterrupt)	Raise	raise HarnessError('workflow cancelled after editor; generated objects may remain') from None
+src/arcen/harness/manual_cli.py	711	(EOFError, KeyboardInterrupt)	Raise	raise HarnessError('experience recording cancelled') from None
+src/arcen/harness/manual_cli.py	767	ProbeModelError	Raise	raise HarnessError('reflection preflight rejected sensitive or invalid input') from None
+src/arcen/harness/manual_cli.py	771	ValueError	Raise	raise HarnessError('invalid provider endpoint') from None
+src/arcen/harness/manual_cli.py	821	Exception	Raise	raise HarnessError('reflection failed; inspect budget before retrying') from None
+src/arcen/harness/manual_cli.py	875	ProbeModelError	Raise	raise HarnessError('composite test preflight rejected invalid or sensitive inputs') from None
+src/arcen/harness/manual_cli.py	945	(EOFError, KeyboardInterrupt)	Raise	cancelled = True | raise HarnessError('campaign cancelled') from None
+src/arcen/harness/manual_cli.py	963	HarnessError	Raise	if cancelled:     raise HarnessError('campaign cancelled') from None | raise
+src/arcen/harness/manual_cli.py	1076	ProbeModelError	Raise	raise HarnessError('canary preflight rejected sensitive or invalid input') from None
+src/arcen/harness/manual_cli.py	1083	ValueError	Raise	raise HarnessError('invalid provider endpoint') from None
+src/arcen/harness/manual_cli.py	1198	ProbeModelError	Raise	raise HarnessError('portability preflight rejected sensitive or invalid input') from None
+src/arcen/harness/manual_cli.py	1212	ValueError	Raise	raise HarnessError('invalid provider endpoint') from None
+src/arcen/harness/manual_cli.py	1256	(EOFError, KeyboardInterrupt)	Raise	raise HarnessError('judge cancelled') from None
+src/arcen/harness/model.py	47	(UnicodeError, json.JSONDecodeError)	Raise	raise HarnessError('invalid stored manifest') from exc
+src/arcen/harness/package.py	44	(ValueError, binascii.Error)	Raise	raise HarnessError('invalid package data') from None
+src/arcen/harness/package.py	56	(ValueError, TypeError, RecursionError, UnicodeError)	Raise	raise HarnessError('invalid package data') from None
+src/arcen/harness/package.py	97	(UnicodeError, ValueError, RecursionError)	Raise	raise HarnessError('invalid package') from None
+src/arcen/harness/package.py	197	FileExistsError	Raise	raise HarnessError('package output already exists') from None
+src/arcen/harness/package.py	199	OSError	Raise	raise HarnessError('cannot write package output') from None
+src/arcen/harness/package.py	205	FileNotFoundError	Pass	pass
+src/arcen/harness/parallel_trials.py	162	Exception		succeeded = False
+src/arcen/harness/parallel_trials.py	190	TrialConcurrencyFull	Return	return TrialAttempt(identifier, 'concurrency_full', None)
+src/arcen/harness/parallel_trials.py	192	BudgetExhausted	Return	return TrialAttempt(identifier, 'budget_closed', None)
+src/arcen/harness/parallel_trials.py	194	ProbeUnavailable	Return	stop_budget() | return TrialAttempt(identifier, 'unavailable', None)
+src/arcen/harness/parallel_trials.py	197	Exception	Return	stop_budget() | return TrialAttempt(identifier, 'unavailable', None)
+src/arcen/harness/parallel_trials.py	217	Exception	Return	stop_budget() | return ParallelTrials(reference, (), candidate_ids, 'scheduler_unavailable', snapshot.sha256, stop_status())
+src/arcen/harness/parallel_trials.py	226	BudgetExhausted	Break	stop_reason = 'budget_closed' | break
+src/arcen/harness/parallel_trials.py	234	Exception	Break	stop_budget() | stop_reason = 'scheduler_unavailable' | break
+src/arcen/harness/portability.py	65	Exception	Raise	raise HarnessError('unable to verify both local Docker image IDs') from None
+src/arcen/harness/probe_execution.py	144	UnicodeError	Return	return {'ok': False, 'result': None, 'error': 'invalid probe command'}
+src/arcen/harness/probe_execution.py	158	BudgetExhausted	Return	return {'ok': False, 'result': None, 'error': 'shared probe budget closed'}
+src/arcen/harness/probe_execution.py	171	ValidationError	Raise	raise HarnessError('invalid probe configuration') from None
+src/arcen/harness/probe_execution.py	310	ProviderError		status = 'error'
+src/arcen/harness/probe_execution.py	312	Exception		status = 'error'
+src/arcen/harness/probe_execution.py	340	Exception	Raise	raise ProbeUnavailable('reviewed probe isolation or cleanup failed; no result accepted') from None
+src/arcen/harness/probe_hygiene.py	35	UnicodeError	Raise	raise ProbeUnavailable('invalid known-secret configuration') from None
+src/arcen/harness/probe_model.py	49	UnicodeError	Raise	raise ProbeModelError('probe model input must be UTF-8') from None
+src/arcen/harness/probe_model.py	147	BudgetExhausted	Raise	raise ProbeModelError('shared probe budget exhausted') from None
+src/arcen/harness/probe_model.py	168	ProbeModelError	Raise	raise
+src/arcen/harness/probe_model.py	170	Exception	Raise	raise ProbeModelError('probe model call failed') from None
+src/arcen/harness/probe_model.py	201	UnicodeError	Raise	raise HarnessError('invalid sensitive values') from None
+src/arcen/harness/probe_model.py	215	ValidationError	Raise	raise HarnessError('invalid probe provider configuration') from None
+src/arcen/harness/probe_workspace.py	74	OSError	Raise	raise WorkspaceError('cannot start local Git') from exc
+src/arcen/harness/probe_workspace.py	97	(WorkspaceError, subprocess.TimeoutExpired)	Pass,Raise	if proc.poll() is None:     try:         os.killpg(proc.pid, signal.SIGKILL)     except ProcessLookupError:         pass     proc.wait() | if isinstance(exc, WorkspaceError):     raise | raise WorkspaceError('Git snapshot timed out') from exc
+src/arcen/harness/probe_workspace.py	101	ProcessLookupError	Pass	pass
+src/arcen/harness/probe_workspace.py	112	ProcessLookupError	Pass	pass
+src/arcen/harness/probe_workspace.py	180	OSError	Raise	raise WorkspaceError('cannot read repository') from exc
+src/arcen/harness/probe_workspace.py	232	(tarfile.TarError, OSError, UnicodeError, ValueError)	Raise	if isinstance(exc, WorkspaceError):     raise | raise WorkspaceError('invalid Git archive') from exc
+src/arcen/harness/probe_workspace.py	307	(tarfile.TarError, OSError, UnicodeError, ValueError)	Raise	if isinstance(exc, WorkspaceError):     raise | raise WorkspaceError('invalid Git snapshot archive') from exc
+src/arcen/harness/progress.py	60	Exception	Return	return
+src/arcen/harness/resolver.py	58	OSError	Raise	raise HarnessError(f'cannot read prompt {name}') from exc
+src/arcen/harness/resolver.py	68	UnicodeDecodeError	Raise	raise HarnessError(f'prompt {name} is not UTF-8') from exc
+src/arcen/harness/resolver.py	98	ValueError	Raise	raise HarnessError(f'invalid template {name}') from exc
+src/arcen/harness/review.py	62	FileExistsError	Raise	if not stat.S_ISREG(self.path.lstat().st_mode):     raise HarnessError('review database must be a regular file')
+src/arcen/harness/review.py	65	OSError	Raise	raise HarnessError('cannot create review database') from None
+src/arcen/harness/review.py	146	sqlite3.Error	Raise	raise HarnessError('cannot open review database') from None
+src/arcen/harness/review.py	236	sqlite3.IntegrityError	Raise	raise HarnessError('a pending review for these manifests already exists') from None
+src/arcen/harness/store.py	31	OSError	Raise	raise HarnessError('cannot create harness store') from exc
+src/arcen/harness/store.py	53	OSError	Raise	raise HarnessError('cannot read stored object') from exc
+src/arcen/harness/store.py	78	FileExistsError		self.get_blob(digest)
+src/arcen/harness/store.py	81	OSError	Raise	raise HarnessError('cannot write stored object') from exc
+src/arcen/harness/store.py	87	FileNotFoundError	Pass	pass
+src/arcen/harness/task_bank.py	49	UnicodeError	Raise	raise HarnessError('task must be UTF-8') from None
+src/arcen/harness/task_bank.py	74	FileExistsError	Raise	if not stat.S_ISREG(self.path.lstat().st_mode):     raise HarnessError('task database must be a regular file')
+src/arcen/harness/task_bank.py	77	OSError	Raise	raise HarnessError('cannot create task database') from None
+src/arcen/harness/task_bank.py	136	sqlite3.Error	Raise	raise HarnessError('cannot open task database') from None
+src/arcen/harness/task_bank.py	199	UnicodeError	Raise	raise HarnessError('invalid task object') from None
+src/arcen/headless.py	134	Exception		result = {'schema_version': SCHEMA_VERSION, 'run_id': None, 'session_id': None, 'status': 'error', 'answer': None, 'error': {'code': 'HEADLESS_FAILED', 'message': str(exc)}, 'events': [], 'workspace_mode': 'snapshot_requested' if args.workspace is not None else 'empty'}
+src/arcen/llm/client.py	295	Exception		cost = 0.0
+src/arcen/llm/client.py	305	Exception	Break,Raise	last_exc = exc | status, brief, kind = classify_provider_failure(exc) | if first is None:     first = (status, brief, kind) | if kind == 'timeout':     raise ProviderError(format_provider_error(status, brief, kind, kwargs.get('timeout')), status=None) from exc | if status is not None and status in NO_RETRY_STATUSES:     raise ProviderError(format_provider_error(status, brief, kind), status=status) from exc | transient = status is None or status in RETRYABLE_STATUSES | if not transient or attempt >= self.max_retries:     break | time.sleep(self.retry_backoff_seconds * 2 ** attempt)
+src/arcen/mcp/bridge.py	41	Exception	Return	return {'ok': False, 'result': None, 'error': str(exc)}
+src/arcen/mcp/client.py	93	Exception	Return	self._session = None | self.tools = [] | self.state = STATE_DECLARATIVE | self.error = f'handshake failed: {exc}' | return False
+src/arcen/mcp/client.py	125	Exception	Return	return {'ok': False, 'result': None, 'error': str(exc)}
+src/arcen/mcp/client.py	161	Exception	Raise	await stack.aclose() | raise
+src/arcen/mcp/client.py	232	Exception	Pass	pass
+src/arcen/plugins/loader.py	85	Exception	Continue	self.errors.append({'plugin': module_file.stem, 'error': f'import failed: {exc}'}) | continue
+src/arcen/plugins/loader.py	131	RuntimeError		loop = None
+src/arcen/plugins/loader.py	145	Exception	Raise	self.errors.append({'plugin': plugin_name, 'hook': hook_name, 'error': str(exc)}) | self.hooks[hook_name].pop(plugin_name, None) | if fail_closed:     raise
+src/arcen/sandbox/runtime.py	88	Exception	Return	return None
+src/arcen/sandbox/runtime.py	105	Exception		present = False
+src/arcen/sandbox/runtime.py	275	Exception		self._degrade_to_process(reason=f'container create failed: {exc} — falling back to process')
+src/arcen/sandbox/runtime.py	298	Exception	Return	return {'ok': False, 'result': None, 'error': str(exc)}
+src/arcen/sandbox/runtime.py	321	subprocess.TimeoutExpired	Return	return {'ok': False, 'result': None, 'error': f'timed out after {timeout_s}s'}
+src/arcen/sandbox/runtime.py	340	Exception	Pass	pass
+src/arcen/sandbox/runtime.py	350	Exception	Return	log.warning('sandbox %s pull of %s failed: %s', self.id, self.image, exc) | return False
+src/arcen/sandbox/runtime.py	404	Exception	Pass	pass
+src/arcen/sandbox/runtime.py	408	Exception	Pass	pass
+src/arcen/sandbox/runtime.py	438	PermissionError	Return	return {'ok': False, 'result': None, 'error': str(exc)}
+src/arcen/sandbox/turn.py	72	(WorkspaceError, OSError)	Raise	raise IsolationUnavailable(f'Workspace snapshot rejected: {exc}') from exc
+src/arcen/sandbox/turn.py	140	Exception	Raise	raise WorkspaceError('isolated workspace import failed') from exc
+src/arcen/sandbox/turn.py	142	BaseException	Raise	if self._container is not None:     try:         self.close(strict=True)     except IsolationUnavailable:         log.error('Docker setup cleanup unconfirmed for %s', container_name)         raise IsolationUnavailable(f'Docker setup failed and container cleanup could not be confirmed; tool execution is disabled. Inspect the Docker daemon for orphaned containers named {container_name}.') from None elif run_attempted:     log.error('Docker creation outcome unconfirmed for %s', container_name)     raise IsolationUnavailable(f'Docker container creation outcome could not be confirmed; tool execution is disabled. Inspect the Docker daemon for {container_name}.') from None | if not isinstance(exc, Exception):     raise | if isinstance(exc, WorkspaceError):     raise IsolationUnavailable('Workspace import failed inside the isolated container; tool execution is disabled.') from None | raise IsolationUnavailable('Docker isolation unavailable; tool execution is disabled. Ensure the Docker daemon is running and the configured sandbox image is installed.') from None
+src/arcen/sandbox/turn.py	146	IsolationUnavailable	Raise	log.error('Docker setup cleanup unconfirmed for %s', container_name) | raise IsolationUnavailable(f'Docker setup failed and container cleanup could not be confirmed; tool execution is disabled. Inspect the Docker daemon for orphaned containers named {container_name}.') from None
+src/arcen/sandbox/turn.py	243	Exception	Return	return {'ok': False, 'result': None, 'error': str(exc)}
+src/arcen/sandbox/turn.py	253	Exception	Raise	if strict:     log.error('Failed to remove isolated turn container')     raise IsolationUnavailable('isolated container cleanup failed') from None | log.exception('Failed to remove isolated turn container')
+src/arcen/server/app.py	220	Exception	Pass	pass
+src/arcen/server/app.py	396	IsolationUnavailable		emit(RunError(seq=0, code='SANDBOX_UNAVAILABLE', message=str(exc), ts=0.0))
+src/arcen/server/app.py	398	ProviderError		emit(RunError(seq=0, code='PROVIDER_ERROR', message=str(exc), ts=0.0))
+src/arcen/server/app.py	404	Exception		emit(RunError(seq=0, code='TURN_FAILED', message=str(exc), ts=0.0))
+src/arcen/server/app.py	410	Exception		emit_now(RunError(seq=0, code='SANDBOX_CLEANUP_UNCONFIRMED', message='Isolated container cleanup could not be confirmed; inspect the Docker daemon.', ts=0.0))
+src/arcen/server/app.py	504	ValueError	Return	return 0
+src/arcen/server/app.py	593	asyncio.TimeoutError	Continue,Return	if terminal and (not STATE.active_runs.get(session)):     yield STREAM_DONE_LINE     return | yield STREAM_PING_LINE | continue
+src/arcen/server/app.py	646	ValidationError	Raise	raise HTTPException(status_code=422, detail='invalid configuration') from None
+src/arcen/server/app.py	651	HarnessError	Raise	raise HTTPException(status_code=422, detail=str(exc)) from exc
+src/arcen/server/app.py	725	Exception	Return	status, brief, kind = classify_provider_failure(exc) | message = format_provider_error(status, brief, kind, kwargs['timeout'], use_hint=True) | if api_key:     message = message.replace(api_key, '<redacted>') | return {'ok': False, 'error': message[:300]}
+src/arcen/server/app.py	758	ValueError	Raise	raise HTTPException(status_code=400, detail='invalid session id') from None
+src/arcen/session/store.py	58	json.JSONDecodeError		skipped += 1
+src/arcen/session/store.py	78	Exception		invalid += 1
+src/arcen/skills/loader.py	101	OSError	Return	return None
+src/arcen/skills/loader.py	108	yaml.YAMLError	Return	return None
+src/arcen/skills/loader.py	131	yaml.YAMLError		metadata = {}
+src/arcen/stream/events.py	351	json.JSONDecodeError	Raise	raise EventError(f'malformed NDJSON line: {exc}') from exc
+src/arcen/stream/events_v2.py	120	(HarnessError, TypeError, ValueError, OverflowError, KeyError)	Raise	raise EventError('invalid v2 progress event') from None
+src/arcen/stream/events_v2.py	138	(OverflowError, ValueError)		valid_ts = False
+src/arcen/stream/events_v2.py	155	(UnicodeError, ValueError)	Raise	raise EventError('invalid v2 progress line') from None
+src/arcen/stream/events_v2.py	197	(OverflowError, ValueError)		valid_now = False
+src/arcen/tools/bash.py	41	Exception	Return	return _err(f'invalid args: {exc}')
+src/arcen/tools/bash.py	51	subprocess.TimeoutExpired	Return	return _err(f'command timed out after {a.timeout_s}s')
+src/arcen/tools/bash.py	53	Exception	Return	return _err(str(exc))
+src/arcen/tools/http.py	79	ValueError	Pass	pass
+src/arcen/tools/registry.py	84	Exception	Return	return _err(f'invalid args: {exc}')
+src/arcen/tools/registry.py	88	Exception	Return	return _err(str(exc))
+src/arcen/tools/registry.py	148	Exception	Raise	raise RegistryError(f'tool {name!r}: schema generation failed: {exc}') from exc
+src/arcen/tools/registry.py	161	Exception	Return	return _err(f'tool {name!r} raised: {exc}')
+src/arcen/tools/search.py	47	OSError	Continue	continue
+src/arcen/tools/search.py	107	OSError	Continue	continue
+src/arcen/tools/search.py	143	OSError	Continue	continue
+src/arcen/tui/__init__.py	14	ImportError	Raise	raise SystemExit("ARCEN TUI needs the optional Textual dependency.\nInstall it with: pip install 'arcen[tui]'") from None
+src/arcen/tui/adapter.py	148	KeyError	Return	return
+src/arcen/tui/client.py	165	(json.JSONDecodeError, ValueError)	Return	return None
+src/arcen/tui/client.py	183	httpx.HTTPError	Return	return False
+src/arcen/tui/client.py	189	(json.JSONDecodeError, ValueError)	Return	return False
+src/arcen/tui/client.py	240	(UnicodeDecodeError, ValueError, RecursionError)	Raise	raise ArcenReplayProtocolError('invalid session replay JSON') from None
+src/arcen/tui/client.py	330	UnicodeDecodeError	Continue	continue
+src/arcen/tui/client.py	342	httpx.HTTPError	Continue,Raise	retries += 1 | if retries > max_hold_retries:     raise ArcenAPIError(0, f'stream kept dropping: {exc}') from exc | if seen_seq is not None:     headers['Last-Event-ID'] = str(seen_seq) | continue
+src/arcen/tui/client.py	360	(ValueError, RecursionError)	Return	return None
+src/arcen/tui/demo.py	225	TimeoutError	Pass	pass
+src/arcen/tui/harness_progress.py	78	(HarnessError, TypeError, KeyError, ValueError, OverflowError)	Return	return False
+src/arcen/tui/harness_progress.py	108	EventError	Return	return
+src/arcen/tui/launcher.py	62	OSError	Continue	continue
+src/arcen/tui/launcher.py	72	httpx.HTTPError	Return	return False
+src/arcen/tui/launcher.py	78	(ValueError, httpx.DecodingError)	Return	return False
+src/arcen/tui/launcher.py	142	subprocess.TimeoutExpired		process.kill() | process.wait(timeout=5)
+src/arcen/tui/live.py	146	asyncio.CancelledError	Pass	pass
+src/arcen/tui/live.py	253	(ArcenAPIError, httpx.HTTPError, OSError)	Return	self._notice(f'sessions unavailable: {exc}') | return
+src/arcen/tui/live.py	270	(ArcenAPIError, httpx.HTTPError, OSError)	Return	self._notice(f'sessions unavailable: {exc}') | return
+src/arcen/tui/live.py	285	(ArcenAPIError, httpx.HTTPError, OSError)	Return	self._notice(f'session replay unavailable: {exc}') | return
+src/arcen/tui/live.py	324	(ArcenAPIError, httpx.HTTPError, OSError, TimeoutError)		self.busy = False | detail = str(exc) or 'stream could not connect in time' | self.narration.push(error_card('SUBMIT', detail, 'Your draft was preserved.'))
+src/arcen/tui/live.py	346	(OSError, ValueError)		self._notice(f'editor unavailable: {exc}; draft preserved')
+src/arcen/tui/live.py	371	(ArcenAPIError, httpx.HTTPError, OSError)		self.narration.push(error_card('INTERRUPT', str(exc), 'The run may still be active.'))
+src/arcen/tui/live.py	387	ArcenReplayProtocolError	Return	self.online = False | self._stream_halted = True | self.header.update_meta(quarantine='replay halted · blocked') | self.footer.set_live(False) | self._notice(f'session replay halted: {exc}; inspect server before reconnecting') | return
+src/arcen/tui/live.py	394	(ArcenAPIError, httpx.HTTPError, OSError)		self._notice(f'session replay unavailable: {exc}')
+src/arcen/tui/live.py	424	(ArcenAPIError, httpx.HTTPError, OSError)		self.header.update_meta(quarantine='connected · sandbox unknown')
+src/arcen/tui/live.py	452	ArcenStreamProtocolError	Return	self.online = False | self._stream_halted = True | self.header.update_meta(quarantine='stream halted · blocked') | self.footer.set_live(False) | self._notice(f'stream halted: {exc}; inspect server before reconnecting') | return
+src/arcen/tui/live.py	459	(ArcenAPIError, httpx.HTTPError, OSError)		self._notice(f'stream disconnected; reconnecting: {exc}')
+src/arcen/tui/live.py	479	ValueError		parser.error('--session must be a valid UUID')
+src/arcen/tui/modals.py	36	ValueError	Return	return '<configured>'
+src/arcen/tui/modals.py	129	(ArcenAPIError, httpx.HTTPError, OSError, ValueError)		items.append(Text(f'Configuration unavailable: {exc}', style=TOKENS['rose']))
+src/arcen/tui/modals.py	135	(ArcenAPIError, httpx.HTTPError, OSError, ValueError)		items.append(Text(f'Sandbox unavailable: {exc}', style=TOKENS['rose']))
+src/arcen/tui/modals.py	249	(ArcenAPIError, httpx.HTTPError, OSError, ValueError)		status.update(f'Save failed: {exc}')
+src/arcen/tui/views/rail.py	113	ValueError	Pass	pass
+tests/_tui_snapshot.py	30	ImportError	Return	return None
+tests/mcp_test_server.py	118	json.JSONDecodeError	Continue	print(json.dumps({'jsonrpc': '2.0', 'id': None, 'error': {'code': -32700, 'message': f'Parse error: {exc}'}}, separators=(',', ':')), flush=True) | continue
+tests/test_campaign_journal.py	55	HarnessError	Return	return False
+tests/test_campaign_journal.py	319	HarnessError	Return	return False
+tests/test_durable_budget.py	57	BudgetExhausted	Return	return False
+tests/test_h12_docker.py	120	ImportError		pytest.fail('real Docker test requested but the Docker Python SDK is missing')
+tests/test_h12c_docker.py	116	ImportError		pytest.fail('real Docker requested but Docker Python SDK is missing')
+tests/test_h12d_docker.py	142	ImportError		pytest.fail('real Docker requested but Docker Python SDK is missing')
+tests/test_h17e_docker.py	60	BaseException	Raise	self.close(strict=True) | raise
+tests/test_h17e_docker.py	161	ImportError		pytest.fail('real Docker requested but the Docker Python SDK is missing')
+tests/test_harness_budget.py	55	BudgetExhausted	Return	return False
+tests/test_harness_budget.py	149	(BudgetExhausted, ProbeUnavailable)	Pass	pass
+tests/test_harness_budget.py	201	(BudgetExhausted, ProbeUnavailable)	Pass	pass
+tests/test_harness_lineage.py	108	HarnessError	Return	return False
+tests/test_harness_package.py	140	HarnessError	Return	return False
+tests/test_harness_review.py	136	HarnessError	Return	return None
+tests/test_harness_review.py	149	HarnessError	Return	return None
+tests/test_harness_review.py	313	OSError	Break,Raise	if exc.errno == errno.EIO:     break | raise
+tests/test_manual_editor_cli.py	254	PermissionError		pytest.skip('loopback server unavailable')
+tests/test_probe_model.py	85	ProbeModelError	Return	return False
+tests/test_server.py	181	Exception		reader_err.append(repr(exc))
+tests/test_task_bank.py	60	HarnessError	Return	return None
+tests/test_tui_launcher.py	159	OSError		time.sleep(0.1)

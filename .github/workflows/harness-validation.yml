@@ -43,7 +43,20 @@ jobs:
         run: |
           cd /tmp
           PYTHONPATH="$GITHUB_WORKSPACE/tests" python -m pytest --import-mode=importlib -o addopts='' -q \
+            "$GITHUB_WORKSPACE/tests/test_git_package.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_static_policy_inspection.py" \
+            "$GITHUB_WORKSPACE/tests/test_probe_snapshot_offline.py" \
+            "$GITHUB_WORKSPACE/tests/test_probe_git_filters.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_tui_demo.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_live_progress.py" \
+            "$GITHUB_WORKSPACE/tests/test_probe_result_binding.py" \
+            "$GITHUB_WORKSPACE/tests/test_probe_terminal_consistency.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_canary_safety.py" \
+            "$GITHUB_WORKSPACE/tests/test_harness_canary_nofollow.py" \
+            "$GITHUB_WORKSPACE/tests/test_tui_stream_hygiene.py" \
+            "$GITHUB_WORKSPACE/tests/test_tui_stream_bounds.py" \
+            "$GITHUB_WORKSPACE/tests/test_tui_replay_bounds.py" \
+            "$GITHUB_WORKSPACE/tests/test_tui_stream_errors.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_stream_v2.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_fusion.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_portability.py" \
@@ -57,6 +70,8 @@ jobs:
             "$GITHUB_WORKSPACE/tests/test_budget_preflight.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_concurrency.py" \
             "$GITHUB_WORKSPACE/tests/test_harness_parallel_trials.py" \
+            "$GITHUB_WORKSPACE/tests/test_parallel_result_binding.py" \
+            "$GITHUB_WORKSPACE/tests/test_parallel_stop_reporting.py" \
             "$GITHUB_WORKSPACE/tests/test_durable_trial_slots.py" \
             "$GITHUB_WORKSPACE/tests/test_h17e_docker.py" \
             "$GITHUB_WORKSPACE/tests/test_portability_cli.py" \

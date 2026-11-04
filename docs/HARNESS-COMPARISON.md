@@ -11,7 +11,10 @@ not deterministic, and a model name does not authenticate model weights.
 After both trials finish without infrastructure/provider errors, the existing
 `compare` judge receives reduced, shuffled A/B evidence through a caller-supplied
 callback. If the reference errors, the candidate and judge are not called; if
-the candidate errors, the judge is not called. A malformed or failing judge
+the candidate errors, the judge is not called. A result whose local baseline,
+candidate, commit, workspace digest or terminal status does not match the
+bound trial raises `ProbeUnavailable` before the judge; these checks do not
+authenticate an executor or its results. A malformed or failing judge
 returns no judgment. Redaction and blinding are best effort: task or answer text
 can still expose secrets or provenance, and the callback can contact a provider
 and incur cost. The caller must separately attest `reviewed_inputs=True` and

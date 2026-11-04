@@ -91,13 +91,22 @@ def test_explicit_workspace_is_passed_to_the_shared_boundary(monkeypatch, tmp_pa
     seen = []
     fake = FakeTurnRegistry()
 
-    def factory(config, *, workspace=None):
-        seen.append(workspace)
+    from arcen.sandbox import baseline_store, host_export
+
+    def capture(session, workspace):
+        assert workspace == str(tmp_path)
+        return b"protected baseline", "a" * 40
+
+    def factory(config, *, snapshot=None):
+        seen.append(snapshot)
         return fake
 
+    monkeypatch.setattr(baseline_store, "capture_workspace_baseline", capture)
+    monkeypatch.setattr(host_export, "export_candidate", lambda *a, **kw: {})
+    monkeypatch.setattr(fake, "export_workspace", lambda: b"candidate", raising=False)
     monkeypatch.setattr(app, "create_turn_registry", factory)
     result = execute("run the task", state=make_state(tmp_path, Planner()), workspace=str(tmp_path))
-    assert seen == [str(tmp_path)] and result["workspace_mode"] == "snapshot_requested"
+    assert seen == [b"protected baseline"] and result["workspace_mode"] == "snapshot_requested"
     assert result["status"] == "ok" and fake.closed
 
 
@@ -154,14 +163,34 @@ def test_harness_ref_is_explicitly_rejected(tmp_path):
     assert proc.returncode != 0 and "no harness reference was applied" in proc.stderr
 
 
-def test_real_docker_headless_workspace_when_enabled(tmp_path):
+def test_real_docker_headless_workspace_when_enabled(tmp_path, monkeypatch):
     if os.environ.get("ARCEN_TEST_DOCKER_ISOLATION") != "1":
         pytest.skip("requires ARCEN_TEST_DOCKER_ISOLATION=1 and a real Docker daemon/image")
     pytest.importorskip("docker")
     workspace = tmp_path / "workspace"
     workspace.mkdir()
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
     source = workspace / "input.txt"
     source.write_text("host-original")
+    subprocess.run(["git", "init", "-q", str(workspace)], check=True)
+    subprocess.run(["git", "-C", str(workspace), "add", "input.txt"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(workspace),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "baseline",
+        ],
+        check=True,
+    )
 
     class WorkspacePlanner(Planner):
         def complete(self, role, messages, **kwargs):
@@ -186,6 +215,27 @@ def test_real_docker_headless_workspace_when_enabled(tmp_path):
     result = execute(
         "edit the file", state=make_state(tmp_path, WorkspacePlanner()), workspace=str(workspace)
     )
-    if result["status"] != "ok":
-        pytest.fail("Headless execution failed:\n" + json.dumps(result, indent=2), pytrace=False)
+    # No test files exist in this fixture; TEMPER must not claim verification.
+    assert result["status"] == "failed", json.dumps(result, indent=2)
+    terminal = result["events"][-1]
+    assert terminal["type"] == "run.done" and terminal["verification_status"] == "unverified"
+    artifact = next(event["artifact"] for event in result["events"] if event["type"] == "file.diff")
+    assert artifact["files"] == ["input.txt"]
     assert source.read_text() == "host-original"
+    from arcen.sandbox.artifact_apply import apply_artifact
+
+    session = result["session_id"]
+    assert not apply_artifact(session, target=workspace, home=home)["applied"]
+    assert source.read_text() == "host-original"
+    assert apply_artifact(session, target=workspace, home=home, yes=True)["applied"]
+    assert source.read_text() == "container-change"
+    subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            "from pathlib import Path; assert Path('input.txt').read_text() == 'container-change'",
+        ],
+        cwd=workspace,
+        check=True,
+    )

@@ -113,11 +113,11 @@ model prompts are [file-based](docs/HARNESS-PROMPTS.md).
 
 - **Narrated execution** — every thought, command, and result is one NDJSON event on the stream
 - **3 core agents** — DRAFT plans, FORGE executes, TEMPER verifies; nothing else decides
-- **500+ sub-agents** — spawned on demand, named for their task, depth-capped
-- **10,000+ skills** — SKILL.md folders loaded progressively, indexed at boot
+- **Sub-agent pool** — task-named instances, depth- and concurrency-capped; no catalog of 500 agents
+- **Skills** — SKILL.md folders indexed at boot; the file is read fully during indexing
 - **Tool registry** — bash, file, search, browse and code schemas; only bash is currently enabled in isolated server turns
-- **300+ MCPs** — Model Context Protocol servers, connected lazily
-- **100+ plugins** — hooks at every point in the loop: `before_tool`, `after_tool`, `on_spawn`, `on_error`
+- **MCPs** — configured Model Context Protocol servers; none configured by default
+- **Plugins** — trusted opt-in hooks; none enabled by default: `before_tool`, `after_tool`, `on_spawn`, `on_error`
 - **Fail-closed server execution** — per-turn Docker container for supported tools; no unsafe process fallback
 - **Persistent memory** — entity graph in a single SQLite file with decay and consolidation
 - **Multi-provider** — one LiteLLM bridge: Anthropic, OpenAI, Groq, local models
@@ -282,7 +282,7 @@ Every value has an API equivalent (`PUT /api/config`). See [docs/BACKEND-SPEC.md
 
 ## Skills
 
-Skills are folders with a `SKILL.md`. They are indexed at boot and loaded progressively — the frontmatter first, the body only when a task matches:
+Skills are folders with a `SKILL.md`. Indexing reads each whole file but retains only frontmatter metadata; loading a matching skill reads the file again to return its body:
 
 ```markdown
 ---
