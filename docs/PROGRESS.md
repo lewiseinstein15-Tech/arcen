@@ -45,3 +45,4 @@
 2026-11-03T15:53:17Z | A-03a | a6a0074 | Next: exercise deletion, binary and executable modes plus malicious archive paths in fake turn integration.
 2026-11-03T15:53:56Z | A-03a | 0623883 | Next: review HTTP workspace/session reuse without enabling unsafe host reads, update Docker-only test for Git-root workspace, and write Docker-machine smoke; then A-03b apply E2E; backend 1828 passed/19 skipped, UI 87 passed; Docker unverified.
 2026-11-04T23:03:39Z | A-03a | 55beb61 | Next: update real-Docker test for a Git-root workspace and document Docker-machine smoke; no real Docker result yet.
+2026-11-04T23:04:47Z | A-03a | 359e8fc | Next: A-03b exercise apply CLI dry-run/--yes, HEAD mismatch and dirty overlap through fake turn-to-export pipeline; Docker-machine smoke docs/A03-SMOKE.md is unrun; backend 1837 passed/19 skipped, UI 87 passed.

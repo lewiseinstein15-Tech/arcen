@@ -11,7 +11,8 @@ specification and tests. Surviving tests were copied from the workspace. The
 missing intervening A-01, A-04, A-05, A-07 and other code changes have not been
 fully restored. Do not mistake this branch for the original branch or deploy
 it as a finished build. Tests may fail because of those missing changes.
-No existing branch was rewritten, and no push or merge was performed.
+No existing branch was rewritten during this recovery. Check Git history and
+remote state for any later merge or push; this file is a historical account.
 
 ## Restore this salvage branch (not the original branch)
 
