@@ -59,3 +59,19 @@ def test_host_diff_new_and_deleted_binary_and_empty_files():
     patch = build_host_patch(baseline, candidate)
     assert set(validate_patch(patch)) == {"deleted.bin", "emptygone", "added.bin", "emptynew"}
     assert patch.count(b"GIT binary patch") == 2
+
+
+def test_transient_caches_never_reach_the_patch():
+    baseline = snapshot({"calc.py": (b"return a - b\n", 0o644)})
+    candidate = snapshot(
+        {
+            "calc.py": (b"return a + b\n", 0o644),
+            "__pycache__/calc.cpython-312.pyc": (b"\x00stale", 0o644),
+            ".pytest_cache/CACHEDIR.TAG": (b"Signature: 8a477f59\n", 0o644),
+            "pkg/__pycache__/mod.cpython-312.pyc": (b"\x00stale", 0o644),
+        }
+    )
+    patch = build_host_patch(baseline, candidate)
+    assert b"calc.py" in patch
+    assert b"__pycache__" not in patch
+    assert b".pytest_cache" not in patch

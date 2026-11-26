@@ -15,6 +15,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends bash coreutils git \
     && rm -rf /var/lib/apt/lists/*
 
+# TEMPER verification runs `python -m pytest -q` inside the turn; without a
+# runner the image can only ever report "unverified". Pinned, no dev extras.
+RUN pip install --no-cache-dir pytest==8.3.4
+
 WORKDIR /workspace
 
 # commands are exec'd via `bash -c` by the runtime; no entrypoint needed —

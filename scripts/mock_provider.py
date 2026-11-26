@@ -86,7 +86,7 @@ def plan_for(text: str, research: bool) -> str:
                 {
                     "title": f"search the web for: {text}",
                     "tool": "search.text",
-                    "args": {"query": text},
+                    "args": {"pattern": text, "glob": "*"},
                 },
                 {
                     "title": "fetch the most relevant result",

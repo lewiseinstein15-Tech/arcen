@@ -12,7 +12,14 @@ def test_unavailable_sandbox_has_no_effective_tools(monkeypatch):
     status = execution_status(ArcenConfig())
     assert status["effective"] == "unavailable"
     assert status["effective_tools"] == []
-    assert status["supported_tools"] == ["bash"]
+    assert status["supported_tools"] == [
+        "bash",
+        "file.read",
+        "file.list",
+        "file.glob",
+        "search.text",
+        "file.edit",
+    ]
 
 
 def test_available_image_reports_only_isolated_policy_tools(monkeypatch):
@@ -23,5 +30,5 @@ def test_available_image_reports_only_isolated_policy_tools(monkeypatch):
     status = execution_status(ArcenConfig())
     assert status["effective"] == "docker"
     assert status["effective_tools"] == []  # preflight is not an inspected turn
-    assert status["candidate_tools"] == ["bash"]
-    assert "file.read" not in status["candidate_tools"]
+    assert status["candidate_tools"] == status["supported_tools"]
+    assert "file.read" in status["candidate_tools"]

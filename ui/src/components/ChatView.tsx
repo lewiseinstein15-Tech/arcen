@@ -339,7 +339,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         </div>
         <div className="version-line">
           <span className="version-dot" aria-hidden="true" />
-          Agentic Engineer v1.0
+          Agentic Engineer v0.1.0
         </div>
       </div>
     </main>

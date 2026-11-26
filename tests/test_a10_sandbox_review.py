@@ -12,7 +12,7 @@ def test_manual_review_references_real_inventory_and_is_not_complete():
         reviewed = list(csv.DictReader(f, delimiter="\t"))
     keys = {(r["path"], r["line"]) for r in inventory}
     reviewed_keys = {(r["path"], r["phase0_line"]) for r in reviewed}
-    assert len(reviewed) == len(reviewed_keys) == 16
+    assert len(reviewed) == len(reviewed_keys) == 18
     assert reviewed_keys <= keys
     assert all(r["classification"] and r["finding"] for r in reviewed)
     assert len(reviewed) < len(inventory)

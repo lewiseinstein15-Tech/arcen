@@ -11,6 +11,9 @@ from test_manual_campaign import run, setup
 from test_probe_execution import Boundary
 from test_probe_model import SECRET
 
+pytest.importorskip("textual")
+pytest.importorskip("rich")
+
 from arcen.harness import probe_container
 from arcen.stream.emitter import StreamEmitter
 from arcen.stream.events import (

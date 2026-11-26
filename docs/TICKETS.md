@@ -584,7 +584,7 @@ The following are backlog entries, not authorization to implement any later phas
 - **Test:** add native loop tests and run DRAFT/FORGE/server regression tests.
 
 ### [A-07] Honest isolated tool capabilities
-- **Status:** [ ] todo, Phase 4. Expose effective safe isolated capabilities separately from registry counts; allow `file.read`, `file.edit`, `search.text`, and `file.glob` inside the container under Phase 4 edit rules. Never fall back to host execution.
+- **Status:** [~] partial. Capability reporting stays separate from registry counts (`supported_tools` / `effective_tools` / `candidate_tools`). `file.read`, `file.edit`, `file.list`, `file.glob` and `search.text` now run inside the container with path confinement to `/workspace`; `file.write`, `http.get` and the code tools remain denied. Still open: exporting those container edits back to the host (A-03b) and the Phase 4 edit rules for snapshots.
 - **Test:** run isolated registry and policy tests plus targeted capability tests.
 
 ### [A-08] Truthful usage and cost

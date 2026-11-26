@@ -4,9 +4,10 @@ import asyncio
 
 import httpx
 import pytest
-from rich.console import Console
 
 pytest.importorskip("textual")
+pytest.importorskip("rich")
+from rich.console import Console
 from arcen.tui.cards.command import MAX_LINE_CELLS, CommandCard
 from arcen.tui.client import ArcenClient
 from arcen.tui.composer import Composer

@@ -33,6 +33,10 @@ and live-provider verification were not run in the salvage environment.
 
 ## Remaining phases
 
+- **Phase 4 isolated tools:** `file.read`, `file.edit`, `file.list`, `file.glob` and
+  `search.text` are ported into the Docker turn boundary (container-only writes,
+  no host mount). `file.write`, `http.get` and the code tools stay denied; the
+  research prompt now lists only tools the boundary actually implements.
 - **A-01:** validate TEMPER against real sandbox test discovery and execution;
   no-test runs must remain explicitly unverified.
 - **A-02 / BENCH-1:** implement the complete benchmark/adapters and run real

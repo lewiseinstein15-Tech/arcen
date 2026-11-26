@@ -96,7 +96,7 @@ docker pull ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0
 docker build -t ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0 docker/sandbox
 ```
 
-**Current limitations:** only `bash` is implemented in the isolated turn executor. Other planned tools are denied, not run on the host. Each turn has a new temporary `/workspace`; its files are discarded at the end, so no host repository is mounted and changes do not persist between turns. Docker presence in Settings is only a readiness check: the actual container policy is checked at turn start. Host process environment variables are not passed into it. Command output is limited to 256 KiB; excessive output stops the container.
+**Current limitations:** the isolated turn executor ports `bash`, `file.read`, `file.edit`, `file.list`, `file.glob` and `search.text`. Every other tool is denied by the allowlist, not run on the host; there is no process fallback. Each turn has a new temporary `/workspace`; its files are discarded at the end, so no host repository is mounted and changes do not persist between turns. Docker presence in Settings is only a readiness check: the actual container policy is checked at turn start. Host process environment variables are not passed into it. Command output is limited to 256 KiB; excessive output stops the container.
 
 The sandbox is a defense-in-depth boundary, not a guarantee against Docker or kernel vulnerabilities. The Docker daemon, selected image and host plugins must be trusted; plugins run in the server process, outside the tool sandbox. Network-disabled commands can still expose any data visible inside the container through their output to the application and its model provider. Sessions, configuration and logs remain host-side. Standalone tool/agent modules and the older `SandboxRuntime` are not the server execution boundary and must not be used to run untrusted input.
 
@@ -115,7 +115,7 @@ model prompts are [file-based](docs/HARNESS-PROMPTS.md).
 - **3 core agents** — DRAFT plans, FORGE executes, TEMPER verifies; nothing else decides
 - **Sub-agent pool** — task-named instances, depth- and concurrency-capped; no catalog of 500 agents
 - **Skills** — SKILL.md folders indexed at boot; the file is read fully during indexing
-- **Tool registry** — bash, file, search, browse and code schemas; only bash is currently enabled in isolated server turns
+- **Tool registry** — bash, file, search, browse and code schemas; isolated server turns enable bash plus the file/search tools above
 - **MCPs** — configured Model Context Protocol servers; none configured by default
 - **Plugins** — trusted opt-in hooks; none enabled by default: `before_tool`, `after_tool`, `on_spawn`, `on_error`
 - **Fail-closed server execution** — per-turn Docker container for supported tools; no unsafe process fallback

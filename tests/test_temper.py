@@ -4,6 +4,8 @@ Proves: planted broken code → step.fail; clean code → step.pass;
 binary verdict with reasons; reruns before declaring failure.
 """
 
+import sys
+
 import pytest
 
 from arcen.agents.temper import TemperVerifier
@@ -37,7 +39,7 @@ def test_planted_broken_code_fails(temper, tmp_path) -> None:
         checks=[
             # Installed third-party pytest plugins can emit warnings on stderr;
             # the verifier prefers stderr, hiding the planted assertion output.
-            f"PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q {tmp_path / 'test_broken.py'}"
+            f"PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 {sys.executable} -m pytest -q {tmp_path / 'test_broken.py'}"
         ],
     )
     assert [type(e) for e in events] == [VerifyStart, StepFail]
@@ -52,11 +54,11 @@ def test_real_pytest_check(tmp_path) -> None:
     registry = load_builtin()
     temper = TemperVerifier(registry, reruns=0)
     (tmp_path / "test_ok.py").write_text("def test_ok():\n    assert 2 + 2 == 4\n")
-    events = temper.verify(step=1, target=str(tmp_path), checks=[f"python3 -m pytest -q {tmp_path / 'test_ok.py'}"])
+    events = temper.verify(step=1, target=str(tmp_path), checks=[f"{sys.executable} -m pytest -q {tmp_path / 'test_ok.py'}"])
     assert isinstance(events[-1], StepPass)
 
     (tmp_path / "test_bad.py").write_text("def test_bad():\n    assert calc_wrong(1) == 1\n")
-    events = temper.verify(step=2, target=str(tmp_path), checks=[f"python3 -m pytest -q {tmp_path / 'test_bad.py'}"])
+    events = temper.verify(step=2, target=str(tmp_path), checks=[f"{sys.executable} -m pytest -q {tmp_path / 'test_bad.py'}"])
     assert isinstance(events[-1], StepFail)
 
 

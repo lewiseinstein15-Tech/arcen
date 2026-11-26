@@ -6,9 +6,10 @@ import asyncio
 
 import httpx
 import pytest
-from rich.console import Console
 
 pytest.importorskip("textual")
+pytest.importorskip("rich")
+from rich.console import Console
 from arcen.tui.client import ArcenClient
 from arcen.tui.live import LiveApp
 from arcen.tui.modals import InfoScreen, config_view, sandbox_view

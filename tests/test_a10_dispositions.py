@@ -10,6 +10,6 @@ def test_every_historical_handler_is_accounted_for_but_unreviewed():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     rows = mod.run()
-    assert len(rows) == 338
+    assert len(rows) == 378
     assert all(row["review"] == "unreviewed" for row in rows)
-    assert len({(row["path"], row["line"]) for row in rows}) == 338
+    assert len({(row["path"], row["line"]) for row in rows}) == 378

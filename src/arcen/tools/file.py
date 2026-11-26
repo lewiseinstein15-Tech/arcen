@@ -94,7 +94,6 @@ class FileEdit(BaseTool):
             fh.write(updated)
         return {
             "path": a.path,
-            "bytes_changed": len(updated.encode("utf-8")) - len(content.encode("utf-8")),
             "replacements": occurrences if a.count < 0 else min(a.count, occurrences),
         }
 

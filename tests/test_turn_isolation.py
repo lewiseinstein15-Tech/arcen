@@ -95,7 +95,7 @@ def test_container_configuration_and_command_do_not_use_host():
     assert docker.container.removed
 
 
-@pytest.mark.parametrize("name", ["file.read", "file.write", "search.web", "code.eval", "unknown"])
+@pytest.mark.parametrize("name", ["file.write", "file.delete", "search.web", "code.eval", "unknown"])
 def test_unported_tools_never_dispatch_to_the_host(name):
     docker = FakeDocker()
     reg = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
@@ -237,6 +237,15 @@ def test_real_docker_isolation_when_explicitly_enabled(monkeypatch, tmp_path):
             },
         )
         assert not network["ok"], network
+        # File tools operate on the container tmpfs only, and refuse host paths.
+        assert reg.dispatch("bash", {"cmd": "printf 'def f():\\n    return 1\\n' > app.py"})["ok"]
+        read = reg.dispatch("file.read", {"path": "app.py"})
+        assert read["ok"] and "return 1" in read["result"]["content"], read
+        edit = reg.dispatch("file.edit", {"path": "app.py", "find": "return 1", "replace": "return 2"})
+        assert edit["ok"] and edit["result"]["replacements"] == 1, edit
+        assert "return 2" in reg.dispatch("file.read", {"path": "app.py"})["result"]["content"]
+        escape = reg.dispatch("file.read", {"path": str(hostfile)})
+        assert not escape["ok"], escape
     finally:
         reg.close()
 

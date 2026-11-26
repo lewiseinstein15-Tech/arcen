@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 import os
+import shutil
 import tarfile
 from pathlib import Path, PurePosixPath
 
@@ -15,6 +16,13 @@ from arcen.sandbox.patch_validation import MAX_PATCH_BYTES, ArtifactError
 MAX_ENTRIES = 10000
 MAX_FILE_SIZE = 4 * 1024 * 1024
 MAX_PATH_BYTES = 240
+
+# Bytecode and tool caches appear the moment the turn runs a test suite. They
+# are not the user's work, so they never belong in a patch the user applies.
+TRANSIENT_DIRS = frozenset(
+    {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", "node_modules"}
+)
+TRANSIENT_SUFFIXES = (".pyc", ".pyo")
 
 
 def extract_candidate(data: bytes, destination: Path) -> None:
@@ -82,13 +90,22 @@ def extract_candidate(data: bytes, destination: Path) -> None:
         raise ArtifactError(f"workspace archive extraction failed: {exc}") from exc
 
 
+def _prune_transient(root: Path) -> None:
+    """Drop bytecode and tool caches from one extracted tree."""
+    for path in sorted(root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+        if path.is_dir():
+            if path.name in TRANSIENT_DIRS:
+                shutil.rmtree(path, ignore_errors=True)
+        elif path.name.endswith(TRANSIENT_SUFFIXES):
+            path.unlink(missing_ok=True)
+
+
 def build_host_patch(baseline_tar: bytes, candidate_tar: bytes) -> bytes:
     """Build and validate a patch in a disposable host Git repository.
 
     Only archive data is processed on the host; no workspace code is executed.
     Turn integration uses this helper only after bounded container collection.
     """
-    import shutil
     import subprocess
     import tempfile
 
@@ -106,6 +123,8 @@ def build_host_patch(baseline_tar: bytes, candidate_tar: bytes) -> bytes:
         baseline, candidate = root / "baseline", root / "candidate"
         extract_candidate(baseline_tar, baseline)
         extract_candidate(candidate_tar, candidate)
+        _prune_transient(baseline)
+        _prune_transient(candidate)
         base_attrs, candidate_attrs = attrs(baseline), attrs(candidate)
         if base_attrs != candidate_attrs:
             raise ArtifactError("changes to .gitattributes are forbidden")

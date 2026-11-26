@@ -17,10 +17,31 @@ export const CommandBlock = memo(function CommandBlock({
   const finished = Boolean(done);
   const [open, setOpen] = useState(true); // expanded while running
   const { glyph, color } = GLYPHS['command'];
-  const stdout = typeof done?.result?.stdout === 'string' ? done.result.stdout : '';
-  const stderr = typeof done?.result?.stderr === 'string' ? done.result.stderr : '';
-  const exit = typeof done?.result?.exit === 'number' ? done.result.exit : undefined;
-  const hasOutput = Boolean(stdout.trim() || stderr.trim());
+  // A failed step nests its captured output under `detail`; file tools return
+  // a structured object with no streams at all.
+  const result = done?.result ?? {};
+  const detail = (result.detail ?? {}) as Record<string, unknown>;
+  const stream = (key: 'stdout' | 'stderr') => {
+    if (typeof detail[key] === 'string') return detail[key] as string;
+    return typeof result[key] === 'string' ? (result[key] as string) : '';
+  };
+  const stdout = stream('stdout');
+  const stderr = stream('stderr') || (typeof result.error === 'string' ? result.error : '');
+  const exit =
+    typeof detail.exit === 'number'
+      ? detail.exit
+      : typeof result.exit === 'number'
+        ? result.exit
+        : undefined;
+  const fileContent =
+    event.tool === 'file.read' && typeof result.content === 'string' ? result.content : '';
+  const structured =
+    !stdout.trim() &&
+    !stderr.trim() &&
+    !fileContent.trim() &&
+    exit === undefined &&
+    Object.keys(result).length > 0;
+  const hasOutput = Boolean(stdout.trim() || stderr.trim() || fileContent.trim() || structured);
   return (
     <article
       className={`block command ${finished ? 'is-done' : 'is-running'}`}
@@ -49,6 +70,8 @@ export const CommandBlock = memo(function CommandBlock({
             <>
               {stdout.trim() && <pre>{stdout.replace(/\n$/, '')}</pre>}
               {stderr.trim() && <pre className="is-stderr">{stderr.replace(/\n$/, '')}</pre>}
+              {fileContent.trim() && <pre>{fileContent.replace(/\n$/, '')}</pre>}
+              {structured && <pre>{JSON.stringify(result, null, 2)}</pre>}
             </>
           ) : (
             <pre className="result-exit">(no output)</pre>

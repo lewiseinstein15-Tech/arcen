@@ -7,6 +7,7 @@ No process fallback, host mounts, host environment, or network is permitted.
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import posixpath
@@ -192,6 +193,79 @@ class DockerTurnRegistry:
                 "result": None,
                 "error": f"tool {name!r} is not yet available inside the isolated executor",
             }
+        if name == "bash":
+            return self._dispatch_bash(args)
+        return self._dispatch_isolated(name, args)
+
+    def _dispatch_isolated(self, name: str, args: dict) -> dict:
+        from arcen.sandbox.isolated_ops import build_argv
+
+        try:
+            argv = build_argv(name, args, root="/workspace")
+        except ValueError as exc:
+            return {"ok": False, "result": None, "error": str(exc)}
+        outcome = self._exec(argv, cwd="/workspace")
+        if "error" in outcome:
+            return {"ok": False, "result": None, "error": outcome["error"]}
+        try:
+            payload = json.loads(outcome["stdout"])
+        except (ValueError, TypeError):
+            payload = None
+        if (
+            type(payload) is not dict
+            or type(payload.get("ok")) is not bool
+            or payload.get("ok") != (payload.get("error") is None)
+        ):
+            return {
+                "ok": False,
+                "result": {"stdout": outcome["stdout"][-2000:], "stderr": outcome["stderr"][-2000:]},
+                "error": f"isolated tool {name!r} returned malformed output",
+            }
+        return {"ok": payload["ok"], "result": payload.get("result"), "error": payload.get("error")}
+
+    def _exec(self, command: list[str], *, cwd: str) -> dict:
+        """Run one argv inside the container with a bounded host-side buffer."""
+        api = self._client.api
+        created = api.exec_create(
+            self._container.id,
+            cmd=command,
+            workdir=cwd,
+            user="65534:65534",
+            privileged=False,
+            environment={
+                "HOME": "/tmp",
+                "LANG": "C.UTF-8",
+                "PATH": "/usr/local/bin:/usr/bin:/bin",
+            },
+        )
+        exec_id = created["Id"]
+        stream = api.exec_start(exec_id, stream=True, demux=True)
+        stdout, stderr = bytearray(), bytearray()
+        try:
+            for out_chunk, err_chunk in stream:
+                if (
+                    len(stdout) + len(stderr) + len(out_chunk or b"") + len(err_chunk or b"")
+                    > self.policy.execution.max_output_bytes
+                ):
+                    self._container.kill()
+                    return {
+                        "error": f"sandbox output exceeded {self.policy.execution.max_output_bytes // 1024} KiB; container stopped"
+                    }
+                stdout.extend(out_chunk or b"")
+                stderr.extend(err_chunk or b"")
+        finally:
+            if hasattr(stream, "close"):
+                stream.close()
+        exit_code = api.exec_inspect(exec_id)["ExitCode"]
+        if exit_code is None:
+            return {"error": "sandbox command did not exit"}
+        return {
+            "stdout": stdout.decode("utf-8", "replace"),
+            "stderr": stderr.decode("utf-8", "replace"),
+            "exit": exit_code,
+        }
+
+    def _dispatch_bash(self, args: dict) -> dict:
         try:
             a = BashArgs.model_validate(args)
             if not math.isfinite(a.timeout_s):
@@ -205,55 +279,20 @@ class DockerTurnRegistry:
             # GNU timeout is installed in the pinned image. The shell is an
             # argv element, not interpolated into a host-side command.
             command = ["timeout", "--kill-after=2s", f"{a.timeout_s:g}s", "bash", "-c", a.cmd]
-            # Stream through a bounded host buffer: untrusted output must not
-            # be allowed to exhaust the server's memory. When the limit is
-            # exceeded, kill this disposable container rather than letting
-            # a noisy process continue in the background.
-            api = self._client.api
-            created = api.exec_create(
-                self._container.id,
-                cmd=command,
-                workdir=cwd,
-                user="65534:65534",
-                privileged=False,
-                environment={
-                    "HOME": "/tmp",
-                    "LANG": "C.UTF-8",
-                    "PATH": "/usr/local/bin:/usr/bin:/bin",
-                },
-            )
-            exec_id = created["Id"]
-            stream = api.exec_start(exec_id, stream=True, demux=True)
-            stdout, stderr = bytearray(), bytearray()
-            try:
-                for out_chunk, err_chunk in stream:
-                    if (
-                        len(stdout) + len(stderr) + len(out_chunk or b"") + len(err_chunk or b"")
-                        > self.policy.execution.max_output_bytes
-                    ):
-                        self._container.kill()
-                        return {
-                            "ok": False,
-                            "result": None,
-                            "error": f"sandbox output exceeded {self.policy.execution.max_output_bytes // 1024} KiB; container stopped",
-                        }
-                    stdout.extend(out_chunk or b"")
-                    stderr.extend(err_chunk or b"")
-            finally:
-                if hasattr(stream, "close"):
-                    stream.close()
-            exit_code = api.exec_inspect(exec_id)["ExitCode"]
-            if exit_code is None:
-                return {"ok": False, "result": None, "error": "sandbox command did not exit"}
+            outcome = self._exec(command, cwd=cwd)
+            if "error" in outcome:
+                return {"ok": False, "result": None, "error": outcome["error"]}
             output = {
-                "stdout": stdout.decode("utf-8", "replace"),
-                "stderr": stderr.decode("utf-8", "replace"),
-                "exit": exit_code,
+                "stdout": outcome["stdout"],
+                "stderr": outcome["stderr"],
+                "exit": outcome["exit"],
             }
             return {
-                "ok": exit_code == 0,
+                "ok": outcome["exit"] == 0,
                 "result": output,
-                "error": None if exit_code == 0 else f"exit {exit_code}: {output['stderr'][-300:]}",
+                "error": None
+                if outcome["exit"] == 0
+                else f"exit {outcome['exit']}: {output['stderr'][-300:]}",
             }
         except Exception as exc:  # noqa: BLE001 — tool failures are values
             return {"ok": False, "result": None, "error": str(exc)}

@@ -9,9 +9,11 @@ src/arcen/sandbox/runtime.py	350	logged-failure	Image pull failure is logged and
 src/arcen/sandbox/runtime.py	404	silent-cleanup-failure	Legacy destroy ignores container kill exceptions; cleanup is not confirmed.
 src/arcen/sandbox/runtime.py	408	silent-cleanup-failure	Legacy destroy ignores forced remove exceptions; orphan container is possible.
 src/arcen/sandbox/runtime.py	438	error-envelope	Path escape is returned as ok false with error string.
-src/arcen/sandbox/turn.py	72	fail-closed	Workspace snapshot rejection raises IsolationUnavailable with cause.
-src/arcen/sandbox/turn.py	140	fail-closed	Workspace import failure is wrapped; outer constructor rejects execution.
-src/arcen/sandbox/turn.py	142	fail-closed	Constructor cleans up or raises explicit unconfirmed cleanup error and refuses tool execution.
-src/arcen/sandbox/turn.py	146	logged-fail-closed	Failed strict cleanup logs and raises unconfirmed cleanup error.
-src/arcen/sandbox/turn.py	243	error-envelope	Turn dispatch failure returns ok false and error string.
-src/arcen/sandbox/turn.py	253	logged-conditional	Strict close logs and raises; non-strict close logs exception but does not confirm cleanup.
+src/arcen/sandbox/turn.py	88	fail-closed	Workspace snapshot rejection raises IsolationUnavailable with cause.
+src/arcen/sandbox/turn.py	156	fail-closed	Workspace import failure is wrapped; outer constructor rejects execution.
+src/arcen/sandbox/turn.py	158	fail-closed	Constructor cleans up or raises explicit unconfirmed cleanup error and refuses tool execution.
+src/arcen/sandbox/turn.py	162	logged-fail-closed	Failed strict cleanup logs and raises unconfirmed cleanup error.
+src/arcen/sandbox/turn.py	297	error-envelope	Turn dispatch failure returns ok false and error string.
+src/arcen/sandbox/turn.py	316	logged-conditional	Strict close logs and raises; non-strict close logs exception but does not confirm cleanup.
+src/arcen/sandbox/turn.py	205	error-envelope	Invalid isolated tool arguments are rejected on the host before any exec; the failure is returned as an error envelope.
+src/arcen/sandbox/turn.py	212	fail-closed	Unparseable isolated-tool output is treated as failure; captured stdout/stderr is truncated and never trusted.
