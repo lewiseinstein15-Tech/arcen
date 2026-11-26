@@ -45,6 +45,12 @@ Live isolation check (host paths hidden, server env not leaked, no network):
 `ARCEN_TEST_DOCKER_ISOLATION=1 .venv/bin/pytest tests/test_turn_isolation.py -k real_docker`
 
 ## Things that bite
+- A sandbox reset takes the daemon, the socket, the image and `~/.arcen` with
+  it. Before the first turn: `sudo dockerd &`, `sudo chmod 666
+  /var/run/docker.sock`, rebuild `docker/sandbox` as
+  `ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0`, rewrite
+  `~/.arcen/config.yaml`, and restart the backend (it picks the sandbox
+  backend at boot).
 - `file.edit` invalidates sibling `__pycache__/<stem>.*.pyc` after a write. A
   same-second, same-size rewrite otherwise passes CPython's (mtime, size)
   check and the next run imports the old bytecode — it looks like the edit
