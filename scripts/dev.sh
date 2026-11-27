@@ -36,9 +36,11 @@ uvicorn arcen.server.app:app --port 3002 &
 BACKEND_PID=$!
 trap 'kill %1 2>/dev/null || true' EXIT
 
-# 4. Wait for health before the UI starts proxying at it
+# 4. Wait for health before the UI starts proxying at it. A cold start imports
+# litellm and probes Docker, which can take well past 15 s on a loaded box —
+# timing out early looks exactly like "the backend is broken".
 healthy=0
-for i in $(seq 1 30); do
+for i in $(seq 1 120); do
   if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
     echo "[dev] backend exited before becoming healthy" >&2
     exit 1
@@ -51,7 +53,11 @@ for i in $(seq 1 30); do
   sleep 0.5
 done
 if [ "$healthy" -ne 1 ]; then
-  echo "[dev] backend health check timed out" >&2
+  cat >&2 <<'MSG'
+[dev] backend did not answer /api/health within 60 s.
+[dev] Run it in the foreground to see why:
+[dev]   .venv/bin/python -m uvicorn arcen.server.app:app --port 3002
+MSG
   exit 1
 fi
 
