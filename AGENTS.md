@@ -86,6 +86,16 @@ Live isolation check (host paths hidden, server env not leaked, no network):
 - Docker socket permissions reset when the daemon restarts; the server user
   needs `sudo chmod 666 /var/run/docker.sock` (or group membership) and a
   backend restart.
+- `pyproject.toml` sets `addopts = "-q"`. Passing another `-q` makes it `-qq`,
+  which swallows the "N passed" summary — a run that looks truncated is just
+  quiet. Use `-o addopts="-q"` when you want the count.
+- sqlite connections are thread-bound and turns run on worker threads, so
+  `ServerState.memory_store()` hands each thread its own `MemoryStore`. Never
+  cache one store on the state and call it from a turn.
+- Tests that drive a turn must point `config.memory.db` at `tmp_path`
+  (`make_state` in `tests/test_headless.py` does), otherwise they read and
+  pollute the developer's real `~/.arcen/memory.db` and payload-comparison
+  tests become order-dependent.
 
 ## Current gaps
 - The isolated turn executor ports `bash`, `file.read`, `file.write`, `file.list`,

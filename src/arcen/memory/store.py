@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import sqlite3
 import time
 
@@ -36,6 +37,25 @@ from .graph import MemoryGraph
 
 DEFAULT_HALF_LIFE_DAYS = 14.0
 ARCHIVE_THRESHOLD = 0.1
+
+# Tokens too common to signal relatedness between two goals.
+_STOPWORDS = frozenset(
+    ["a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "have", "in", "into", "is", "it", "its", "of", "on", "or", "that", "the", "then", "this", "to", "with", "all", "any", "can", "create", "do", "does", "file", "files", "make", "new", "not", "use", "using", "write"]
+)
+_WORD = re.compile(r"[a-z0-9_]{3,}")
+# A goal naming the same path as an earlier one is evidence, not coincidence,
+# even when the path is the only shared token ("fizzbuzz.py" alone).
+_PATH = re.compile(
+    r"[a-z0-9_./-]+\.(?:py|pyi|ts|tsx|js|jsx|go|rs|java|rb|sh|json|ya?ml|toml|md|sql|css|html)"
+)
+
+
+def _tokens(text: str) -> set[str]:
+    return {w for w in _WORD.findall(text.lower()) if w not in _STOPWORDS}
+
+
+def _paths(text: str) -> set[str]:
+    return {p.rstrip("./") for p in _PATH.findall(text.lower())}
 
 
 def _connect(path: str) -> sqlite3.Connection:
@@ -183,6 +203,52 @@ class MemoryStore:
             (entity, key),
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def recall_related(self, text: str, k: int = 5, min_overlap: int = 2) -> list[dict]:
+        """Facts whose entity or text shares meaningful terms with ``text``.
+
+        ``recall`` needs an exact entity, which is why memory was write-only
+        in the turn path: a new goal rarely matches a previous goal string.
+        This ranks live facts by token overlap so a later turn can reuse
+        earlier conclusions. Scoring is lexical and explainable — no
+        embeddings, no hidden state — and ties break by weight then recency.
+
+        ``min_overlap`` filters out single-token coincidences ("test", "the").
+        A shared file path overrides that floor: two goals naming ``calc.py``
+        are related even when it is the only token they have in common.
+        """
+        tokens = _tokens(text)
+        paths = _paths(text)
+        if not tokens:
+            return []
+        rows = self.conn.execute(
+            """SELECT id, entity, key, fact, weight, last_accessed, created_at
+               FROM facts WHERE archived=0 AND invalid_at IS NULL"""
+        ).fetchall()
+        now = time.time()
+        scored: list[dict] = []
+        for r in rows:
+            candidate = f"{r['entity']} {r['fact']}"
+            overlap = tokens & _tokens(candidate)
+            shared_paths = paths & _paths(candidate)
+            if len(overlap) < min_overlap and not shared_paths:
+                continue
+            days_stale = max(0.0, (now - r["last_accessed"]) / 86400.0)
+            recency = math.pow(0.5, days_stale / self.half_life_days)
+            score = (len(overlap) + 2 * len(shared_paths)) * r["weight"] * recency
+            scored.append(
+                {
+                    "id": r["id"],
+                    "entity": r["entity"],
+                    "fact": r["fact"],
+                    "key": r["key"],
+                    "weight": r["weight"],
+                    "score": round(score, 6),
+                    "overlap": sorted(overlap | shared_paths),
+                }
+            )
+        scored.sort(key=lambda f: (f["score"], f["weight"]), reverse=True)
+        return scored[:k]
 
     # -- decay -----------------------------------------------------------------
     def decay(self, now: float | None = None) -> dict:

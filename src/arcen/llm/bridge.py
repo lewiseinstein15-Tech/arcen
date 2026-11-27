@@ -76,7 +76,10 @@ def provider_ready(config: ArcenConfig) -> tuple[bool, str]:
     (False, reason) naming the first gap so refusals and logs can say what
     is actually missing instead of a bare "no provider".
     """
-    provider = config.provider
+    return _ready(config.provider)
+
+
+def _ready(provider: Any) -> tuple[bool, str]:
     name = provider.name.strip()
     if not name:
         return False, "provider.name is empty — pick a provider in Settings"
@@ -97,15 +100,39 @@ def build_llm_client(
     Returns an arcen.llm.client.Client whose completion calls carry the
     provider's api_key / api_base. The credential lives only in process
     memory; it is never logged, never returned by the API.
+
+    When ``provider.fallbacks`` is non-empty the usable alternates are
+    wrapped in a :class:`FallbackClient` (llm/fallback.py): the primary is
+    tried first, and a provider failure fails over instead of ending the
+    turn. An unusable fallback is skipped silently — a broken alternate
+    must not break a working primary.
     """
+    primary = _client_for(config.provider, config, prompts)
+    if primary is None:
+        return None  # incomplete provider → offline mode (degrade, never block)
+
+    alternates = [
+        client
+        for provider in config.provider.fallbacks
+        if (client := _client_for(provider, config, prompts)) is not None
+    ]
+    if not alternates:
+        return primary
+
+    from arcen.llm.fallback import FallbackClient
+
+    return FallbackClient([primary, *alternates])
+
+
+def _client_for(provider: Any, config: ArcenConfig, prompts: ResolvedPrompts | None) -> Any | None:
+    """One provider → one Client, or None when that provider is unusable."""
     # imported lazily — litellm import is heavy and tests may stub it
     from arcen.llm.client import Client
 
-    ok, _reason = provider_ready(config)
+    ok, _reason = _ready(provider)
     if not ok:
-        return None  # incomplete provider → offline mode (degrade, never block)
+        return None  # incomplete provider → skipped (degrade, never block)
 
-    provider = config.provider
     resolved, _missing = resolve_secrets(
         {"api_key": provider.api_key, "base_url": provider.base_url}
     )
@@ -120,7 +147,13 @@ def build_llm_client(
     prefix = LITELLM_PREFIX.get(provider.name, "")
     models: dict[str, str] = {}
     for role, agent in ROLE_AGENT_NAMES.items():
-        name = model_for(agent, config)
+        # An alternate carries its own model for every role; the agent slots
+        # describe the primary provider and are not inherited across vendors.
+        name = (
+            model_for(agent, config)
+            if provider is config.provider
+            else str(provider.model).strip()
+        )
         # T-053: only native providers (anthropic/openai) go bare. A custom
         # endpoint's model id may itself contain "/" (org/model) — routing
         # it un-prefixed makes LiteLLM guess the vendor instead of using the
@@ -153,7 +186,7 @@ def build_llm_client(
     return Client(
         models=models,
         completion_fn=completion,
-        max_retries=config.provider.max_retries,
-        retry_backoff_seconds=config.provider.retry_backoff_seconds,
+        max_retries=provider.max_retries,
+        retry_backoff_seconds=provider.retry_backoff_seconds,
         prompts=prompts,
     )

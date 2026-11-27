@@ -100,7 +100,14 @@ See [docs/TUI.md](docs/TUI.md).
 2. **FORGE** executes step *n*, in order, one at a time. A step that fails returns its failure — not a retry storm.
 3. **DRAFT** re-plans on failure, with the failure text in hand. This is where the interesting behaviour lives: a wrong assumption gets corrected instead of repeated.
 4. **TEMPER** verifies adversarially. It runs the project's tests. If it finds no test command, the turn is reported as `unverified` — never as a pass.
-5. The answer is prose, and every claim in it should trace back to a step in the stream.
+5. If verification fails, the failure becomes the input to a **refinement pass**: DRAFT re-plans with the verifier's contradictions, FORGE executes, TEMPER re-verifies. The loop keeps the best attempt, never the last one, and stops when the budget is spent or a pass stops improving. Simple goals get no refinement at all.
+6. The answer is prose, and every claim in it should trace back to a step in the stream.
+
+### Reasoning depth
+
+ARCEN estimates how much iterative refinement a goal deserves and bounds it. A one-file task gets one attempt; a repository-scale change earns up to two refinements (`reasoning.max_passes: 3`). Each refinement is gated — preserved, partially applied, replaced, or refused for lack of evidence — and a model review can only downgrade a verdict, never overrule a failed test. Passes are checkpointed under `~/.arcen/checkpoints`.
+
+This is ARCEN's own control policy, adapted from the loop-transformer ideas Z.ai published for GLM-5.4. The neural parts of that work (shared layers, learned gates, KV reuse) are not reproducible through a chat API and are not claimed here; [docs/GLM54-ADAPTATION.md](docs/GLM54-ADAPTATION.md) says exactly what transferred and what did not, with measurements.
 
 ### The stream
 
@@ -178,7 +185,7 @@ Eleven procedures ship in `skills/`, indexed at boot, loaded on demand:
 
 `api-design` · `code-review` · `debug-traceback` · `dockerize` · `git-workflow` · `large-codebase` · `pytest-repair` · `python-refactor` · `security-audit` · `sql-migration` · `test-generation`
 
-A skill is a folder with a `SKILL.md`. Indexing reads the whole file but keeps only frontmatter, so a hundred skills cost a hundred lines of context; the body loads only when the planner asks for it by name.
+A skill is a folder with a `SKILL.md`. Indexing reads each whole file but keeps only frontmatter, so a hundred skills cost a hundred lines of context; the body loads only when the planner asks for it by name.
 
 ```markdown
 ---
@@ -232,6 +239,16 @@ agents:
   forge:   { step_timeout_s: 120, max_retries: 2, model: null }
   temper:  { adversarial: true, reruns: 1, model: null }
 
+reasoning:
+  enabled: true
+  max_passes: 3          # first attempt + up to 2 refinements
+  min_gain: 0.05         # stop when a pass improves confidence by less
+  first_pass_cap: 0.35   # first refinement writes conservatively
+  later_pass_ramp: 0.3   # later passes may write more
+  confidence_floor: 0.6  # below this, replace the candidate instead of patching
+  independent_review: true
+  checkpoints: true
+
 subagents:
   max_depth: 2
   max_concurrent: 8
@@ -239,6 +256,8 @@ subagents:
 stream:
   port: 3002
 ```
+
+`provider.fallbacks` takes an ordered list of alternate providers, tried only when the primary raises. `provider.vision_model` names a multimodal model for image checks; without one, image requests are refused rather than described blind.
 
 Every key has an API equivalent (`GET`/`PUT /api/config`), which is what the Settings page uses. `kilo` and `ollama` are keyless: they authenticate by absence, so an empty `api_key` is correct and any `Authorization` header must be omitted.
 
@@ -296,6 +315,7 @@ Stated plainly, because a README that oversells is worse than a short one:
 | [HEADLESS.md](docs/HEADLESS.md) | `arcen run` result schema, exit codes, workspace limits |
 | [TUI.md](docs/TUI.md) | Terminal client |
 | [TICKETS.md](docs/TICKETS.md) | Work items and their verification loops |
+| [GLM54-ADAPTATION.md](docs/GLM54-ADAPTATION.md) | Which loop-transformer ideas transferred, which could not, and the measurements |
 
 ## Contributing
 

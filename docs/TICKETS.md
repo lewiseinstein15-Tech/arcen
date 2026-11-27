@@ -645,3 +645,31 @@ The following are backlog entries, not authorization to implement any later phas
 - **Status:** [x] verified regression fix before A-08. Third pre-ticket frontend regression failed in `tests/settings.test.tsx` T-039 because `settings-view` can still be the loading view: `TestingLibraryElementError: Unable to find an element by: [data-testid="settings-general"]`. On the third post-fix suite the clipboard test failed because the write call is observable before the asynchronous copied state: `Unable to find an element with the text: copied`.
 - **Test:** `cd ui && npm test -- --run tests/settings.test.tsx tests/markdown.test.tsx` and repeat the full frontend suite; deliberately defer the config and clipboard responses to exercise the asynchronous boundaries.
 - **Verification:** assertions about loaded controls and the absent theme occur after configuration loads; clipboard confirmation is asserted after write completion; no product behavior change. Fresh PTY evidence: `docs/verify/A-15-real-async-tests.png`; focused tests 26 passed, full frontend suite 84 passed in three successive runs. React act warnings remain A-14.
+
+### [A-16] Adaptive refinement, context reuse and memory that reads back
+- **Status:** [x] verified. The turn path now scores a goal before work starts
+  (`reasoning/complexity.py`), wraps plan → execute → verify in a bounded
+  `RefinementLoop` (`reasoning/loop.py`) gated by an `UpdateGate`
+  (`reasoning/gate.py`), judges each pass with deterministic evidence
+  (`reasoning/verify.py`) and checkpoints it (`reasoning/checkpoint.py`).
+  Rendered prompt blocks and retrieval rankings are cached by content version
+  (`context/cache.py`, `context/retrieval.py`); providers fall back in order
+  and vision is refused unless the model is declared multimodal
+  (`llm/fallback.py`, `llm/vision.py`). Memory is now read as well as written:
+  `run_turn` calls `MemoryStore.recall_related` and emits `memory op=recall`,
+  and the write event is only emitted for a write that happened. The frozen
+  17-type event schema is untouched: the loop narrates through the existing
+  `think` and `memory` types. Design and measurements:
+  [GLM54-ADAPTATION.md](GLM54-ADAPTATION.md).
+- **Test:** `.venv/bin/python -m pytest tests/test_reasoning_loop.py tests/test_context_cache.py tests/test_provider_fallback_vision.py tests/test_memory_recall_related.py tests/test_refinement_turn.py` and the full suite.
+- **Verification:** focused suites pass; full backend suite `1795 passed,
+  44 skipped` in 4 m 40 s on the final tree (`-p no:randomly`, junit at
+  `/tmp/junit3.xml`), plus the new `test_shared_file_path_overrides_the_overlap_floor`
+  and `test_memory_written_by_one_turn_is_recalled_by_the_next`. Live proof with a real provider
+  (`kilo`, `baidu/ernie-5.5-flash-preview:free`): three turns ended `ok`,
+  `docs/screenshots/11-reasoning-*.png` show the DRAFT complexity line, the
+  recall line and TEMPER verification. `scripts/bench_reasoning.py` measures
+  the context reuse (9.78 → 0.042 ms/turn) and the recall cost. Known limits:
+  the complexity estimator is lexical, the gate weight is a scheduling
+  heuristic rather than a learned probability, and refinement re-plans a whole
+  attempt instead of merging file sets.

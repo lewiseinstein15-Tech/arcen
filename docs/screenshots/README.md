@@ -93,3 +93,27 @@ this, it planned `file.read calc.py`, re-planned twice, and the turn died with
 planner receives (`## workspace`, also visible in the prompt inspector), so
 the same goal plans `file.write calc.py` → `file.write test_calc.py` →
 `pytest` → `2 passed`, TEMPER verified, turn `ok`, 3 steps · 14.01 s.
+
+The `11-reasoning-*` set is the v0.3 reasoning layer in the product UI, on a
+live provider (`kilo`, `baidu/ernie-5.5-flash-preview:free`), served by the
+backend alone. Nothing was scripted: the goal
+`create fizzbuzz.py with fizzbuzz(n) and test_fizzbuzz.py, then run pytest`
+went through the real planner, the real Docker sandbox and the real verifier.
+
+| File | What it shows |
+| --- | --- |
+| `11-reasoning-01-idle.png` | The app before the turn |
+| `11-reasoning-02-turn.png` | Turn `ok`: `file.write` ×2, `pytest` → `3 passed`, TEMPER verified, memory write, `3 steps · 7.9s` |
+| `11-reasoning-03-plan.png` | The same turn from the top: a `recall` line from memory, the 3-step plan, and `DRAFT Complexity moderate (score 1.60); allowing 1 refinement pass(es).` |
+
+That last line is the new part. The goal is scored before any work starts, and
+the budget it earns is what bounds the refinement loop. On this goal the first
+verification passed, so no refinement was spent — which is the intended
+outcome, and visible on the stream rather than hidden.
+
+Capture them again with:
+
+```bash
+.venv/bin/arcen serve                                  # serves the API and ui/dist
+.venv/bin/python scripts/capture_reasoning_shots.py    # writes docs/screenshots/11-*.png
+```

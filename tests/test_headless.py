@@ -34,6 +34,9 @@ class Planner:
 def make_state(tmp_path, llm=None):
     config = ArcenConfig()
     config.session.dir = str(tmp_path / "sessions")
+    # A turn reads and writes memory; without this every test would share
+    # (and pollute) the developer's real ~/.arcen/memory.db.
+    config.memory.db = str(tmp_path / "memory.db")
     state = ServerState(config)
     state.llm = llm
     return state

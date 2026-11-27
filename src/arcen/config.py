@@ -87,6 +87,16 @@ DEFAULT_CONFIG: dict = {
     "stream": {"port": 3002, "content_type": "application/x-ndjson"},
     "session": {"dir": "~/.arcen/sessions"},
     "memory": {"db": "~/.arcen/memory.db", "decay_half_life_days": 14},
+    "reasoning": {
+        "enabled": True,
+        "max_passes": 3,
+        "min_gain": 0.05,
+        "first_pass_cap": 0.35,
+        "later_pass_ramp": 0.3,
+        "confidence_floor": 0.6,
+        "independent_review": True,
+        "checkpoints": True,
+    },
     "harnessing": {"enabled": False},
 }
 
@@ -106,6 +116,12 @@ class ProviderConfig(BaseModel):
     base_url: str = ""
     api_key: str = ""
     model: str = ""
+    # Multimodal override: empty → the role's model is probed instead. A
+    # vision-capable model here is what /api/vision and describe_image use.
+    vision_model: str = ""
+    # Ordered alternates, tried only when this provider raises. Empty keeps
+    # the single-provider behaviour of v0.1.6.
+    fallbacks: list[ProviderConfig] = Field(default_factory=list)
     max_retries: int = Field(default=3, ge=0, le=10)
     retry_backoff_seconds: float = Field(default=1.0, ge=0, le=30)
 
@@ -185,6 +201,25 @@ class MemoryConfig(BaseModel):
     decay_half_life_days: int = 14
 
 
+class ReasoningConfig(BaseModel):
+    """Iterative refinement settings (docs/GLM54-ADAPTATION.md).
+
+    ``max_passes`` counts the first attempt: 3 means "attempt + up to 2
+    refinements". ``independent_review`` asks a second model for a verdict
+    when one is configured; with a single model the review is labelled
+    not-independent instead of being silently trusted.
+    """
+
+    enabled: bool = True
+    max_passes: int = Field(default=3, ge=1, le=6)
+    min_gain: float = Field(default=0.05, ge=0.0, le=1.0)
+    first_pass_cap: float = Field(default=0.35, ge=0.0, le=1.0)
+    later_pass_ramp: float = Field(default=0.3, ge=0.0, le=1.0)
+    confidence_floor: float = Field(default=0.6, ge=0.0, le=1.0)
+    independent_review: bool = True
+    checkpoints: bool = True
+
+
 class HarnessingConfig(BaseModel):
     """The only supported setting is a literal, disabled boolean."""
 
@@ -215,6 +250,7 @@ class ArcenConfig(BaseModel):
     stream: StreamConfig = Field(default_factory=StreamConfig)
     session: SessionConfig = Field(default_factory=SessionConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    reasoning: ReasoningConfig = Field(default_factory=ReasoningConfig)
     harnessing: HarnessingConfig = Field(default_factory=HarnessingConfig)
 
     def to_dict(self) -> dict:

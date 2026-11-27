@@ -43,6 +43,7 @@ from arcen.agents.draft import DraftPlanner
 from arcen.agents.forge import ForgeExecutor
 from arcen.agents.temper import verify_sandbox_tests
 from arcen.config import ArcenConfig, default_config_path, load_config, resolve_secrets, save_config
+from arcen.context import fingerprint
 from arcen.guardrails import default_policy
 from arcen.harness import HarnessError
 from arcen.harness.manifest import check_model_pin, default_manifest
@@ -52,6 +53,15 @@ from arcen.llm.client import ProviderError, classify_provider_failure, format_pr
 from arcen.llm.usage import MeteredClient, UsageAccumulator
 from arcen.mcp.client import McpError, McpManager
 from arcen.plugins.loader import PluginLoader
+from arcen.reasoning import (
+    Candidate,
+    LoopCheckpoint,
+    Observation,
+    PassOutput,
+    RefinementLoop,
+    UpdateGate,
+    estimate_complexity,
+)
 from arcen.sandbox.turn import IsolationUnavailable, create_turn_registry, execution_status
 from arcen.session.store import SessionStore
 from arcen.skills.loader import SkillsLoader
@@ -63,6 +73,7 @@ from arcen.stream.events import (
     RunDone,
     RunError,
     RunStart,
+    Think,
     Usage,
 )
 from arcen.tools import catalog
@@ -133,6 +144,23 @@ class ServerState:
             )
             self.mcp_thread.start()
         self.store = SessionStore(self.config.session.dir)
+        # Memory was write-only in the turn path before this: every turn
+        # emitted a `memory` write and nothing ever read it back. The store
+        # is owned here so planning can recall related facts (recall_related)
+        # and the brief can say what earlier turns established.
+        self._memory_local = threading.local()
+        self._memory_disabled = False
+        self.memory = self.memory_store()  # main-thread instance for endpoints
+        # Context reuse: rendered blocks (catalog/skills/brief) are cached
+        # per content version; retrieval results are memoized per corpus
+        # version. Both are invalidated explicitly, never by time.
+        from arcen.context import ContextCache, RetrievalIndex
+
+        self.context_cache = ContextCache()
+        self.retrieval = RetrievalIndex()
+        from arcen.reasoning import CheckpointStore
+
+        self.checkpoints = CheckpointStore()
         self.plugin_loader = _boot_plugins(self.config)
         if self.plugin_loader.active("after_tool") or self.plugin_loader.active("before_tool"):
             self.registry = HookedRegistry(self.registry, self.plugin_loader)
@@ -171,6 +199,29 @@ class ServerState:
                 "available — sandboxed tasks will be REFUSED at /api/run "
                 "with a clear error until Docker is running and the image is installed"
             )
+
+    def memory_store(self):
+        """The calling thread's MemoryStore, or None when memory is broken.
+
+        sqlite3 connections are thread-bound, and turns run on worker
+        threads, so one connection per thread is the only safe sharing
+        model here. WAL mode makes the separate connections cheap.
+        """
+        if self._memory_disabled:
+            return None
+        store = getattr(self._memory_local, "store", None)
+        if store is not None:
+            return store
+        from arcen.memory.store import MemoryStore
+
+        try:
+            store = MemoryStore(self.config.memory.db, self.config.memory.decay_half_life_days)
+        except Exception as exc:  # noqa: BLE001 — a broken db must not block boot
+            log.warning("[memory] unavailable: %s", exc)
+            self._memory_disabled = True
+            return None
+        self._memory_local.store = store
+        return store
 
     def emitter_for(self, session_id: str) -> StreamEmitter:
         with self._lock:
@@ -361,18 +412,58 @@ def run_turn(
         # that fails at dispatch, so it is not advertised.
         turn_llm = MeteredClient(state.llm, usage) if state.llm is not None else None
         plan_tools = _plannable_tools(state)
-        brief = "\n\n".join(
-            part
-            for part in (
-                catalog.workspace_note(imported=workspace is not None),
-                catalog.render_many(
-                    (state.registry, getattr(state, "host_registry", None)),
-                    available=plan_tools,
-                ),
-                catalog.render_skills(getattr(state, "skill_index", {})),
-            )
-            if part
+
+        # Memory is read before it is written. `recall_related` ranks live
+        # facts by token overlap, so a new goal can reuse what an earlier
+        # turn established instead of re-deriving it. A recall failure is
+        # never fatal — the brief simply carries no memory section.
+        recalled: list[dict] = []
+        memory = state.memory_store()
+        if memory is not None:
+            try:
+                recalled = memory.recall_related(goal, k=3)
+            except Exception as exc:  # noqa: BLE001 — memory is an optimisation
+                log.warning("[memory] recall failed: %s", exc)
+            if recalled:
+                emit(
+                    Memory(
+                        seq=0,
+                        op="recall",
+                        entity=goal[:64],
+                        fact=f"{len(recalled)} related fact(s) recalled",
+                        ts=0.0,
+                    )
+                )
+
+        # The catalog and skills index change only when tools, skills or MCP
+        # servers do, so the rendered brief is cached under a version
+        # fingerprint instead of rebuilt on every turn (context/cache.py).
+        # Memory is per-goal and therefore not part of the cached block.
+        brief_key = "brief:" + fingerprint(
+            tuple(sorted(plan_tools)),
+            tuple(sorted(getattr(state, "skill_index", {}) or {})),
+            bool(workspace is not None),
+            len(getattr(state.mcp, "clients", {}) or {}),
         )
+        brief = state.context_cache.get_or_compute(
+            brief_key,
+            lambda: "\n\n".join(
+                part
+                for part in (
+                    catalog.workspace_note(imported=workspace is not None),
+                    catalog.render_many(
+                        (state.registry, getattr(state, "host_registry", None)),
+                        available=plan_tools,
+                    ),
+                    catalog.render_skills(getattr(state, "skill_index", {})),
+                )
+                if part
+            ),
+        )
+        if recalled:
+            brief = f"{brief}\n\n## memory\n" + "\n".join(
+                f"- {fact['entity']}: {fact['fact']}" for fact in recalled
+            )
         draft = DraftPlanner(llm=turn_llm, emit=emit, tool_catalog=brief, tool_names=plan_tools)
         plan_events = draft.open_turn(goal)
         if plan_events and plan_events[-1].TYPE == "answer":
@@ -398,19 +489,13 @@ def run_turn(
         # nothing useful (empty, or the same failing step again) is terminal;
         # a step that already failed with the same error is terminal. The
         # goal text is NEVER run as a command (T-037).
-        def interrupted_done() -> bool:
-            if interrupted.is_set():
-                emit(
-                    RunDone(
-                        seq=0,
-                        status="interrupted",
-                        steps=executed,
-                        duration_s=round(time.time() - turn_start, 4),
-                        ts=0.0,
-                    )
-                )
-                return True
-            return False
+        if isolated_registry is None:
+            isolated_registry = create_turn_registry(state.config)
+        run_registry = CompositeRegistry(isolated_registry, state.host_registry)
+        if state.plugin_loader.active("after_tool") or state.plugin_loader.active("before_tool"):
+            run_registry = HookedRegistry(run_registry, state.plugin_loader)
+        forge = ForgeExecutor(run_registry, emit=emit)
+        executed = 0
 
         def step_sig(step: dict) -> tuple[str, str]:
             """Identity of a step for the repeat-failure guard: tool + args."""
@@ -419,82 +504,230 @@ def run_turn(
                 json.dumps(step.get("args") or {}, sort_keys=True, default=str),
             )
 
-        if isolated_registry is None:
-            isolated_registry = create_turn_registry(state.config)
-        run_registry = CompositeRegistry(isolated_registry, state.host_registry)
-        if state.plugin_loader.active("after_tool") or state.plugin_loader.active("before_tool"):
-            run_registry = HookedRegistry(run_registry, state.plugin_loader)
-        forge = ForgeExecutor(run_registry, emit=emit)
-        executed = 0
-        last_cmd: tuple[str, dict] | None = None
-        last_ok = True
-        pending: list[dict] = list(steps)
-        replans = 0
-        MAX_REPLANS = 2
-        failed_sigs: set[tuple[str, str]] = set()
-        failure: str | None = None
+        def run_plan(pending_steps: list[dict]) -> dict:
+            """FORGE executes a step list, one step at a time.
 
-        while pending:
-            step = pending.pop(0)
-            if interrupted_done():
-                return
-            # args come from the plan (the LLM fills them); a step without
-            # the args its tool needs simply fails and DRAFT re-plans
-            args = step.get("args") or {}
-            events = forge.execute_step({**step, "args": args})
-            executed += 1
-            last_ok = events[1].ok
-            last_cmd = (step.get("tool") or "bash", args)
-            if interrupted_done():
-                return
-            if events[1].ok:
-                continue
+            A failed step triggers a DRAFT replan and the run CONTINUES with
+            the corrected steps (T-042). Bounds: max 2 replans per attempt; a
+            replan that returns nothing useful (empty, or the same failing
+            step again) is terminal; a step that already failed with the same
+            error is terminal. The goal text is NEVER run as a command (T-037).
+            """
+            nonlocal executed
+            pending = list(pending_steps)
+            replans = 0
+            max_replans = 2
+            failed_sigs: set[tuple[str, str]] = set()
+            failure: str | None = None
+            last_cmd: tuple[str, dict] | None = None
+            last_ok = True
+            observations: list[Observation] = []
 
-            done = events[1]
-            res = done.result if isinstance(done.result, dict) else {}
-            err = str(res.get("error") or res.get("detail") or "unknown error")[:300]
-            reason = f"step {step.get('id')} ({step.get('tool') or 'bash'}) failed: {err}"
-            sig = step_sig(step)
+            while pending:
+                step = pending.pop(0)
+                if interrupted.is_set():
+                    return {
+                        "failure": "interrupted",
+                        "executed": executed,
+                        "last_cmd": last_cmd,
+                        "last_ok": last_ok,
+                        "observations": observations,
+                        "interrupted": True,
+                    }
+                # args come from the plan (the LLM fills them); a step without
+                # the args its tool needs simply fails and DRAFT re-plans
+                args = step.get("args") or {}
+                events = forge.execute_step({**step, "args": args})
+                executed += 1
+                last_ok = events[1].ok
+                last_cmd = (step.get("tool") or "bash", args)
+                result = events[1].result if isinstance(events[1].result, dict) else {}
+                observations.append(
+                    Observation(
+                        tool=step.get("tool") or "bash",
+                        ok=bool(events[1].ok),
+                        detail=json.dumps(result, default=str)[:1500],
+                    )
+                )
+                if interrupted.is_set():
+                    return {
+                        "failure": "interrupted",
+                        "executed": executed,
+                        "last_cmd": last_cmd,
+                        "last_ok": last_ok,
+                        "observations": observations,
+                        "interrupted": True,
+                    }
+                if events[1].ok:
+                    continue
 
-            if sig in failed_sigs:
-                # this exact step already failed once this turn — replanning
-                # again cannot help; a third identical run proves nothing
-                failure = f"the same step failed twice — treating as terminal: {err}"
-                break
-            if replans >= MAX_REPLANS:
-                failure = f"replanned twice, still failing: {err}"
-                break
+                err = str(result.get("error") or result.get("detail") or "unknown error")[:300]
+                reason = f"step {step.get('id')} ({step.get('tool') or 'bash'}) failed: {err}"
+                sig = step_sig(step)
 
-            failed_sigs.add(sig)
-            replans += 1
-            # DRAFT re-plans; the plan.update is already on the stream (live)
-            plan_events = draft.replan(goal, reason, failed_step=step)
-            update = plan_events[-1] if plan_events else None
-            new_steps = getattr(update, "steps", None)
-            if not isinstance(update, PlanUpdate) or not new_steps:
-                failure = f"replan produced no usable plan: {err}"
-                break
-            if step_sig(new_steps[0]) == sig:
-                # replanning returned the step that just failed — running it
-                # again would loop forever; treat as terminal now
-                failure = f"replan returned the same failing step — not looping: {err}"
-                break
-            pending = list(new_steps)  # corrected steps replace the remainder
+                if sig in failed_sigs:
+                    # this exact step already failed once this turn — replanning
+                    # again cannot help; a third identical run proves nothing
+                    failure = f"the same step failed twice — treating as terminal: {err}"
+                    break
+                if replans >= max_replans:
+                    failure = f"replanned twice, still failing: {err}"
+                    break
 
-        # Discover tests in the same sandbox; never replay a work command.
-        verification_status = "unverified"
-        if failure is None and last_cmd is not None and last_ok:
-            verification_status = verify_sandbox_tests(
-                run_registry, step=executed, target=goal[:64], emit=emit
+                failed_sigs.add(sig)
+                replans += 1
+                # DRAFT re-plans; the plan.update is already on the stream (live)
+                plan_events = draft.replan(goal, reason, failed_step=step)
+                update = plan_events[-1] if plan_events else None
+                new_steps = getattr(update, "steps", None)
+                if not isinstance(update, PlanUpdate) or not new_steps:
+                    failure = f"replan produced no usable plan: {err}"
+                    break
+                if step_sig(new_steps[0]) == sig:
+                    # replanning returned the step that just failed — running it
+                    # again would loop forever; treat as terminal now
+                    failure = f"replan returned the same failing step — not looping: {err}"
+                    break
+                pending = list(new_steps)  # corrected steps replace the remainder
+
+            return {
+                "failure": failure,
+                "executed": executed,
+                "last_cmd": last_cmd,
+                "last_ok": last_ok,
+                "observations": observations,
+                "interrupted": False,
+            }
+
+        def produce(ctx) -> PassOutput:
+            """One attempt: plan (or repair) → execute → verify."""
+            if ctx.pass_no == 0:
+                attempt_steps = list(steps)
+            else:
+                # Refinement is driven by the verifier's contradictions, not
+                # by the model's opinion of itself.
+                reason = "; ".join(ctx.contradictions[:3]) or "verification did not pass"
+                events = draft.replan(goal, f"refinement pass {ctx.pass_no}: {reason}")
+                update = events[-1] if events else None
+                new_steps = getattr(update, "steps", None)
+                if not isinstance(update, PlanUpdate) or not new_steps:
+                    raise RuntimeError(f"refinement produced no usable plan: {reason}")
+                attempt_steps = list(new_steps)
+
+            outcome = run_plan(attempt_steps)
+            status = "unverified"
+            if (
+                outcome["failure"] is None
+                and outcome["last_cmd"] is not None
+                and outcome["last_ok"]
+            ):
+                # Discover tests in the same sandbox; never replay a work command.
+                status = verify_sandbox_tests(
+                    run_registry, step=executed, target=goal[:64], emit=emit
+                )
+            outcome["verification_status"] = status
+            return PassOutput(
+                candidate=Candidate(value=outcome, claim=goal),
+                observations=outcome["observations"],
+                test_status=status,
+                tokens=0,
             )
-        verified = verification_status == "pass"
 
+        # Adaptive depth: a one-file task gets one attempt; a multi-stage
+        # repository change earns refinements. The budget is lexical and
+        # bounded by reasoning.max_passes — see reasoning/complexity.py.
+        complexity = estimate_complexity(goal, max_passes=state.config.reasoning.max_passes)
+        budget = complexity.budget if state.config.reasoning.enabled else 0
+        if budget:
+            emit(
+                Think(
+                    seq=0,
+                    agent="DRAFT",
+                    text=(
+                        f"Complexity {complexity.level} (score {complexity.score:.2f}); "
+                        f"allowing {budget} refinement pass(es)."
+                    ),
+                    ts=0.0,
+                )
+            )
+
+        def record_pass(record) -> None:
+            if not state.config.reasoning.checkpoints:
+                return
+            try:
+                state.checkpoints.write(
+                    LoopCheckpoint(
+                        run_id=run_id,
+                        goal=goal[:500],
+                        pass_index=record.index,
+                        action=record.action,
+                        write_weight=record.write_weight,
+                        ok=record.ok,
+                        confidence=record.confidence,
+                        contradictions=list(record.contradictions)[:8],
+                    )
+                )
+            except OSError as exc:
+                log.warning("[checkpoints] write failed: %s", exc)
+
+        loop = RefinementLoop(
+            budget=budget,
+            gate=UpdateGate(
+                first_pass_cap=state.config.reasoning.first_pass_cap,
+                later_pass_ramp=state.config.reasoning.later_pass_ramp,
+                confidence_floor=state.config.reasoning.confidence_floor,
+                min_gain=state.config.reasoning.min_gain,
+            ),
+            max_passes=state.config.reasoning.max_passes,
+            min_gain=state.config.reasoning.min_gain,
+            on_pass=record_pass,
+        )
+        result = loop.run(produce, goal=goal)
+
+        accepted = result.accepted.value
+        if accepted.get("interrupted"):
+            emit(
+                RunDone(
+                    seq=0,
+                    status="interrupted",
+                    steps=executed,
+                    duration_s=round(time.time() - turn_start, 4),
+                    ts=0.0,
+                )
+            )
+            return
+        failure = accepted["failure"]
+        verification_status = accepted["verification_status"]
+        executed = accepted["executed"]
+        verified = verification_status == "pass"
+        if result.pass_count > 1:
+            emit(
+                Think(
+                    seq=0,
+                    agent="TEMPER",
+                    text=(
+                        f"Refined over {result.pass_count} passes ({result.termination}); "
+                        f"accepted confidence {result.verdict.confidence:.2f}, "
+                        f"{len(result.verdict.contradictions)} contradiction(s) remaining."
+                    ),
+                    ts=0.0,
+                )
+            )
+
+        # The event and the store must agree: an event that reports a write
+        # which never happened is a lie the next turn's recall cannot see.
+        memory_fact = f"turn {run_id}: {executed} steps, verified={verified}"
+        if memory is not None:
+            try:
+                memory.write(goal[:64], memory_fact, source="turn")
+            except Exception as exc:  # noqa: BLE001 — memory is not the turn
+                log.warning("[memory] write failed: %s", exc)
         emit(
             Memory(
                 seq=0,
                 op="write",
                 entity=goal[:64],
-                fact=f"turn {run_id}: {executed} steps, verified={verified}",
+                fact=memory_fact,
                 ts=0.0,
             )
         )
