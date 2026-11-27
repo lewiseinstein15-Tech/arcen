@@ -3,6 +3,8 @@
 # Usage: bash setup-omarchy.sh [work-dir]   (default: ~/Work)
 set -euo pipefail
 
+say() { printf '[setup] %s\n' "$*"; }
+
 sudo pacman -S --needed --noconfirm python nodejs npm git docker docker-buildx docker-compose
 sudo systemctl enable --now docker.socket
 
@@ -22,13 +24,16 @@ MSG
 fi
 
 cd "${1:-$HOME/Work}"
+say "cloning into $(pwd)/arcen"
 [ -d arcen ] || git clone https://github.com/lewiseinstein15-Tech/arcen
 cd arcen
 
+say "python environment"
 [ -d .venv ] || python -m venv .venv
 .venv/bin/python -m pip install -q --upgrade pip
 .venv/bin/pip install -q -e ".[sandbox]"
 
+say "sandbox image"
 IMAGE=ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0
 docker image inspect "$IMAGE" >/dev/null 2>&1 \
   || docker pull "$IMAGE" \
@@ -46,9 +51,24 @@ YAML
   chmod 600 "$HOME/.arcen/config.yaml"
 fi
 
-npm --prefix ui install --silent
+# --silent hides npm's own error text, which turns a failed install into a
+# script that dies with no message at all. Keep the output.
+say "UI dependencies (this is the slow one)"
+npm --prefix ui install --no-fund --no-audit
+say "UI build"
 npm --prefix ui run build
 
+if [ ! -f ui/dist/index.html ]; then
+  cat >&2 <<'MSG'
+UI build produced no ui/dist/index.html, so the backend would answer / with
+{"detail":"Not Found"}. Read the npm output above, or run the dev server instead:
+
+  ./scripts/dev.sh      # backend :3002, Vite :5173
+MSG
+  exit 1
+fi
+
+say "starting the server"
 .venv/bin/arcen serve &
 SERVER=$!
 trap 'kill "$SERVER" 2>/dev/null || true' EXIT
