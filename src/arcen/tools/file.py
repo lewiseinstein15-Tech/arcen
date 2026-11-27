@@ -89,7 +89,11 @@ class FileEdit(BaseTool):
             raise ValueError(f"needle not found in {a.path}")
         if a.count >= 0 and occurrences > a.count:
             raise ValueError(f"needle is ambiguous: {occurrences} occurrences, count={a.count}")
-        updated = content.replace(a.find, a.replace) if a.count < 0 else content.replace(a.find, a.replace, a.count)
+        updated = (
+            content.replace(a.find, a.replace)
+            if a.count < 0
+            else content.replace(a.find, a.replace, a.count)
+        )
         with open(a.path, "w", encoding="utf-8") as fh:
             fh.write(updated)
         return {

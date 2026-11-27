@@ -98,7 +98,20 @@ INTENTS = frozenset({DIRECT, RESEARCH, CODE, UNKNOWN})
 
 # single pleasantries — the whole (punctuation-stripped) message
 _CONVERSATIONAL_WORDS = frozenset(
-    {"hello", "hi", "hey", "yo", "thanks", "thank", "bye", "goodbye", "ok", "okay", "sup", "greetings"}
+    {
+        "hello",
+        "hi",
+        "hey",
+        "yo",
+        "thanks",
+        "thank",
+        "bye",
+        "goodbye",
+        "ok",
+        "okay",
+        "sup",
+        "greetings",
+    }
 )
 
 # short social / self questions — matched as full (punctuation-stripped) messages

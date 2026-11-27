@@ -68,7 +68,7 @@ def repo(tmp_path):
 def helper(root, name, args):
     """Run the in-container helper on the host, exactly as the boundary would."""
     argv = ["python3", "-c", HELPER, name, str(root), json.dumps(args)]
-    done = subprocess.run(argv, capture_output=True, text=True, timeout=60)
+    done = subprocess.run(argv, check=False, capture_output=True, text=True, timeout=60)
     return json.loads(done.stdout)
 
 
@@ -122,7 +122,9 @@ def test_log_and_show_agree(repo):
 
 
 def test_commit_round_trip_agrees(repo):
-    (repo / "src" / "app.py").write_text("def add(a, b):\n    return a + b\n\n\ndef sub(a, b):\n    return a - b\n")
+    (repo / "src" / "app.py").write_text(
+        "def add(a, b):\n    return a + b\n\n\ndef sub(a, b):\n    return a - b\n"
+    )
     assert call(GitAdd(), root=str(repo), paths=["src/app.py"])["ok"] is True
     host = call(GitCommit(), root=str(repo), message="add sub")["result"]
     assert host["summary"] == "add sub"

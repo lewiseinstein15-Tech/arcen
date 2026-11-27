@@ -1,6 +1,7 @@
 """A-07 capability reporting is distinct from registry inventory."""
 
 from arcen.config import ArcenConfig
+from arcen.guardrails import default_policy
 from arcen.sandbox.turn import execution_status
 
 
@@ -12,15 +13,9 @@ def test_unavailable_sandbox_has_no_effective_tools(monkeypatch):
     status = execution_status(ArcenConfig())
     assert status["effective"] == "unavailable"
     assert status["effective_tools"] == []
-    assert status["supported_tools"] == [
-        "bash",
-        "file.read",
-        "file.write",
-        "file.list",
-        "file.glob",
-        "search.text",
-        "file.edit",
-    ]
+    # The allowlist is the source of truth; this asserts the report follows it
+    # rather than pinning a second copy of the list.
+    assert status["supported_tools"] == list(default_policy().execution.allowed_tools)
 
 
 def test_available_image_reports_only_isolated_policy_tools(monkeypatch):

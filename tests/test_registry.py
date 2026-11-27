@@ -4,6 +4,9 @@ Proves: 40 tools register; duplicate name and hand-written schema
 rejected; MCP namespace not shadowed; schemas auto-generated from hints.
 """
 
+import tomllib
+from pathlib import Path
+
 import pytest
 
 from arcen.tools import (
@@ -24,9 +27,14 @@ def registry() -> Registry:
     return load_builtin()
 
 
-def test_40_tools_register(registry: Registry) -> None:
-    # mirrors the ticket Verification: 40 tools registered
-    assert len(registry) == 40
+def test_the_core_manifest_registers_every_entry(registry: Registry) -> None:
+    # The ticket's 40 core tools are a floor, not a ceiling: git, patch and
+    # repo.map joined the manifest later, and the count must track the file.
+    manifest = tomllib.loads(
+        (Path(__file__).resolve().parents[1] / "src/arcen/tools/registry.toml").read_text()
+    )
+    assert len(registry) == len(manifest["tool"])
+    assert len(registry) >= 40
     assert "bash" in registry
     assert "file.edit" in registry
     assert registry.names() == sorted(registry.names())

@@ -146,7 +146,9 @@ class Registry:
         if name in self._tools:
             raise RegistryError(f"duplicate tool name {name!r}")
         if tool.danger not in DANGERS:
-            raise RegistryError(f"tool {name!r}: danger must be one of {DANGERS}, got {tool.danger!r}")
+            raise RegistryError(
+                f"tool {name!r}: danger must be one of {DANGERS}, got {tool.danger!r}"
+            )
         try:
             schema = tool.schema()
         except Exception as exc:  # noqa: BLE001

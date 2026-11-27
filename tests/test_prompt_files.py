@@ -24,7 +24,15 @@ def copied_harness(tmp_path):
     return tmp_path
 
 
-def test_pre_externalization_provider_payloads_are_byte_identical():
+def test_provider_payloads_match_the_recorded_baseline():
+    """Golden payloads: any prompt change must be deliberate and re-recorded.
+
+    The fixture began as the pre-externalization capture (H-02) proving that
+    moving prompts into harness files changed nothing. It is now the standing
+    baseline: a diff here means the model will see different text, which is
+    fine only when the change was intended — so re-record it in the same
+    commit as the prompt edit.
+    """
     fixture = ROOT / "tests/fixtures/prompts/H-02-before.json"
     original = json.loads(fixture.read_text(encoding="utf-8"))
     actual = capture_prompt_payloads()

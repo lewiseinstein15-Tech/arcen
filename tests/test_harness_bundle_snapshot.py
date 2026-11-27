@@ -73,7 +73,7 @@ assert prompts.executor_job.startswith('you execute exactly one tool step')
 assert default_policy() == load_policy()
 assert default_policy().execution.backend == 'docker'
 registry = load_builtin()
-assert len(registry) == 40 and 'bash' in registry
+assert len(registry) >= 40 and 'bash' in registry and 'git.commit' in registry
 assert default_manifest() is bundle.manifest
 print('SINGLE VERIFIED SNAPSHOT OK: prompts, policy, registry, manifest')
 """

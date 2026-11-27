@@ -18,7 +18,9 @@ SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "bu
 
 class SearchText(BaseTool):
     name = "search.text"
-    description = "Regex search across text files under a root. Returns path, line number, and line."
+    description = (
+        "Regex search across text files under a root. Returns path, line number, and line."
+    )
     version = "1.0.0"
     danger = "safe"
 
@@ -41,9 +43,15 @@ class SearchText(BaseTool):
                     with open(full, "r", encoding="utf-8", errors="ignore") as fh:
                         for lineno, line in enumerate(fh, 1):
                             if rx.search(line):
-                                matches.append({"path": full, "line": lineno, "text": line.rstrip()[:300]})
+                                matches.append(
+                                    {"path": full, "line": lineno, "text": line.rstrip()[:300]}
+                                )
                                 if len(matches) >= a.limit:
-                                    return {"matches": matches, "count": len(matches), "truncated": True}
+                                    return {
+                                        "matches": matches,
+                                        "count": len(matches),
+                                        "truncated": True,
+                                    }
                 except OSError:
                     continue
         return {"matches": matches, "count": len(matches), "truncated": False}
@@ -101,9 +109,20 @@ class SearchSymbols(BaseTool):
                     for lineno, line in enumerate(fh, 1):
                         m = rx.match(line)
                         if m and not line.startswith((" ", "\t")):
-                            symbols.append({"path": target, "line": lineno, "kind": m.group(1), "name": m.group(2)})
+                            symbols.append(
+                                {
+                                    "path": target,
+                                    "line": lineno,
+                                    "kind": m.group(1),
+                                    "name": m.group(2),
+                                }
+                            )
                             if len(symbols) >= a.limit:
-                                return {"symbols": symbols, "count": len(symbols), "truncated": True}
+                                return {
+                                    "symbols": symbols,
+                                    "count": len(symbols),
+                                    "truncated": True,
+                                }
             except OSError:
                 continue
         return {"symbols": symbols, "count": len(symbols), "truncated": False}

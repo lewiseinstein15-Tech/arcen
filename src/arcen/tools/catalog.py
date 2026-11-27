@@ -20,7 +20,10 @@ keep it honest and cheap:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
+
+log = logging.getLogger(__name__)
 
 MAX_CHARS = 6000
 MAX_TOOLS = 80
@@ -71,6 +74,36 @@ def _args(schema: dict, *, optional: bool) -> list[str]:
     return rendered
 
 
+class _Merged:
+    """Read-only view over several registries; the first definition wins.
+
+    The builtin registry comes first so a host tool can never shadow a
+    sandbox tool's schema, matching the dispatch rule in CompositeRegistry.
+    """
+
+    def __init__(self, registries: Iterable) -> None:
+        self._registries = [r for r in registries if r is not None]
+
+    def names(self) -> list[str]:
+        seen: set[str] = set()
+        for registry in self._registries:
+            seen |= set(registry.names())
+        return sorted(seen)
+
+    def get(self, name: str):
+        for registry in self._registries:
+            try:
+                return registry.get(name)
+            except KeyError:
+                continue
+        raise KeyError(name)
+
+
+def render_many(registries: Iterable, **kwargs) -> str:
+    """Render a catalog over several registries (builtin + host-side tools)."""
+    return render(_Merged(registries), **kwargs)
+
+
 def entries(
     registry,
     *,
@@ -89,7 +122,8 @@ def entries(
         try:
             tool = registry.get(name)
             schema = tool.schema()
-        except Exception:  # noqa: BLE001 — a broken tool is not a planner problem
+        except Exception as exc:  # noqa: BLE001 — a broken tool is not a planner problem
+            log.warning("catalog: skipping %s (%s)", name, exc)
             continue
         if not isinstance(schema, dict):
             continue
@@ -161,6 +195,28 @@ def render(
             if len(text) <= max_chars:
                 return text
     return text[:max_chars]
+
+
+def render_skills(index: dict, *, max_chars: int = 2000) -> str:
+    """The skills index as prompt text: names and descriptions only.
+
+    Bodies stay on disk until ``skill.load`` asks for one — that is the whole
+    point of progressive loading, and it keeps a 500-skill library cheap.
+    """
+    if not index:
+        return ""
+    lines = []
+    for name in sorted(index):
+        meta = index[name]
+        lines.append(f"{meta.name} — {_clip(meta.description, 140)}")
+    text = "\n".join(lines)
+    if len(text) > max_chars:
+        text = text[:max_chars].rsplit("\n", 1)[0]
+    return (
+        "## skills\n"
+        + text
+        + '\nLoad one with skill.load {"name": "<name>"} when it fits the task.'
+    )
 
 
 def names(registry, *, available: Iterable[str] | None = None) -> set[str]:

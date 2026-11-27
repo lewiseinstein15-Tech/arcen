@@ -60,8 +60,11 @@ from arcen.stream.events import (
     RunStart,
     Usage,
 )
+from arcen.skills.loader import SkillsLoader
 from arcen.tools import catalog
-from arcen.tools.registry import load_builtin
+from arcen.tools.composite import CompositeRegistry
+from arcen.tools.registry import Registry, load_builtin
+from arcen.tools.skills import SkillList, SkillLoad
 
 app = FastAPI(title="ARCEN", version="0.1.0")
 
@@ -90,6 +93,17 @@ class ServerState:
         check_model_pin(self.manifest, self.config)
         self.llm = build_llm_client(self.config)  # None → offline mode
         self.registry = load_builtin()
+        # Host-side tools live in their own registry: they run in this
+        # process, not in the turn container, and a turn reaches them
+        # through CompositeRegistry.
+        self.host_registry = Registry()
+        self.skills = SkillsLoader(self.config.skills.paths)
+        self.skill_index = self.skills.index()
+        self.host_registry.register(SkillList(self.skills, self.skill_index))
+        self.host_registry.register(SkillLoad(self.skills, self.skill_index))
+        log.info(
+            "[skills] %d skill(s) indexed from %s", len(self.skill_index), self.config.skills.paths
+        )
         self.store = SessionStore(self.config.session.dir)
         self.plugin_loader = _boot_plugins(self.config)
         if self.plugin_loader.active("after_tool") or self.plugin_loader.active("before_tool"):
@@ -239,7 +253,9 @@ def _plannable_tools(state: ServerState) -> set[str]:
     plannable, because FORGE calls them through the same registry interface.
     """
     allowed = set(default_policy().execution.allowed_tools)
-    allowed |= set(getattr(state, "host_tools", ()) or ())
+    host = getattr(state, "host_registry", None)
+    if host is not None:
+        allowed |= set(host.names())
     return allowed
 
 
@@ -317,12 +333,18 @@ def run_turn(
         # that fails at dispatch, so it is not advertised.
         turn_llm = MeteredClient(state.llm, usage) if state.llm is not None else None
         plan_tools = _plannable_tools(state)
-        draft = DraftPlanner(
-            llm=turn_llm,
-            emit=emit,
-            tool_catalog=catalog.render(state.registry, available=plan_tools),
-            tool_names=plan_tools,
+        brief = "\n\n".join(
+            part
+            for part in (
+                catalog.render_many(
+                    (state.registry, getattr(state, "host_registry", None)),
+                    available=plan_tools,
+                ),
+                catalog.render_skills(getattr(state, "skill_index", {})),
+            )
+            if part
         )
+        draft = DraftPlanner(llm=turn_llm, emit=emit, tool_catalog=brief, tool_names=plan_tools)
         plan_events = draft.open_turn(goal)
         if plan_events and plan_events[-1].TYPE == "answer":
             # conversational short-circuit: the greeting got its warm reply
@@ -370,9 +392,9 @@ def run_turn(
 
         if isolated_registry is None:
             isolated_registry = create_turn_registry(state.config)
-        run_registry = isolated_registry
+        run_registry = CompositeRegistry(isolated_registry, state.host_registry)
         if state.plugin_loader.active("after_tool") or state.plugin_loader.active("before_tool"):
-            run_registry = HookedRegistry(isolated_registry, state.plugin_loader)
+            run_registry = HookedRegistry(run_registry, state.plugin_loader)
         forge = ForgeExecutor(run_registry, emit=emit)
         executed = 0
         last_cmd: tuple[str, dict] | None = None
@@ -776,9 +798,7 @@ def put_config(payload: dict = Body(...)) -> dict:
     return STATE.config.redacted()
 
 
-PROVIDERS = frozenset(
-    {"custom", "groq", "deepseek", "openai", "anthropic", "ollama", "kilo"}
-)
+PROVIDERS = frozenset({"custom", "groq", "deepseek", "openai", "anthropic", "ollama", "kilo"})
 
 
 @app.post("/api/config/test")
@@ -854,6 +874,69 @@ def test_config(payload: dict = Body(...)) -> dict:
         if api_key:
             message = message.replace(api_key, "<redacted>")  # never echo the key
         return {"ok": False, "error": message[:300]}
+
+
+@app.get("/api/skills")
+def list_skills() -> dict:
+    """The skills index: what this installation can do, and where it lives.
+
+    Bodies are not inlined — the same progressive-loading rule the agent
+    follows, so the UI stays cheap with a large skill library.
+    """
+    skills = [
+        {
+            "name": meta.name,
+            "version": meta.version,
+            "description": meta.description,
+            "tools": list(meta.tools),
+            "path": str(meta.path),
+        }
+        for meta in sorted(STATE.skill_index.values(), key=lambda m: m.name)
+    ]
+    return {"skills": skills, "count": len(skills), "paths": STATE.config.skills.paths}
+
+
+@app.get("/api/skills/{name}")
+def read_skill(name: str) -> dict:
+    """One skill body, for the UI's preview pane."""
+    if name not in STATE.skill_index:
+        raise HTTPException(status_code=404, detail=f"unknown skill {name!r}")
+    skill = STATE.skills.load(name, STATE.skill_index)
+    return {
+        "name": skill.meta.name,
+        "version": skill.meta.version,
+        "description": skill.meta.description,
+        "tools": list(skill.meta.tools),
+        "body": skill.body,
+    }
+
+
+@app.get("/api/tools")
+def list_tools() -> dict:
+    """Every tool the planner may name, split by where it executes.
+
+    ``sandbox`` tools run inside the turn container; ``host`` tools run in
+    this process. The split is what the catalog shows the model, so the UI
+    can show the same truth instead of guessing.
+    """
+    available = _plannable_tools(STATE)
+    sandbox = set(default_policy().execution.allowed_tools)
+    entries = catalog.entries(
+        catalog._Merged((STATE.registry, getattr(STATE, "host_registry", None))),
+        available=available,
+    )
+    host = (
+        set(getattr(STATE, "host_registry", None).names())
+        if hasattr(STATE, "host_registry")
+        else set()
+    )
+    for entry in entries:
+        entry["runs_in"] = (
+            "sandbox"
+            if entry["name"] in sandbox
+            else ("host" if entry["name"] in host else "unknown")
+        )
+    return {"tools": entries, "count": len(entries)}
 
 
 @app.get("/api/sessions")
