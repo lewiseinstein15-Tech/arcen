@@ -60,6 +60,7 @@ from arcen.stream.events import (
     RunStart,
     Usage,
 )
+from arcen.tools import catalog
 from arcen.tools.registry import load_builtin
 
 app = FastAPI(title="ARCEN", version="0.1.0")
@@ -230,6 +231,18 @@ def _boot_plugins(config: ArcenConfig) -> PluginLoader:
 STATE = ServerState()
 
 
+def _plannable_tools(state: ServerState) -> set[str]:
+    """Every tool a step may name: the sandbox allowlist plus host-side tools.
+
+    Host-side tools (MCP-bridged, plugin-contributed) never enter the
+    container; they are dispatched by the server process. They are still
+    plannable, because FORGE calls them through the same registry interface.
+    """
+    allowed = set(default_policy().execution.allowed_tools)
+    allowed |= set(getattr(state, "host_tools", ()) or ())
+    return allowed
+
+
 # ---------------------------------------------------------------------------
 # the turn pipeline: DRAFT → FORGE → TEMPER → answer
 # ---------------------------------------------------------------------------
@@ -297,9 +310,19 @@ def run_turn(
             isolated_registry = create_turn_registry(state.config, snapshot=snapshot)
 
         # DRAFT opens the turn — plan from the provider, or an honest
-        # refusal when none is configured (never a fake bash plan, T-037)
+        # refusal when none is configured (never a fake bash plan, T-037).
+        # The planner is told exactly what this executor can run: the
+        # sandbox allowlist, plus any host-side tool a plugin or MCP server
+        # contributed. A tool outside that set would only produce a step
+        # that fails at dispatch, so it is not advertised.
         turn_llm = MeteredClient(state.llm, usage) if state.llm is not None else None
-        draft = DraftPlanner(llm=turn_llm, emit=emit)
+        plan_tools = _plannable_tools(state)
+        draft = DraftPlanner(
+            llm=turn_llm,
+            emit=emit,
+            tool_catalog=catalog.render(state.registry, available=plan_tools),
+            tool_names=plan_tools,
+        )
         plan_events = draft.open_turn(goal)
         if plan_events and plan_events[-1].TYPE == "answer":
             # conversational short-circuit: the greeting got its warm reply

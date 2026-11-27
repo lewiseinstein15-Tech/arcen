@@ -186,6 +186,10 @@ class DockerTurnRegistry:
                 "Ensure the Docker daemon is running and the configured sandbox image is installed."
             ) from None
 
+    def available_tools(self) -> list[str]:
+        """The tools this boundary can run — the planner is told only these."""
+        return list(self.policy.execution.allowed_tools)
+
     def dispatch(self, name: str, args: dict) -> dict:
         if name not in self.policy.execution.allowed_tools:
             return {

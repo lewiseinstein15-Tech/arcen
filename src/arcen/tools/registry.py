@@ -113,6 +113,10 @@ class Registry:
     def names(self) -> list[str]:
         return sorted(self._tools)
 
+    def available_tools(self) -> list[str]:
+        """Names this registry can actually dispatch — the catalog's filter."""
+        return self.names()
+
     def get(self, name: str) -> Tool:
         if name not in self._tools:
             raise KeyError(f"unknown tool {name!r}")

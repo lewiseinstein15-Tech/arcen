@@ -55,6 +55,9 @@ STRICT_PLAN_HINT = _DEFAULT_PROMPTS.strict
 CLASSIFY_HINT = _DEFAULT_PROMPTS.classify
 DIRECT_IDENTITY = _DEFAULT_PROMPTS.direct
 
+# The fallback toolset for a planner built without a registry (offline CLI,
+# unit tests). At runtime the catalog comes from the registry, so MCP, plugin
+# and newly ported tools are advertised without touching this set.
 KNOWN_TOOLS = {
     "bash",
     "file.read",
@@ -251,6 +254,8 @@ class DraftPlanner:
         emit: Callable[[Event], None] | None = None,
         max_steps: int = 40,
         prompts: ResolvedPrompts | None = None,
+        tool_catalog: str | None = None,
+        tool_names: set[str] | None = None,
     ) -> None:
         self.llm = llm
         inherited = getattr(llm, "prompts", None)
@@ -259,6 +264,11 @@ class DraftPlanner:
         self.prompts = prompts if prompts is not None else (inherited or _DEFAULT_PROMPTS)
         self.emit = emit
         self.max_steps = max_steps
+        # What this executor can actually run, and how it is described to the
+        # model. Both come from the tool registry at runtime; the constants
+        # above are only the no-registry default.
+        self.tool_names = set(tool_names) if tool_names is not None else set(KNOWN_TOOLS)
+        self.tool_catalog = tool_catalog or ""
 
     # -- event plumbing ----------------------------------------------------
     def _emit_all(self, events: list[Event]) -> list[Event]:
@@ -384,6 +394,8 @@ class DraftPlanner:
         if not self._has_provider():
             return None
         hint = self.prompts.plan if hint is None else hint
+        if self.tool_catalog:
+            hint = f"{hint}\n\n## available tools\n{self.tool_catalog}"
         try:
             return self._decompose_llm(goal, depth, failed_step, hint)
         except ProviderError:
@@ -421,7 +433,7 @@ class DraftPlanner:
             step: dict = {
                 "id": i,
                 "title": str(raw.get("title", goal))[:200],
-                "tool": tool if tool in KNOWN_TOOLS else None,
+                "tool": tool if tool in self.tool_names else None,
             }
             args = raw.get("args")
             if isinstance(args, dict) and args:
