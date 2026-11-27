@@ -69,6 +69,8 @@ Open the page, type a goal. Or stay in the terminal — each turn starts from an
 arcen run "create calc.py with add(a, b), then test_calc.py asserting add(2,2)==4, then run pytest" --json
 ```
 
+> **Arch and Omarchy.** `scripts/setup-omarchy.sh` does the whole install — packages, venv, sandbox image, keyless provider, UI build — and then serves. It stops at the Docker check on a stock Omarchy, because Omarchy withholds the `docker` group by default.
+>
 > **Install note.** ARCEN is not on PyPI yet, so `pip install arcen` does not work — install from the repository as above. The sandbox image *is* published (`arcen-sandbox:0.1.0` and `:latest`), or build it locally with `docker build -t ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0 docker/sandbox`.
 
 ### Development stack
