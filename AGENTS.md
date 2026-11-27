@@ -89,14 +89,28 @@ Live isolation check (host paths hidden, server env not leaked, no network):
 
 ## Current gaps
 - The isolated turn executor ports `bash`, `file.read`, `file.write`, `file.list`,
-  `file.glob`, `search.text` and `file.edit` (path-confined to `/workspace`).
-  `http.get` and the code tools are denied, so plans using them fail/replan.
+  `file.glob`, `search.text`, `file.edit`, `patch.apply`, `repo.map` and the
+  `git.*` family (all path-confined to `/workspace`). `http.get` and the code
+  tools are denied, so plans using them fail/replan.
   `file.write` tops out at 96 000 bytes: tool arguments travel as one argv
   element and Linux caps a single argument at 128 KiB.
+- `git.*` tools take `root`; it is resolved and confined to `/workspace`
+  (`git_tree` in `sandbox/isolated_ops.py`). The catalog is rendered from the
+  HOST schema, so any argument added there must also be added to `_ARG_KEYS`
+  or the model plans a tool call the sandbox refuses — `tests/test_isolated_ops.py`
+  pins that contract for every git tool.
+- Commands run as uid 65534 against a root-owned `/workspace` tmpfs, so the
+  exec environment sets `GIT_CONFIG_KEY_0=safe.directory` / `..._VALUE_0=*`;
+  without it every `git` call inside `bash` dies with "dubious ownership".
+- A turn's workspace is disposable (docs/AUDIT.md forbids persistence), so
+  files do not survive into the next message. The planner is told this via
+  `catalog.workspace_note()` at the top of its brief; keep that note in sync
+  with any change to workspace lifecycle.
 - Container edits leave the sandbox as a host-generated patch in
   `~/.arcen/artifacts/<session>/patch.diff`; `arcen apply SESSION --yes` applies
   it to the repo the turn ran against (no commit).
-- UI `Projects` and `Tools` nav entries are `view: null` placeholders (v0.2).
+- UI `Projects` nav entry is still a `view: null` placeholder; `Tools` is live
+  (tools / skills / mcp / prompt tabs, `/api/tools`, `/api/skills`, `/api/mcp`, `/api/prompt`).
 - CLI: `arcen --version` and `arcen resume SESSION [--after SEQ] [--list]` are
   implemented (usage: `arcen [serve | run GOAL --json | apply SESSION | resume SESSION | harness]`).
 - Config, sessions and memory live in `~/.arcen` (`config.yaml` chmod 600).
