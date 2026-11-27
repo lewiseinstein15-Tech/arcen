@@ -32,9 +32,11 @@ import logging
 import threading
 import time
 import uuid
+from pathlib import Path
 
 from fastapi import Body, FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from arcen.agents.draft import DraftPlanner
@@ -44,6 +46,7 @@ from arcen.config import ArcenConfig, default_config_path, load_config, resolve_
 from arcen.guardrails import default_policy
 from arcen.harness import HarnessError
 from arcen.harness.manifest import check_model_pin, default_manifest
+from arcen.harness.resolver import default_prompts
 from arcen.llm.bridge import build_llm_client
 from arcen.llm.client import ProviderError, classify_provider_failure, format_provider_error
 from arcen.llm.usage import MeteredClient, UsageAccumulator
@@ -574,6 +577,24 @@ def run_turn(
 # ---------------------------------------------------------------------------
 # endpoints
 # ---------------------------------------------------------------------------
+# -- the built UI, when present --------------------------------------------
+# `npm run build` writes ui/dist; serving it here means one process and one
+# port for the whole product instead of "start vite, then remember 5173".
+# A wheel install has no ui/dist, so the API stays the only surface.
+UI_DIST = Path(__file__).resolve().parents[3] / "ui" / "dist"
+
+if UI_DIST.is_dir():
+    app.mount("/assets", StaticFiles(directory=UI_DIST / "assets"), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    def ui_index() -> FileResponse:
+        return FileResponse(UI_DIST / "index.html")
+
+    @app.get("/favicon.svg", include_in_schema=False)
+    def ui_favicon() -> FileResponse:
+        return FileResponse(UI_DIST / "favicon.svg")
+
+
 @app.get("/api/health")
 def health() -> dict:
     return {"ok": True}
@@ -968,6 +989,39 @@ def connect_mcp(name: str) -> dict:
         "state": client.state,
         "error": client.error,
         "tools": [t.qualified for t in client.tools],
+    }
+
+
+@app.get("/api/prompt")
+def inspect_prompt() -> dict:
+    """Exactly what the planner will be told on the next turn.
+
+    Prompt debugging is guesswork without this: the catalog, the skills index
+    and the templates are assembled from several places, and "why did the
+    model pick that tool" is usually answered by reading the text it saw. No
+    credential is in this payload — only harness text and tool metadata.
+    """
+    prompts = default_prompts()
+    available = _plannable_tools(STATE)
+    catalog_text = catalog.render_many(
+        (STATE.registry, getattr(STATE, "host_registry", None)), available=available
+    )
+    skills_text = catalog.render_skills(getattr(STATE, "skill_index", {}))
+    return {
+        "templates": {
+            "identity": prompts.identity_template,
+            "planner_job": prompts.planner_job,
+            "classify": prompts.classify,
+            "plan": prompts.plan,
+            "research": prompts.research,
+            "strict": prompts.strict,
+            "executor_job": prompts.executor_job,
+            "verifier_job": prompts.verifier_job,
+        },
+        "catalog": catalog_text,
+        "skills": skills_text,
+        "tools": sorted(available),
+        "chars": len(catalog_text) + len(skills_text),
     }
 
 

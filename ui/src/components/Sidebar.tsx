@@ -15,7 +15,7 @@ import { newChat } from '../state/chatActions';
 const NAV_ITEMS = [
   { label: 'Chat', Icon: ChatIcon, view: 'chat' as const },
   { label: 'Projects', Icon: FolderIcon, view: null }, // v0.2
-  { label: 'Tools', Icon: WrenchIcon, view: null }, // v0.2
+  { label: 'Tools', Icon: WrenchIcon, view: 'tools' as const },
   { label: 'Settings', Icon: GearIcon, view: 'settings' as const },
 ];
 

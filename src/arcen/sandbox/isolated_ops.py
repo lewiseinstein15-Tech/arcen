@@ -208,12 +208,24 @@ def git_ref(ref):
     return ref
 
 
-def git_run(argv, stdin=None):
+def git_tree(a):
+    # `root` is the repo's working tree; the host schema advertises it, so the
+    # sandbox must honour it rather than reject it as an unknown argument.
+    want = a.get("root")
+    if not want:
+        return root
+    p = resolve(want, must_exist=True)
+    if not os.path.isdir(p):
+        raise ValueError("root must be a directory")
+    return p
+
+
+def git_run(argv, stdin=None, cwd=None):
     # Run git inside the workspace. Non-zero exits become tool errors.
     env = dict(os.environ)
     env.update(_SAFE_ENV)
     proc = subprocess.run(
-        ["git", "-C", root, "-c", "safe.directory=*",
+        ["git", "-C", cwd or root, "-c", "safe.directory=*",
          "-c", "user.name=ARCEN", "-c", "user.email=arcen@localhost"] + argv,
         input=stdin, capture_output=True, text=True, timeout=GIT_TIMEOUT, env=env,
     )
@@ -224,7 +236,7 @@ def git_run(argv, stdin=None):
 
 
 def git_status(a):
-    out = git_run(["status", "--porcelain=v1", "--branch"])
+    out = git_run(["status", "--porcelain=v1", "--branch"], cwd=git_tree(a))
     branch, ahead, behind, staged, unstaged, untracked = "", 0, 0, [], [], []
     for line in out.splitlines():
         if line.startswith("## "):
@@ -247,6 +259,7 @@ def git_status(a):
 
 
 def git_diff(a):
+    tree = git_tree(a)
     argv = ["diff", "--no-color"]
     if a.get("staged"):
         argv.append("--staged")
@@ -254,18 +267,19 @@ def git_diff(a):
         argv.append(git_ref(a["ref"]))
     if a.get("path"):
         argv += ["--", git_path(a["path"])]
-    out = git_run(argv)
+    out = git_run(argv, cwd=tree)
     return {"diff": out[:GIT_OUTPUT_LIMIT], "bytes": len(out), "truncated": len(out) > GIT_OUTPUT_LIMIT}
 
 
 def git_log(a):
+    tree = git_tree(a)
     limit = min(max(int(a.get("limit", 20)), 1), 200)
     argv = ["log", "--no-color", "--date=short",
             "--format=%H%x1f%an%x1f%ad%x1f%s", "-n", str(limit)]
     if a.get("path"):
         argv += ["--", git_path(a["path"])]
     commits = []
-    for line in git_run(argv).splitlines():
+    for line in git_run(argv, cwd=tree).splitlines():
         parts = line.split("\x1f")
         if len(parts) == 4:
             commits.append({"hash": parts[0], "author": parts[1], "date": parts[2], "subject": parts[3]})
@@ -273,52 +287,57 @@ def git_log(a):
 
 
 def git_show(a):
+    tree = git_tree(a)
     ref = git_ref(a.get("ref") or "HEAD")
     target = ref + (":" + git_path(a["path"]) if a.get("path") else "")
-    out = git_run(["show", "--no-color", target])
+    out = git_run(["show", "--no-color", target], cwd=tree)
     return {"ref": ref, "content": out[:GIT_OUTPUT_LIMIT], "bytes": len(out),
             "truncated": len(out) > GIT_OUTPUT_LIMIT}
 
 
 def git_add(a):
+    tree = git_tree(a)
     paths = a.get("paths") or []
     if not isinstance(paths, list) or not paths or len(paths) > 200:
         raise ValueError("paths must be a non-empty list of at most 200 entries")
-    git_run(["add", "--"] + [git_path(p) for p in paths])
-    return {"added": list(paths), "status": git_status({})}
+    git_run(["add", "--"] + [git_path(p) for p in paths], cwd=tree)
+    return {"added": list(paths), "status": git_status({"root": tree})}
 
 
 def git_commit(a):
+    tree = git_tree(a)
     message = (a.get("message") or "").strip()
     if not message:
         raise ValueError("commit message must not be empty")
     argv = ["commit", "-m", message[:2000]]
     if a.get("all"):
         argv.append("--all")
-    git_run(argv)
-    head = git_run(["log", "-1", "--format=%H%x1f%s"]).strip().split("\x1f")
+    git_run(argv, cwd=tree)
+    head = git_run(["log", "-1", "--format=%H%x1f%s"], cwd=tree).strip().split("\x1f")
     return {"hash": head[0] if head else "", "summary": head[1] if len(head) > 1 else "",
-            "status": git_status({})}
+            "status": git_status({"root": tree})}
 
 
 def git_branch(a):
+    tree = git_tree(a)
     if a.get("name") and a.get("create"):
-        git_run(["checkout", "-b", git_ref(a["name"])])
+        git_run(["checkout", "-b", git_ref(a["name"])], cwd=tree)
     elif a.get("name"):
-        git_run(["branch", git_ref(a["name"])])
-    out = git_run(["branch", "--format=%(refname:short)%09%(HEAD)"])
+        git_run(["branch", git_ref(a["name"])], cwd=tree)
+    out = git_run(["branch", "--format=%(refname:short)%09%(HEAD)"], cwd=tree)
     branches = [{"name": line.split("\t")[0], "current": line.endswith("*")}
                 for line in out.splitlines() if line.strip()]
     return {"branches": branches, "current": next((b["name"] for b in branches if b["current"]), "")}
 
 
 def git_checkout(a):
+    tree = git_tree(a)
     ref = git_ref(a.get("ref") or "")
     if a.get("create"):
-        git_run(["checkout", "-b", ref])
+        git_run(["checkout", "-b", ref], cwd=tree)
     else:
-        git_run(["checkout", ref])
-    return {"current": git_run(["rev-parse", "--abbrev-ref", "HEAD"]).strip()}
+        git_run(["checkout", ref], cwd=tree)
+    return {"current": git_run(["rev-parse", "--abbrev-ref", "HEAD"], cwd=tree).strip()}
 
 
 def patch_apply(a):
@@ -405,20 +424,32 @@ _ARG_KEYS = {
     "file.glob": {"pattern", "root"},
     "search.text": {"pattern", "root", "glob", "limit"},
     "file.edit": {"path", "find", "replace", "count"},
-    "git.status": set(),
-    "git.diff": {"path", "staged", "ref"},
-    "git.log": {"limit", "path"},
-    "git.show": {"ref", "path"},
-    "git.add": {"paths"},
-    "git.commit": {"message", "all"},
-    "git.branch": {"name", "create"},
-    "git.checkout": {"ref", "create"},
+    "git.status": {"root"},
+    "git.diff": {"path", "staged", "ref", "root"},
+    "git.log": {"limit", "path", "root"},
+    "git.show": {"ref", "path", "root"},
+    "git.add": {"paths", "root"},
+    "git.commit": {"message", "all", "root"},
+    "git.branch": {"name", "create", "root"},
+    "git.checkout": {"ref", "create", "root"},
     "patch.apply": {"patch", "reverse", "check"},
     "repo.map": {"root", "max_files", "include"},
 }
 
-_STR_KEYS = ("path", "root", "pattern", "glob", "find", "replace", "content",
-             "ref", "message", "name", "patch", "include")
+_STR_KEYS = (
+    "path",
+    "root",
+    "pattern",
+    "glob",
+    "find",
+    "replace",
+    "content",
+    "ref",
+    "message",
+    "name",
+    "patch",
+    "include",
+)
 _INT_KEYS = ("offset_line", "limit_lines", "limit", "count", "max_files")
 _BOOL_KEYS = ("staged", "all", "create", "reverse", "check")
 

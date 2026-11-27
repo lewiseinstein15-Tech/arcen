@@ -190,3 +190,60 @@ def test_dispatch_rejects_malformed_helper_output():
     response = reg.dispatch("file.read", {"path": "x"})
     assert not response["ok"] and "malformed output" in response["error"]
     assert "Traceback" in response["result"]["stdout"]
+
+
+# -- git: the sandbox must accept what the planner was told it accepts ------
+# The catalog is rendered from the HOST tool schema (git.add takes `root`),
+# while execution happens in the container. When the two drift the model
+# follows the catalog and gets "unknown argument(s): root" — a tool that is
+# advertised and unusable. This table is the contract between them.
+
+GIT_TOOLS = (
+    "git.status",
+    "git.diff",
+    "git.log",
+    "git.show",
+    "git.add",
+    "git.commit",
+    "git.branch",
+    "git.checkout",
+)
+
+
+@pytest.mark.parametrize("name", GIT_TOOLS)
+def test_sandbox_accepts_every_argument_the_host_schema_advertises(name):
+    from arcen.tools.registry import load_builtin
+
+    tool = load_builtin().get(name)
+    advertised = set(tool.Args.model_fields)
+    from arcen.sandbox.isolated_ops import _ARG_KEYS
+
+    missing = advertised - _ARG_KEYS[name]
+    assert not missing, f"{name}: advertised but refused inside the sandbox: {sorted(missing)}"
+
+
+def test_git_round_trip_inside_the_helper(root):
+    # there is no git.init tool: initialising is a bash step, the ops act on
+    # an existing repository
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    assert run(root, "git.branch", {"name": "main", "create": True})["ok"] is True
+    added = run(root, "git.add", {"paths": ["src/app.py", "README.md"], "root": "."})
+    assert added["ok"] is True, added
+    assert added["result"]["status"]["staged"], "staging must be visible in the status"
+
+    committed = run(root, "git.commit", {"message": "add demo files"})
+    assert committed["ok"] is True, committed
+    assert committed["result"]["summary"] == "add demo files"
+
+    log = run(root, "git.log", {"limit": 5})
+    assert log["ok"] is True
+    assert log["result"]["commits"][0]["subject"] == "add demo files"
+
+    status = run(root, "git.status", {"root": "."})
+    assert status["result"]["clean"] is True
+
+
+def test_git_root_outside_the_workspace_is_refused(root):
+    payload = run(root, "git.status", {"root": "/etc"})
+    assert payload["ok"] is False
+    assert "escapes the isolated workspace" in payload["error"]

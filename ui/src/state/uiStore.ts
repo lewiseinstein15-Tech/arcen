@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 
-export type View = 'chat' | 'settings';
+export type View = 'chat' | 'tools' | 'settings';
 
 interface UiState {
   view: View;

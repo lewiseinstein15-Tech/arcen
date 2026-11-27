@@ -222,7 +222,10 @@ class DockerTurnRegistry:
         ):
             return {
                 "ok": False,
-                "result": {"stdout": outcome["stdout"][-2000:], "stderr": outcome["stderr"][-2000:]},
+                "result": {
+                    "stdout": outcome["stdout"][-2000:],
+                    "stderr": outcome["stderr"][-2000:],
+                },
                 "error": f"isolated tool {name!r} returned malformed output",
             }
         return {"ok": payload["ok"], "result": payload.get("result"), "error": payload.get("error")}
@@ -240,6 +243,13 @@ class DockerTurnRegistry:
                 "HOME": "/tmp",
                 "LANG": "C.UTF-8",
                 "PATH": "/usr/local/bin:/usr/bin:/bin",
+                # /workspace is a root-owned tmpfs while every command runs
+                # as uid 65534, so git treats a repo the agent just created as
+                # foreign and refuses ("dubious ownership"). Trusting it costs
+                # nothing: the only writable paths are this tmpfs and /tmp.
+                "GIT_CONFIG_COUNT": "1",
+                "GIT_CONFIG_KEY_0": "safe.directory",
+                "GIT_CONFIG_VALUE_0": "*",
             },
         )
         exec_id = created["Id"]

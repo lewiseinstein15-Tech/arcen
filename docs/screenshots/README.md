@@ -69,3 +69,18 @@ arcen apply <session-id> --yes   # from inside /tmp/calc
 Only planning is scripted. Execution is real: the steps run in the Docker
 sandbox, pytest really fails and then really passes, and the patch in
 `06-terminal-proof.png` is a host-generated diff applied to the host repo.
+
+The `09-tools-*` and `10-loop-*` sets are from the v0.2 tool surface: the
+Tools view (tools/skills/MCP/prompt tabs), the run trace waterfall, and a live
+DRAFT → FORGE → TEMPER turn against Docker with the git tools. Provider
+`kilo`, model `baidu/ernie-5.5-flash-preview:free`, served by the backend
+itself (`npm run build` in `ui/`, then `python -m arcen.server.app` on one
+port — no Vite in the loop).
+
+| File | What it shows |
+| --- | --- |
+| `09-tools-01-tool-catalog.png` | 20 tools advertised to the planner, grouped by trust domain (Sandbox 17 / Host 3) with each tool's arguments |
+| `09-tools-02-skills.png` | The 11 installed skills with the tools each one is allowed to use |
+| `09-tools-03-prompt-inspector.png` | The exact catalog string the planner receives, plus the prompt templates |
+| `10-loop-01-draft-forge-temper-pass.png` | Live turn: `file.write` ×2, `python -m pytest -q` → `1 passed`, TEMPER verified, turn `ok`, trace strip reading `11 steps · 5.1s` |
+| `10-loop-02-git-tools-in-sandbox.png` | Live turn using `git.add`, `git.commit`, `git.log` with `root=/workspace`; commit `d3061a4b` on `master`, tree clean, TEMPER `unverified · no test command found` |

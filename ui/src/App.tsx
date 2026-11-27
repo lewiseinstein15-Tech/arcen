@@ -9,6 +9,7 @@ import { DrawerNav } from './components/Drawer';
 import { Header } from './components/Header';
 import { SettingsView } from './components/SettingsView';
 import { Sidebar } from './components/Sidebar';
+import { ToolsView } from './components/ToolsView';
 import { useSessionStore, ensureActiveSession } from './state/sessionStore';
 import { useSidebarStore } from './state/sidebarStore';
 import { useUiStore } from './state/uiStore';
@@ -26,7 +27,9 @@ export default function App() {
       <Sidebar />
       <div className="main">
         <Header />
-        {view === 'settings' ? <SettingsView key="settings" /> : <ChatView key={sessionId} sessionId={sessionId} />}
+        {view === 'settings' && <SettingsView key="settings" />}
+        {view === 'tools' && <ToolsView key="tools" />}
+        {view === 'chat' && <ChatView key={sessionId} sessionId={sessionId} />}
       </div>
       <DrawerNav />
     </div>

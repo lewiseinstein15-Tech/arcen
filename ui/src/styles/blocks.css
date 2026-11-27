@@ -492,3 +492,55 @@
     transform: scale(1.15);
   }
 }
+
+/* ---- run trace (v0.2): a waterfall over the folded blocks ------------- */
+.trace-strip {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  margin: 0 0 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.trace-meta {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trace-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--chip-bg);
+  overflow: hidden;
+}
+
+.trace-seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  min-width: 2px;
+}
+
+.trace-draft {
+  background: var(--accent);
+}
+
+.trace-forge {
+  background: var(--warn);
+}
+
+.trace-temper {
+  background: var(--success);
+}

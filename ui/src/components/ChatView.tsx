@@ -24,6 +24,7 @@ import { fmtTime } from '../events/render';
 import type { ArcenEvent } from '../types/events';
 import { Composer } from './Composer';
 import { ScrollPill } from './ScrollPill';
+import { TraceStrip } from './TraceStrip';
 import { autoScrollPreference } from './SettingsView';
 
 const BACKOFF_MS = [500, 1000, 2000, 5000]; // delay before retry N (attempt 1 is immediate)
@@ -263,6 +264,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
             </p>
           </div>
         )}
+        <TraceStrip blocks={folded} />
         {folded.map((block) => (
           <BlockFor key={block.seq} block={block} depth={0} />
         ))}
