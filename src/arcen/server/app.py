@@ -45,11 +45,13 @@ from arcen.guardrails import default_policy
 from arcen.harness import HarnessError
 from arcen.harness.manifest import check_model_pin, default_manifest
 from arcen.llm.bridge import build_llm_client
-from arcen.llm.usage import MeteredClient, UsageAccumulator
 from arcen.llm.client import ProviderError, classify_provider_failure, format_provider_error
+from arcen.llm.usage import MeteredClient, UsageAccumulator
+from arcen.mcp.client import McpError, McpManager
 from arcen.plugins.loader import PluginLoader
 from arcen.sandbox.turn import IsolationUnavailable, create_turn_registry, execution_status
 from arcen.session.store import SessionStore
+from arcen.skills.loader import SkillsLoader
 from arcen.stream.emitter import StreamEmitter
 from arcen.stream.events import (
     Answer,
@@ -60,9 +62,9 @@ from arcen.stream.events import (
     RunStart,
     Usage,
 )
-from arcen.skills.loader import SkillsLoader
 from arcen.tools import catalog
 from arcen.tools.composite import CompositeRegistry
+from arcen.tools.mcp_tools import McpListTool
 from arcen.tools.registry import Registry, load_builtin
 from arcen.tools.skills import SkillList, SkillLoad
 
@@ -82,6 +84,16 @@ if not logging.getLogger().handlers:
 
 class ServerState:
     """Everything the server owns. One per process."""
+
+    def _connect_mcp(self) -> None:
+        for name in list(self.mcp.clients):
+            try:
+                self.mcp.connect_sync(name)
+            except Exception as exc:  # noqa: BLE001 — one bad server is not a boot failure
+                log.warning("[mcp] %s did not connect: %s", name, exc)
+            else:
+                client = self.mcp.clients[name]
+                log.info("[mcp] %s: %s (%d tools)", name, client.state, len(client.tools))
 
     def __init__(self, config: ArcenConfig | None = None) -> None:
         # A malformed or unsafe policy is fatal at boot, before provider or
@@ -104,6 +116,19 @@ class ServerState:
         log.info(
             "[skills] %d skill(s) indexed from %s", len(self.skill_index), self.config.skills.paths
         )
+        # MCP: declare at boot (zero I/O), connect in the background so a slow
+        # or broken server can never delay the first request. A server that
+        # comes up later is bridged into the host registry, which is what makes
+        # its tools appear in the next turn's catalog.
+        self.mcp = McpManager(list(self.config.mcps or []), self.host_registry)
+        self.mcp.declare_all()
+        self.host_registry.register(McpListTool(self.mcp))
+        self.mcp_thread = None
+        if self.mcp.clients:
+            self.mcp_thread = threading.Thread(
+                target=self._connect_mcp, daemon=True, name="arcen-mcp-boot"
+            )
+            self.mcp_thread.start()
         self.store = SessionStore(self.config.session.dir)
         self.plugin_loader = _boot_plugins(self.config)
         if self.plugin_loader.active("after_tool") or self.plugin_loader.active("before_tool"):
@@ -712,8 +737,7 @@ def get_stream(session: str, last_event_id: str | None = Header(default=None)) -
                     yield STREAM_PING_LINE
                     last_ping = loop.time()
             start = _resume_start(last_event_id, emitter)
-            if start < 0:
-                start = 0  # headers are already sent — replay the safe superset
+            start = max(start, 0)  # headers are already sent — replay the safe superset
         else:
             start = start_seq
         # subscribe BEFORE replaying so no event is lost in between
@@ -732,7 +756,7 @@ def get_stream(session: str, last_event_id: str | None = Header(default=None)) -
             while True:
                 try:
                     wire = await asyncio.wait_for(live.get(), timeout=STREAM_PING_INTERVAL)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     if terminal and not STATE.active_runs.get(session):
                         yield STREAM_DONE_LINE
                         return
@@ -813,7 +837,7 @@ def test_config(payload: dict = Body(...)) -> dict:
     """
     import litellm
 
-    from arcen.llm.bridge import LITELLM_PREFIX, KEYLESS_PROVIDERS
+    from arcen.llm.bridge import KEYLESS_PROVIDERS, LITELLM_PREFIX
 
     provider = str(payload.get("provider", "")).strip().lower()
     if provider not in PROVIDERS:
@@ -908,6 +932,42 @@ def read_skill(name: str) -> dict:
         "description": skill.meta.description,
         "tools": list(skill.meta.tools),
         "body": skill.body,
+    }
+
+
+@app.get("/api/mcp")
+def list_mcp() -> dict:
+    """Configured MCP servers: state, error, and the tools they published."""
+    servers = []
+    for name, client in sorted(STATE.mcp.clients.items()):
+        servers.append(
+            {
+                "name": name,
+                "state": client.state,
+                "error": client.error,
+                "transport": client.config.transport,
+                "tools": [{"name": t.name, "description": t.description} for t in client.tools],
+            }
+        )
+    return {"servers": servers, "count": len(servers)}
+
+
+@app.post("/api/mcp/{name}/connect")
+def connect_mcp(name: str) -> dict:
+    """Connect one server now. The model's catalog picks it up next turn."""
+    if name not in STATE.mcp.clients:
+        raise HTTPException(status_code=404, detail=f"unknown mcp server {name!r}")
+    client = STATE.mcp.clients[name]
+    try:
+        ok = STATE.mcp.connect_sync(name)
+    except McpError as exc:  # a disabled server is a state, not a server error
+        return {"ok": False, "name": name, "state": client.state, "error": str(exc), "tools": []}
+    return {
+        "ok": ok,
+        "name": name,
+        "state": client.state,
+        "error": client.error,
+        "tools": [t.qualified for t in client.tools],
     }
 
 

@@ -11,6 +11,22 @@ from __future__ import annotations
 from .client import McpClient, McpToolRef
 
 
+def _unwrap(args: dict, schema: dict) -> dict:
+    """Accept both shapes: the remote arguments, or ``{"args": {...}}``.
+
+    A server that publishes no schema gets the wrapper from the fallback
+    schema; a server that does may still be called with the wrapper, so the
+    unwrap is keyed on the argument name rather than on the schema alone.
+    """
+    if not isinstance(args, dict):
+        return {}
+    props = schema.get("properties") or {}
+    if set(args) == {"args"} and "args" not in props:
+        inner = args["args"]
+        return inner if isinstance(inner, dict) else {}
+    return args
+
+
 class McpBridgeTool:
     """The frozen Tool schema over a remote MCP tool."""
 
@@ -24,7 +40,15 @@ class McpBridgeTool:
         self.danger = "sandboxed"
 
     def schema(self) -> dict:
-        """Remote schemas are taken as-is (declared by the server)."""
+        """The server's own schema, when it published one.
+
+        A remote ``inputSchema`` is what the model needs in order to pass the
+        right arguments; the generic ``{"args": {...}}`` wrapper is only the
+        fallback for servers that publish nothing.
+        """
+        remote = self._ref.input_schema
+        if isinstance(remote, dict) and remote.get("type") == "object":
+            return remote
         return {
             "type": "object",
             "properties": {
@@ -34,7 +58,7 @@ class McpBridgeTool:
         }
 
     def execute(self, args: dict) -> dict:
-        remote_args = args.get("args", args if "args" not in args else {})
+        remote_args = _unwrap(args, self.schema())
         tool = self._ref.name
         try:
             return self._manager.call_sync(self._ref.server, tool, remote_args)
