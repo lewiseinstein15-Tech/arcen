@@ -130,7 +130,12 @@ def render(
     arguments and tool names survive longest because they are what the model
     needs to emit a runnable step.
     """
-    items = entries(registry, available=available)
+    try:
+        items = entries(registry, available=available)
+    except Exception:  # noqa: BLE001 — a proxy registry may not enumerate
+        # The catalog is guidance, not a precondition: a registry that cannot
+        # list itself still dispatches, so the turn proceeds without one.
+        return ""
     if not items:
         return ""
     if len(items) > max_tools:

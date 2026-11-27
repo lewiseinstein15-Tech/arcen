@@ -33,7 +33,7 @@ MAX_ENTRIES = 1000
 MAX_MATCHES = 500
 
 HELPER = r"""
-import fnmatch, json, os, re, sys
+import fnmatch, json, os, re, subprocess, sys
 
 op, root, raw = sys.argv[1], os.path.realpath(sys.argv[2]), sys.argv[3]
 args = json.loads(raw)
@@ -180,8 +180,214 @@ def edit(a):
     }
 
 
+GIT_OUTPUT_LIMIT = 60000
+GIT_TIMEOUT = 60
+_REF = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._/@{}^~:-]{0,200}\Z")
+_SAFE_ENV = {
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_ASKPASS": "/bin/true",
+    "GIT_PAGER": "cat",
+    "PAGER": "cat",
+    "HOME": "/tmp",
+}
+
+
+def git_path(p):
+    # A repo-relative path: no absolute, no traversal, no option-looking name.
+    if not isinstance(p, str) or not p or p.startswith("/") or p.startswith("-"):
+        raise ValueError("invalid repository path")
+    if ".." in p.split("/") or "\x00" in p:
+        raise ValueError("path escapes the repository")
+    return p
+
+
+def git_ref(ref):
+    if not isinstance(ref, str) or not _REF.match(ref) or ".." in ref:
+        raise ValueError("invalid git ref")
+    return ref
+
+
+def git_run(argv, stdin=None):
+    # Run git inside the workspace. Non-zero exits become tool errors.
+    env = dict(os.environ)
+    env.update(_SAFE_ENV)
+    proc = subprocess.run(
+        ["git", "-C", root, "-c", "safe.directory=*",
+         "-c", "user.name=ARCEN", "-c", "user.email=arcen@localhost"] + argv,
+        input=stdin, capture_output=True, text=True, timeout=GIT_TIMEOUT, env=env,
+    )
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip().splitlines()
+        raise ValueError(detail[-1][:500] if detail else "git failed")
+    return proc.stdout
+
+
+def git_status(a):
+    out = git_run(["status", "--porcelain=v1", "--branch"])
+    branch, ahead, behind, staged, unstaged, untracked = "", 0, 0, [], [], []
+    for line in out.splitlines():
+        if line.startswith("## "):
+            head = line[3:]
+            branch = head.split("...")[0].split(" ")[0]
+            for token in head.split():
+                if token.startswith("ahead "):
+                    ahead = int(token[6:].strip(",") or 0)
+                elif token.startswith("behind "):
+                    behind = int(token[7:].strip(",") or 0)
+            continue
+        code, path = line[:2], line[3:]
+        if code == "??":
+            untracked.append(path)
+        else:
+            (staged if code[0] not in " ?" else unstaged).append({"code": code, "path": path})
+    return {"branch": branch, "ahead": ahead, "behind": behind, "staged": staged,
+            "unstaged": unstaged, "untracked": untracked,
+            "clean": not (staged or unstaged or untracked)}
+
+
+def git_diff(a):
+    argv = ["diff", "--no-color"]
+    if a.get("staged"):
+        argv.append("--staged")
+    if a.get("ref"):
+        argv.append(git_ref(a["ref"]))
+    if a.get("path"):
+        argv += ["--", git_path(a["path"])]
+    out = git_run(argv)
+    return {"diff": out[:GIT_OUTPUT_LIMIT], "bytes": len(out), "truncated": len(out) > GIT_OUTPUT_LIMIT}
+
+
+def git_log(a):
+    limit = min(max(int(a.get("limit", 20)), 1), 200)
+    argv = ["log", "--no-color", "--date=short",
+            "--format=%H%x1f%an%x1f%ad%x1f%s", "-n", str(limit)]
+    if a.get("path"):
+        argv += ["--", git_path(a["path"])]
+    commits = []
+    for line in git_run(argv).splitlines():
+        parts = line.split("\x1f")
+        if len(parts) == 4:
+            commits.append({"hash": parts[0], "author": parts[1], "date": parts[2], "subject": parts[3]})
+    return {"commits": commits, "count": len(commits)}
+
+
+def git_show(a):
+    ref = git_ref(a.get("ref") or "HEAD")
+    target = ref + (":" + git_path(a["path"]) if a.get("path") else "")
+    out = git_run(["show", "--no-color", target])
+    return {"ref": ref, "content": out[:GIT_OUTPUT_LIMIT], "bytes": len(out),
+            "truncated": len(out) > GIT_OUTPUT_LIMIT}
+
+
+def git_add(a):
+    paths = a.get("paths") or []
+    if not isinstance(paths, list) or not paths or len(paths) > 200:
+        raise ValueError("paths must be a non-empty list of at most 200 entries")
+    git_run(["add", "--"] + [git_path(p) for p in paths])
+    return {"added": list(paths), "status": git_status({})}
+
+
+def git_commit(a):
+    message = (a.get("message") or "").strip()
+    if not message:
+        raise ValueError("commit message must not be empty")
+    argv = ["commit", "-m", message[:2000]]
+    if a.get("all"):
+        argv.append("--all")
+    git_run(argv)
+    head = git_run(["log", "-1", "--format=%H%x1f%s"]).strip().split("\x1f")
+    return {"hash": head[0] if head else "", "summary": head[1] if len(head) > 1 else "",
+            "status": git_status({})}
+
+
+def git_branch(a):
+    if a.get("name") and a.get("create"):
+        git_run(["checkout", "-b", git_ref(a["name"])])
+    elif a.get("name"):
+        git_run(["branch", git_ref(a["name"])])
+    out = git_run(["branch", "--format=%(refname:short)%09%(HEAD)"])
+    branches = [{"name": line.split("\t")[0], "current": line.endswith("*")}
+                for line in out.splitlines() if line.strip()]
+    return {"branches": branches, "current": next((b["name"] for b in branches if b["current"]), "")}
+
+
+def git_checkout(a):
+    ref = git_ref(a.get("ref") or "")
+    if a.get("create"):
+        git_run(["checkout", "-b", ref])
+    else:
+        git_run(["checkout", ref])
+    return {"current": git_run(["rev-parse", "--abbrev-ref", "HEAD"]).strip()}
+
+
+def patch_apply(a):
+    patch = a.get("patch") or ""
+    if not isinstance(patch, str) or not patch.strip():
+        raise ValueError("patch must be a non-empty unified diff")
+    if len(patch.encode("utf-8")) > 400000:
+        raise ValueError("patch larger than 400000 bytes")
+    argv = ["apply", "--whitespace=nowarn"]
+    if a.get("reverse"):
+        argv.append("--reverse")
+    if a.get("check"):
+        argv.append("--check")
+    git_run(argv + ["-"], stdin=patch)
+    touched = sorted({line.split("+++ b/")[-1].strip() for line in patch.splitlines()
+                      if line.startswith("+++ b/")})
+    return {"applied": not a.get("check"), "check_only": bool(a.get("check")), "files": touched}
+
+
+SYMBOL_RE = re.compile(
+    r"^\s*(?:async\s+)?(?:def|class|function|func|fn|interface|struct|enum|type|impl|module)\s+([A-Za-z_][\w]*)"
+    r"|^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_][\w]*)\s*=",
+    re.MULTILINE,
+)
+TEXT_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".rs", ".java", ".rb", ".php",
+                 ".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".kt", ".swift", ".scala", ".sh",
+                 ".sql", ".vue", ".svelte", ".md", ".toml", ".yaml", ".yml", ".json"}
+
+
+def repo_map(a):
+    # A ranked skeleton of the tree: which files carry the code.
+    start = resolve(a.get("root", "."), must_exist=True)
+    max_files = min(max(int(a.get("max_files", 60)), 1), 400)
+    include = a.get("include") or "*"
+    scanned = 0
+    files = []
+    for dirpath, dirnames, filenames in os.walk(start):
+        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
+        for fname in sorted(filenames):
+            if not fnmatch.fnmatch(fname, include):
+                continue
+            full = os.path.join(dirpath, fname)
+            if os.path.splitext(fname)[1].lower() not in TEXT_SUFFIXES:
+                continue
+            try:
+                if os.path.getsize(full) > 1_000_000:
+                    continue
+                with open(full, "r", encoding="utf-8", errors="ignore") as fh:
+                    text = fh.read()
+            except OSError:
+                continue
+            scanned += 1
+            symbols = [m.group(1) or m.group(2) for m in SYMBOL_RE.finditer(text)]
+            lines = text.count("\n") + 1
+            rel = os.path.relpath(full, root)
+            files.append({"path": rel, "lines": lines, "symbols": len(symbols),
+                          "top": symbols[:8],
+                          "rank": len(symbols) * 3 + min(lines // 20, 20)})
+    files.sort(key=lambda f: (-f["rank"], f["path"]))
+    return {"files": files[:max_files], "scanned": scanned,
+            "truncated": len(files) > max_files, "root": os.path.relpath(start, root)}
+
+
 OPS = {"file.read": read, "file.write": write, "file.list": list_dir,
-       "file.glob": glob_files, "search.text": search, "file.edit": edit}
+       "file.glob": glob_files, "search.text": search, "file.edit": edit,
+       "git.status": git_status, "git.diff": git_diff, "git.log": git_log,
+       "git.show": git_show, "git.add": git_add, "git.commit": git_commit,
+       "git.branch": git_branch, "git.checkout": git_checkout,
+       "patch.apply": patch_apply, "repo.map": repo_map}
 
 try:
     if op not in OPS:
@@ -199,7 +405,22 @@ _ARG_KEYS = {
     "file.glob": {"pattern", "root"},
     "search.text": {"pattern", "root", "glob", "limit"},
     "file.edit": {"path", "find", "replace", "count"},
+    "git.status": set(),
+    "git.diff": {"path", "staged", "ref"},
+    "git.log": {"limit", "path"},
+    "git.show": {"ref", "path"},
+    "git.add": {"paths"},
+    "git.commit": {"message", "all"},
+    "git.branch": {"name", "create"},
+    "git.checkout": {"ref", "create"},
+    "patch.apply": {"patch", "reverse", "check"},
+    "repo.map": {"root", "max_files", "include"},
 }
+
+_STR_KEYS = ("path", "root", "pattern", "glob", "find", "replace", "content",
+             "ref", "message", "name", "patch", "include")
+_INT_KEYS = ("offset_line", "limit_lines", "limit", "count", "max_files")
+_BOOL_KEYS = ("staged", "all", "create", "reverse", "check")
 
 
 def validate(name: str, args: object) -> dict:
@@ -211,12 +432,19 @@ def validate(name: str, args: object) -> dict:
     unknown = set(args) - _ARG_KEYS[name]
     if unknown:
         raise ValueError(f"unknown argument(s): {', '.join(sorted(unknown))}")
-    for key in ("path", "root", "pattern", "glob", "find", "replace", "content"):
+    for key in _STR_KEYS:
         if key in args and type(args[key]) is not str:
             raise ValueError(f"{key} must be a string")
-    for key in ("offset_line", "limit_lines", "limit", "count"):
+    for key in _INT_KEYS:
         if key in args and type(args[key]) is not int:
             raise ValueError(f"{key} must be an integer")
+    for key in _BOOL_KEYS:
+        if key in args and type(args[key]) is not bool:
+            raise ValueError(f"{key} must be a boolean")
+    if "paths" in args:
+        paths = args["paths"]
+        if type(paths) is not list or any(type(item) is not str for item in paths):
+            raise ValueError("paths must be a list of strings")
     if name == "file.write" and len(args.get("content", "").encode("utf-8")) > MAX_WRITE_BYTES:
         raise ValueError("content is too large to write")
     payload = json.dumps(args, ensure_ascii=False)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -109,6 +110,16 @@ def test_policy_and_nested_values_are_immutable_and_snapshot_is_detached(tmp_pat
         "file.glob",
         "search.text",
         "file.edit",
+        "git.status",
+        "git.diff",
+        "git.log",
+        "git.show",
+        "git.add",
+        "git.commit",
+        "git.branch",
+        "git.checkout",
+        "patch.apply",
+        "repo.map",
     )
     assert policy.snapshot()["execution"]["max_pids"] == 128
 
@@ -173,9 +184,9 @@ def test_tightened_policy_reaches_status_and_enforces_resources(monkeypatch, tmp
 
 
 def test_tightened_allowlist_and_pid_inspection_fail_closed(monkeypatch, tmp_path):
-    text = POLICY.read_text().replace(
-        "allowed_tools:\n    - bash\n    - file.read\n    - file.write\n    - file.list\n    - file.glob\n    - search.text\n    - file.edit",
-        "allowed_tools: []",
+    # Narrow the shipped allowlist to nothing without hardcoding its contents.
+    text = re.sub(
+        r"allowed_tools:\n(?:    - .*\n)+", "allowed_tools: []\n", POLICY.read_text()
     )
     text = text.replace("max_pids: 128", "max_pids: 8")
     policy = load_policy(policy_file(tmp_path, text))

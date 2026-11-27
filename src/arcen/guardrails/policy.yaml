@@ -20,6 +20,16 @@ execution:
     - file.glob
     - search.text
     - file.edit
+    - git.status
+    - git.diff
+    - git.log
+    - git.show
+    - git.add
+    - git.commit
+    - git.branch
+    - git.checkout
+    - patch.apply
+    - repo.map
   max_pids: 128
   max_output_bytes: 262144
 workspace:

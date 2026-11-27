@@ -250,3 +250,65 @@ name = "system.info"
 module = "arcen.tools.system"
 class = "SystemInfo"
 danger = "safe"
+
+# --- git (8) ---
+[[tool]]
+name = "git.status"
+module = "arcen.tools.git"
+class = "GitStatus"
+danger = "safe"
+
+[[tool]]
+name = "git.diff"
+module = "arcen.tools.git"
+class = "GitDiff"
+danger = "safe"
+
+[[tool]]
+name = "git.log"
+module = "arcen.tools.git"
+class = "GitLog"
+danger = "safe"
+
+[[tool]]
+name = "git.show"
+module = "arcen.tools.git"
+class = "GitShow"
+danger = "safe"
+
+[[tool]]
+name = "git.add"
+module = "arcen.tools.git"
+class = "GitAdd"
+danger = "sandboxed"
+
+[[tool]]
+name = "git.commit"
+module = "arcen.tools.git"
+class = "GitCommit"
+danger = "sandboxed"
+
+[[tool]]
+name = "git.branch"
+module = "arcen.tools.git"
+class = "GitBranch"
+danger = "sandboxed"
+
+[[tool]]
+name = "git.checkout"
+module = "arcen.tools.git"
+class = "GitCheckout"
+danger = "sandboxed"
+
+# --- patch + repo map (2) ---
+[[tool]]
+name = "patch.apply"
+module = "arcen.tools.patch"
+class = "PatchApply"
+danger = "sandboxed"
+
+[[tool]]
+name = "repo.map"
+module = "arcen.tools.repomap"
+class = "RepoMap"
+danger = "safe"

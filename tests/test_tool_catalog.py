@@ -59,11 +59,22 @@ def test_render_respects_the_character_budget(registry) -> None:
 
 def test_render_reports_tools_it_had_to_hide(registry) -> None:
     text = catalog.render(registry, max_tools=3)
-    assert "(+37 more tools not shown" in text
+    hidden = len(registry.names()) - 3
+    assert f"(+{hidden} more tools not shown" in text
 
 
 def test_render_of_an_empty_selection_is_empty(registry) -> None:
     assert catalog.render(registry, available=[]) == ""
+
+
+def test_render_tolerates_a_registry_that_cannot_enumerate() -> None:
+    """A dispatch-only proxy is not a reason to kill the turn."""
+
+    class Opaque:
+        def dispatch(self, name, args):
+            return {"ok": True, "result": None, "error": None}
+
+    assert catalog.render(Opaque()) == ""
 
 
 def test_a_broken_tool_does_not_break_the_catalog() -> None:
