@@ -192,6 +192,32 @@ def test_dispatch_rejects_malformed_helper_output():
     assert "Traceback" in response["result"]["stdout"]
 
 
+def test_dispatch_names_a_host_io_fault_instead_of_malformed_output():
+    # A corrupt image layer on the host killed python before the helper could
+    # report. "malformed output" sends the reader after the tool; name the host.
+    docker = FakeDocker()
+    docker.output = [(
+        b"",
+        b"ImportError: /usr/local/lib/python3.12/lib-dynload/_posixsubprocess"
+        b".cpython-312-x86_64-linux-gnu.so: cannot read file data: "
+        b"Input/output error",
+    )]
+    reg = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    response = reg.dispatch("file.write", {"path": "a.py", "content": "x"})
+    assert not response["ok"]
+    assert "I/O error" in response["error"] and "sandbox-check" in response["error"]
+    assert "malformed output" not in response["error"]
+    assert "Input/output error" in response["result"]["stderr"]
+
+
+def test_dispatch_names_disk_exhaustion():
+    docker = FakeDocker()
+    docker.output = [(b"", b"OSError: [Errno 28] No space left on device")]
+    reg = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    response = reg.dispatch("file.read", {"path": "x"})
+    assert not response["ok"] and "disk space" in response["error"]
+
+
 # -- git: the sandbox must accept what the planner was told it accepts ------
 # The catalog is rendered from the HOST tool schema (git.add takes `root`),
 # while execution happens in the container. When the two drift the model

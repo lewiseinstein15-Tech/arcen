@@ -201,6 +201,26 @@ class DockerTurnRegistry:
             return self._dispatch_bash(args)
         return self._dispatch_isolated(name, args)
 
+    @staticmethod
+    def _crash_hint(stderr: str) -> str | None:
+        """Name a host-level fault when the runner died before reporting.
+
+        A malformed payload means the helper never reached its own error
+        handling, so the failure is below the tool. Say which one it is
+        instead of leaving the caller with "malformed output".
+        """
+        low = stderr.lower()
+        if "input/output error" in low:
+            return (
+                "the sandbox image is unreadable on this host (I/O error); "
+                "re-pull it and run scripts/sandbox-check.sh"
+            )
+        if "no space left on device" in low:
+            return "the sandbox host is out of disk space; run scripts/sandbox-check.sh"
+        if "cannot read file data" in low or "_posixsubprocess" in low:
+            return "the sandbox image cannot load its own stdlib; run scripts/sandbox-check.sh"
+        return None
+
     def _dispatch_isolated(self, name: str, args: dict) -> dict:
         from arcen.sandbox.isolated_ops import build_argv
 
@@ -220,13 +240,18 @@ class DockerTurnRegistry:
             or type(payload.get("ok")) is not bool
             or payload.get("ok") != (payload.get("error") is None)
         ):
+            hint = self._crash_hint(outcome.get("stderr") or "")
             return {
                 "ok": False,
                 "result": {
                     "stdout": outcome["stdout"][-2000:],
                     "stderr": outcome["stderr"][-2000:],
                 },
-                "error": f"isolated tool {name!r} returned malformed output",
+                "error": (
+                    f"isolated tool {name!r} could not run: {hint}"
+                    if hint
+                    else f"isolated tool {name!r} returned malformed output"
+                ),
             }
         return {"ok": payload["ok"], "result": payload.get("result"), "error": payload.get("error")}
 

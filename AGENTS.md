@@ -65,6 +65,13 @@ sudo docker pull ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0
 Live isolation check (host paths hidden, server env not leaked, no network):
 `ARCEN_TEST_DOCKER_ISOLATION=1 .venv/bin/pytest tests/test_turn_isolation.py -k real_docker`
 
+When tools fail with `could not run` or `malformed output`, the runner died
+before it could report — the fault is below the tool. `./scripts/sandbox-check.sh`
+probes socket, image, the image's own python and a write, and names the first
+thing that fails. `Input/output error` reading `/usr/local/lib/python3.12/...`
+means the local image layers are unreadable: `docker rmi` then `docker pull`
+the pinned image.
+
 ## Things that bite
 - Editing `guardrails/policy.yaml`, `tool-guidance.md`, `tools/registry.toml` or
   anything under `prompts/` breaks the bundled harness manifest: refresh the
