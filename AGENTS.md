@@ -28,7 +28,9 @@ succeed; `doomed` always fails.
 For a demo that exercises the full fix-a-real-bug loop (red tests → replan →
 edit → green → TEMPER), use `scripts/demo_agent.py` on port 9378: goals
 containing `calc` scaffold a module with a real bug, watch pytest fail, then
-read, edit and re-run. `DEMO_DELAY=<seconds>` paces the provider so the phases
+read, edit and re-run; goals containing `geometry` do the same through
+`file.write`, creating the module and its tests from nothing and then
+rewriting the module whole. `DEMO_DELAY=<seconds>` paces the provider so the phases
 are visible on screen; `scripts/capture_ui_demo.py` drives the UI with
 Playwright and writes `docs/screenshots/`.
 
@@ -45,6 +47,10 @@ Live isolation check (host paths hidden, server env not leaked, no network):
 `ARCEN_TEST_DOCKER_ISOLATION=1 .venv/bin/pytest tests/test_turn_isolation.py -k real_docker`
 
 ## Things that bite
+- Editing `guardrails/policy.yaml`, `tool-guidance.md`, `tools/registry.toml` or
+  anything under `prompts/` breaks the bundled harness manifest: refresh the
+  sha256 in `src/arcen/harness.toml` or every turn fails with `component hash
+  mismatch`.
 - A sandbox reset takes the daemon, the socket, the image and `~/.arcen` with
   it. Before the first turn: `sudo dockerd &`, `sudo chmod 666
   /var/run/docker.sock`, rebuild `docker/sandbox` as
@@ -63,9 +69,11 @@ Live isolation check (host paths hidden, server env not leaked, no network):
   backend restart.
 
 ## Current gaps
-- The isolated turn executor ports `bash`, `file.read`, `file.list`, `file.glob`,
-  `search.text` and `file.edit` (path-confined to `/workspace`). `file.write`,
+- The isolated turn executor ports `bash`, `file.read`, `file.write`, `file.list`,
+  `file.glob`, `search.text` and `file.edit` (path-confined to `/workspace`).
   `http.get` and the code tools are denied, so plans using them fail/replan.
+  `file.write` tops out at 96 000 bytes: tool arguments travel as one argv
+  element and Linux caps a single argument at 128 KiB.
 - Container edits leave the sandbox as a host-generated patch in
   `~/.arcen/artifacts/<session>/patch.diff`; `arcen apply SESSION --yes` applies
   it to the repo the turn ran against (no commit).

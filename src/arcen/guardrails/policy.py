@@ -53,7 +53,16 @@ class ExecutionPolicy(BaseModel):
     process_fallback: Literal[False]
     user: Literal["65534:65534"]
     allowed_tools: tuple[
-        Literal["bash", "file.read", "file.list", "file.glob", "search.text", "file.edit"], ...
+        Literal[
+            "bash",
+            "file.read",
+            "file.write",
+            "file.list",
+            "file.glob",
+            "search.text",
+            "file.edit",
+        ],
+        ...,
     ]
     max_pids: int = Field(ge=1, le=128)
     max_output_bytes: int = Field(ge=1024, le=262144, multiple_of=1024)

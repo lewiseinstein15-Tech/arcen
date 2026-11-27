@@ -98,12 +98,13 @@ def test_policy_and_nested_values_are_immutable_and_snapshot_is_detached(tmp_pat
     with pytest.raises(ValidationError):
         policy.workspace.max_entries = 99999
     with pytest.raises(TypeError):
-        policy.execution.allowed_tools[0] = "file.write"
+        policy.execution.allowed_tools[0] = "http.get"
     copy = policy.snapshot()
-    copy["execution"]["allowed_tools"].append("file.write")
+    copy["execution"]["allowed_tools"].append("http.get")
     assert policy.execution.allowed_tools == (
         "bash",
         "file.read",
+        "file.write",
         "file.list",
         "file.glob",
         "search.text",
@@ -173,7 +174,7 @@ def test_tightened_policy_reaches_status_and_enforces_resources(monkeypatch, tmp
 
 def test_tightened_allowlist_and_pid_inspection_fail_closed(monkeypatch, tmp_path):
     text = POLICY.read_text().replace(
-        "allowed_tools:\n    - bash\n    - file.read\n    - file.list\n    - file.glob\n    - search.text\n    - file.edit",
+        "allowed_tools:\n    - bash\n    - file.read\n    - file.write\n    - file.list\n    - file.glob\n    - search.text\n    - file.edit",
         "allowed_tools: []",
     )
     text = text.replace("max_pids: 128", "max_pids: 8")

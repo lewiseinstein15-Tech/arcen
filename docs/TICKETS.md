@@ -560,7 +560,13 @@ The following are backlog entries, not authorization to implement any later phas
 - **Verification:** inventories match, source-linked audit and all requested exception dispositions are substantiated; reproduce counts; attach fresh verification evidence. Backend and frontend results are recorded in `AUDIT.md`.
 
 ### [A-01] Independent verification instead of command replay
-- **Status:** [ ] todo. Avoid automatic rerunning of arbitrary mutating work commands; discover and explicitly run appropriate safe checks, report evidence and unknowns, add false-pass and side-effect regressions.
+- **Status:** [~] partial. TEMPER discovers and re-runs the suite inside the
+  container on real turns: session `30145512` (edit path) and `4ffaa061`
+  (file.write path) both ended `Verification passed` after TEMPER ran
+  `python -m pytest -q` itself rather than replaying FORGE's command. A turn
+  with no discoverable tests stays explicitly unverified. Still open: the
+  false-pass and side-effect regression suite, and mutating-command avoidance
+  beyond test runners.
 - **Test:** `pytest tests/test_temper.py` plus new server verification tests.
 
 ### [A-02] Repeatable engineering benchmark
@@ -568,7 +574,18 @@ The following are backlog entries, not authorization to implement any later phas
 - **Test:** add deterministic benchmark harness tests and publish run commands.
 
 ### [A-03] Safe reviewed change return
-- **Status:** [~] in progress, not Done (mock). The superseded host-side Git patch constructor was removed; it did not satisfy the required inside-container design. A preliminary standalone patch validator and 15 unit tests exist, and Git was added to the sandbox Dockerfile, but the image has not been built or tested. Snapshot-baseline protection, bounded container diff export, metadata publication, server event integration, explicit apply, complete fake-runtime tests and the real-Docker smoke procedure remain unimplemented. The validator is not connected to the runtime and is not a security assurance. Preserve isolation and never silently write host files.
+- **Status:** [~] in progress, real Docker run done for the edit and create
+  paths. The sandbox image is built locally and a live turn exports a bounded
+  patch to `~/.arcen/artifacts/<session>/patch.diff`; `arcen apply SESSION
+  --yes` applies it to the workspace repo without committing. Verified on
+  2026-11-25: session `30145512` returned a one-hunk edit to `calc.py` and
+  session `4ffaa061` returned two `new file mode 100644` entries
+  (`shapes.py`, `test_shapes.py`); both applied cleanly and the host suite
+  passed (`2 passed`). Still open: the A-03b attack matrix through the real
+  pipeline (malicious paths, secrets, size limits, binary/new/deleted files,
+  executable modes), the different-HEAD and overlapping-dirty-tree refusals,
+  metadata publication and server event integration. The validator is not a
+  security assurance. Preserve isolation and never silently write host files.
 - **Test:** `pytest tests/test_sandbox.py` plus export and attack regressions.
 
 ### [A-04] Enabled-only plugin discovery
@@ -584,7 +601,7 @@ The following are backlog entries, not authorization to implement any later phas
 - **Test:** add native loop tests and run DRAFT/FORGE/server regression tests.
 
 ### [A-07] Honest isolated tool capabilities
-- **Status:** [~] partial. Capability reporting stays separate from registry counts (`supported_tools` / `effective_tools` / `candidate_tools`). `file.read`, `file.edit`, `file.list`, `file.glob` and `search.text` now run inside the container with path confinement to `/workspace`; `file.write`, `http.get` and the code tools remain denied. Still open: exporting those container edits back to the host (A-03b) and the Phase 4 edit rules for snapshots.
+- **Status:** [~] partial. Capability reporting stays separate from registry counts (`supported_tools` / `effective_tools` / `candidate_tools`). `bash`, `file.read`, `file.write`, `file.edit`, `file.list`, `file.glob` and `search.text` now run inside the container with path confinement to `/workspace`; `http.get` and the code tools remain denied, and `file.write` is capped at 96 000 bytes because tool arguments travel as one argv element. Container edits are exported back to the host as a patch (A-03). Still open: the Phase 4 edit rules for snapshots and the `http.get` egress design.
 - **Test:** run isolated registry and policy tests plus targeted capability tests.
 
 ### [A-08] Truthful usage and cost

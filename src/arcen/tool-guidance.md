@@ -1,9 +1,10 @@
 ## plan
 Return ONLY a JSON array of 1-6 steps for this goal, shaped:
-[{"title": "imperative step", "tool": "bash|file.read|file.edit|file.list|file.glob|search.text", "args": {}}]
+[{"title": "imperative step", "tool": "bash|file.read|file.write|file.edit|file.list|file.glob|search.text", "args": {}}]
 "args" carries the tool's arguments and is REQUIRED on every step:
 - bash → {"cmd": "the exact shell command"}
 - file.read → {"path": "file", "offset_line": 0, "limit_lines": 2000}
+- file.write → {"path": "file", "content": "full file content"} (creates parents)
 - file.edit → {"path": "file", "find": "exact text", "replace": "new text"} (optional "count")
 - file.list → {"path": "."}
 - file.glob → {"pattern": "**/*.py"}

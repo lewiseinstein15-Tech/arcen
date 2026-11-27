@@ -95,7 +95,7 @@ def test_container_configuration_and_command_do_not_use_host():
     assert docker.container.removed
 
 
-@pytest.mark.parametrize("name", ["file.write", "file.delete", "search.web", "code.eval", "unknown"])
+@pytest.mark.parametrize("name", ["file.append", "file.delete", "search.web", "code.eval", "unknown"])
 def test_unported_tools_never_dispatch_to_the_host(name):
     docker = FakeDocker()
     reg = DockerTurnRegistry(ArcenConfig(), docker_client=docker)

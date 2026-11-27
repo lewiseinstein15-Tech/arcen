@@ -15,6 +15,7 @@ def test_unavailable_sandbox_has_no_effective_tools(monkeypatch):
     assert status["supported_tools"] == [
         "bash",
         "file.read",
+        "file.write",
         "file.list",
         "file.glob",
         "search.text",

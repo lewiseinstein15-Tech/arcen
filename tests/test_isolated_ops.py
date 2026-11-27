@@ -12,16 +12,23 @@ import subprocess
 import sys
 
 import pytest
+from test_turn_isolation import FakeDocker
 
 from arcen.config import ArcenConfig
-from arcen.sandbox.isolated_ops import build_argv, validate
+from arcen.sandbox.isolated_ops import HELPER, build_argv, validate
 from arcen.sandbox.turn import DockerTurnRegistry
-from test_turn_isolation import FakeDocker
 
 
 def run(root, name, args):
     argv = build_argv(name, args, root=str(root))
-    completed = subprocess.run(argv, capture_output=True, text=True, timeout=30)
+    completed = subprocess.run(argv, check=False, capture_output=True, text=True, timeout=30)
+    return json.loads(completed.stdout)
+
+
+def run_raw(root, name, args):
+    """Bypass host validation to exercise the helper's own guards."""
+    argv = ["python3", "-c", HELPER, name, str(root), json.dumps(args)]
+    completed = subprocess.run(argv, check=False, capture_output=True, text=True, timeout=30)
     return json.loads(completed.stdout)
 
 
@@ -62,9 +69,7 @@ def test_search_reports_path_line_and_text(root):
 
 
 def test_edit_replaces_exactly_and_reports_ambiguity(root):
-    edited = run(
-        root, "file.edit", {"path": "src/app.py", "find": "a + b", "replace": "b + a"}
-    )
+    edited = run(root, "file.edit", {"path": "src/app.py", "find": "a + b", "replace": "b + a"})
     assert edited["ok"] is True
     assert edited["result"]["replacements"] == 1
     assert "return b + a" in (root / "src" / "app.py").read_text()
@@ -77,11 +82,58 @@ def test_edit_replaces_exactly_and_reports_ambiguity(root):
     assert ambiguous["ok"] is False and "ambiguous" in ambiguous["error"]
 
 
+def test_write_creates_parents_and_reports_bytes(root):
+    written = run(root, "file.write", {"path": "pkg/sub/mod.py", "content": "x = 1\n"})
+    assert written["ok"] is True
+    assert written["result"] == {"path": str((root / "pkg/sub/mod.py").resolve()), "bytes": 6}
+    assert (root / "pkg/sub/mod.py").read_text() == "x = 1\n"
+
+
+def test_write_drops_stale_bytecode_so_a_same_size_rewrite_takes_effect(root):
+    (root / "mod.py").write_text("value = 1\n")
+    assert (
+        subprocess.run(
+            [sys.executable, "-c", "import mod; print(mod.value)"],
+            check=False,
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        ).stdout.strip()
+        == "1"
+    )
+    run(root, "file.write", {"path": "mod.py", "content": "value = 2\n"})
+    assert (
+        subprocess.run(
+            [sys.executable, "-c", "import mod; print(mod.value)"],
+            check=False,
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        ).stdout.strip()
+        == "2"
+    )
+
+
+def test_write_refuses_a_directory_and_oversized_content(root):
+    on_dir = run(root, "file.write", {"path": "src", "content": "x"})
+    assert on_dir["ok"] is False and "not a regular file" in on_dir["error"]
+    with pytest.raises(ValueError, match="too large to write"):
+        validate("file.write", {"path": "a", "content": "x" * 96_001})
+    big = run_raw(root, "file.write", {"path": "big.txt", "content": "x" * 96_001})
+    assert big["ok"] is False and "larger than 96000" in big["error"]
+    assert not (root / "big.txt").exists()
+
+
 @pytest.mark.parametrize("path", ["../escape", "/etc/passwd", "src/../../escape"])
 def test_paths_outside_the_root_are_refused(root, path):
     payload = run(root, "file.read", {"path": path})
     assert payload["ok"] is False
     assert "escapes the isolated workspace" in payload["error"]
+    write = run(root, "file.write", {"path": path, "content": "x"})
+    assert write["ok"] is False
+    assert "escapes the isolated workspace" in write["error"]
 
 
 def test_validate_rejects_unknown_keys_types_and_oversized_arguments(root):
@@ -92,7 +144,9 @@ def test_validate_rejects_unknown_keys_types_and_oversized_arguments(root):
     with pytest.raises(ValueError, match="too large"):
         validate("file.edit", {"path": "a", "find": "x", "replace": "y" * 1_100_000})
     with pytest.raises(ValueError, match="not an isolated file operation"):
-        validate("file.write", {"path": "a"})
+        validate("file.append", {"path": "a"})
+    with pytest.raises(ValueError, match="unknown argument"):
+        validate("file.write", {"path": "a", "content": "x", "mode": "append"})
 
 
 def test_dispatch_runs_file_tools_inside_the_container():
@@ -107,10 +161,23 @@ def test_dispatch_runs_file_tools_inside_the_container():
     assert kwargs["workdir"] == "/workspace" and kwargs["user"] == "65534:65534"
 
 
+def test_dispatch_runs_file_write_inside_the_container():
+    docker = FakeDocker()
+    docker.output = [
+        (b'{"ok": true, "result": {"path": "/workspace/a.py", "bytes": 6}, "error": null}', b"")
+    ]
+    reg = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
+    response = reg.dispatch("file.write", {"path": "a.py", "content": "x = 1\n"})
+    assert response["ok"] is True and response["result"]["bytes"] == 6
+    command, kwargs = docker.container.calls[-1]
+    assert command[3] == "file.write" and command[4] == "/workspace"
+    assert kwargs["user"] == "65534:65534"
+
+
 def test_dispatch_denies_tools_outside_the_allowlist_without_exec():
     docker = FakeDocker()
     reg = DockerTurnRegistry(ArcenConfig(), docker_client=docker)
-    for name in ("file.write", "file.delete", "code.eval"):
+    for name in ("file.append", "file.delete", "code.eval"):
         response = reg.dispatch(name, {"path": "/etc/passwd"})
         assert not response["ok"] and "not yet available" in response["error"]
     assert docker.container.calls == []

@@ -5,18 +5,30 @@ on the host. It receives an explicit root (always ``/workspace`` from the
 runtime) and refuses any path that resolves outside it. Output is a single JSON
 object; the host treats it as untrusted and re-validates the shape.
 
-Only read-mostly tools plus exact-string ``file.edit`` are ported. Anything
-else stays denied by the allowlist and never falls back to a host registry.
+The ported tools are the read-mostly ones plus whole-file ``file.write`` and
+exact-string ``file.edit``. Anything else stays denied by the allowlist and
+never falls back to a host registry.
 """
 
 from __future__ import annotations
 
 import json
 
-ALLOWED = ("bash", "file.read", "file.list", "file.glob", "search.text", "file.edit")
+ALLOWED = (
+    "bash",
+    "file.read",
+    "file.write",
+    "file.list",
+    "file.glob",
+    "search.text",
+    "file.edit",
+)
 
 MAX_ARG_BYTES = 1_048_576
 MAX_READ_BYTES = 2_000_000
+# Tool arguments travel as one argv element, and Linux caps a single argument
+# at 128 KiB, so a whole-file write is bounded well below that.
+MAX_WRITE_BYTES = 96_000
 MAX_ENTRIES = 1000
 MAX_MATCHES = 500
 
@@ -108,6 +120,38 @@ def search(a):
     return {"matches": matches, "count": len(matches), "truncated": False}
 
 
+def drop_bytecode(p):
+    # A same-second, same-size rewrite leaves the old .pyc looking valid to
+    # CPython's (mtime, size) check, so the next run would import stale code.
+    if not p.endswith(".py"):
+        return
+    cache = os.path.join(os.path.dirname(p), "__pycache__")
+    stem = os.path.splitext(os.path.basename(p))[0]
+    try:
+        for name in os.listdir(cache):
+            if name.startswith(stem + ".") and name.endswith(".pyc"):
+                os.unlink(os.path.join(cache, name))
+    except OSError:
+        pass
+
+
+def write(a):
+    p = resolve(a.get("path", ""))
+    if os.path.isdir(p):
+        raise ValueError("not a regular file")
+    content = a.get("content", "")
+    if len(content.encode("utf-8")) > 96000:
+        raise ValueError("content larger than 96000 bytes")
+    parent = os.path.dirname(p) or root
+    os.makedirs(parent, exist_ok=True)
+    tmp = p + ".arcen-tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(content)
+    os.replace(tmp, p)
+    drop_bytecode(p)
+    return {"path": p, "bytes": len(content.encode("utf-8"))}
+
+
 def edit(a):
     p = resolve(a.get("path", ""), must_exist=True)
     if not os.path.isfile(p):
@@ -129,25 +173,15 @@ def edit(a):
     with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(updated)
     os.replace(tmp, p)
-    # A same-second, same-size rewrite leaves the old .pyc looking valid to
-    # CPython's (mtime, size) check, so the next run would import stale code.
-    if p.endswith(".py"):
-        cache = os.path.join(os.path.dirname(p), "__pycache__")
-        stem = os.path.splitext(os.path.basename(p))[0]
-        try:
-            for name in os.listdir(cache):
-                if name.startswith(stem + ".") and name.endswith(".pyc"):
-                    os.unlink(os.path.join(cache, name))
-        except OSError:
-            pass
+    drop_bytecode(p)
     return {
         "path": p,
         "replacements": occurrences if count < 0 else min(count, occurrences),
     }
 
 
-OPS = {"file.read": read, "file.list": list_dir, "file.glob": glob_files,
-       "search.text": search, "file.edit": edit}
+OPS = {"file.read": read, "file.write": write, "file.list": list_dir,
+       "file.glob": glob_files, "search.text": search, "file.edit": edit}
 
 try:
     if op not in OPS:
@@ -160,6 +194,7 @@ print(json.dumps(result))
 
 _ARG_KEYS = {
     "file.read": {"path", "offset_line", "limit_lines"},
+    "file.write": {"path", "content"},
     "file.list": {"path"},
     "file.glob": {"pattern", "root"},
     "search.text": {"pattern", "root", "glob", "limit"},
@@ -176,12 +211,14 @@ def validate(name: str, args: object) -> dict:
     unknown = set(args) - _ARG_KEYS[name]
     if unknown:
         raise ValueError(f"unknown argument(s): {', '.join(sorted(unknown))}")
-    for key in ("path", "root", "pattern", "glob", "find", "replace"):
+    for key in ("path", "root", "pattern", "glob", "find", "replace", "content"):
         if key in args and type(args[key]) is not str:
             raise ValueError(f"{key} must be a string")
     for key in ("offset_line", "limit_lines", "limit", "count"):
         if key in args and type(args[key]) is not int:
             raise ValueError(f"{key} must be an integer")
+    if name == "file.write" and len(args.get("content", "").encode("utf-8")) > MAX_WRITE_BYTES:
+        raise ValueError("content is too large to write")
     payload = json.dumps(args, ensure_ascii=False)
     if len(payload.encode("utf-8")) > MAX_ARG_BYTES:
         raise ValueError("tool arguments are too large")

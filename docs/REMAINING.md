@@ -12,10 +12,21 @@ The latest complete salvage regression, at `359e8fc`, was **1,837 backend
 passed, 19 skipped**, and **87 UI tests passed**. In the recovery workspace the
 logs are `~/phase-evidence/A-03a-continuation/backend-api-smoke.log` and
 `ui-api-smoke.log`; they are not automatically included in a Git checkout.
-Those results predate the documentation-only handoff and its merge. Real Docker
-and live-provider verification were not run in the salvage environment.
+Those results predate the documentation-only handoff and its merge.
+
+Real Docker verification has since been run (2026-11-25) on this working tree:
+the sandbox image builds locally, turns execute inside a `network=none`,
+read-only, capability-dropped container as uid 65534, TEMPER re-runs the suite
+there, and the exported patch applies to the host repo with a passing host
+suite. See `docs/TICKETS.md` A-01, A-03 and A-07 for the session IDs. No live
+provider has been used yet: every turn so far was planned by
+`scripts/demo_agent.py`, a scripted OpenAI-compatible provider.
 
 ## Next: A-03b patch application
+
+Done so far: `arcen apply SESSION` dry run, changed-file listing and `--yes`
+application all work against real turns (one edit, one pair of new files), and
+the host suite passes afterwards. What remains is the attack surface:
 
 - Exercise `arcen apply SESSION` through the CLI after a fake turn and export:
   default dry run, changed-file listing, `--yes` application, and a passing
@@ -33,10 +44,12 @@ and live-provider verification were not run in the salvage environment.
 
 ## Remaining phases
 
-- **Phase 4 isolated tools:** `file.read`, `file.edit`, `file.list`, `file.glob` and
-  `search.text` are ported into the Docker turn boundary (container-only writes,
-  no host mount). `file.write`, `http.get` and the code tools stay denied; the
-  research prompt now lists only tools the boundary actually implements.
+- **Phase 4 isolated tools:** `bash`, `file.read`, `file.write`, `file.edit`,
+  `file.list`, `file.glob` and `search.text` are ported into the Docker turn
+  boundary (container-only writes, no host mount). `http.get` and the code
+  tools stay denied; the research prompt now lists only tools the boundary
+  actually implements. `file.write` is capped at 96 000 bytes because tool
+  arguments travel as a single argv element, which Linux caps at 128 KiB.
 - **A-01:** validate TEMPER against real sandbox test discovery and execution;
   no-test runs must remain explicitly unverified.
 - **A-02 / BENCH-1:** implement the complete benchmark/adapters and run real

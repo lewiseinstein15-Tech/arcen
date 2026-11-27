@@ -7,7 +7,12 @@ every step runs inside the Docker sandbox, pytest really fails and then really
 passes, TEMPER discovers and runs the suite, and the exported patch is a
 genuine host diff.
 
-Scenario (any goal mentioning "calc"):
+Scenarios:
+  "geometry" (any goal mentioning it): creates a module and its tests with
+  ``file.write``, runs the suite red, rewrites the module with ``file.write``
+  and runs it green — the whole-file write path, no shell involved.
+
+  "calc" (any goal mentioning it):
   attempt 1: write the buggy project, run pytest   -> red, step fails
   replan:    read calc.py, fix it, run pytest      -> green
   TEMPER:    discovers test_calc.py, verifies the turn
@@ -43,6 +48,55 @@ WRITE_CMD = (
     "cat > calc.py <<'PY'\n" + CALC_PY + "PY\ncat > test_calc.py <<'PY'\n" + TEST_PY + "PY\nls -1"
 )
 
+SHAPES_BUGGY = """def rectangle_area(w, h):
+    \"\"\"Return the area of a rectangle.\"\"\"
+    return w + h
+"""
+
+SHAPES_FIXED = """def rectangle_area(w, h):
+    \"\"\"Return the area of a rectangle.\"\"\"
+    return w * h
+"""
+
+TEST_SHAPES = """from shapes import rectangle_area
+
+
+def test_unit_square():
+    assert rectangle_area(1, 1) == 1
+
+
+def test_three_by_four():
+    assert rectangle_area(3, 4) == 12
+"""
+
+GEOMETRY_PLAN = [
+    {
+        "title": "create shapes.py with rectangle_area",
+        "tool": "file.write",
+        "args": {"path": "shapes.py", "content": SHAPES_BUGGY},
+    },
+    {
+        "title": "create the tests for it",
+        "tool": "file.write",
+        "args": {"path": "test_shapes.py", "content": TEST_SHAPES},
+    },
+    {"title": "run the test suite", "tool": "bash", "args": {"cmd": "python -m pytest -q"}},
+]
+
+GEOMETRY_REPLAN = [
+    {
+        "title": "read the failing implementation",
+        "tool": "file.read",
+        "args": {"path": "shapes.py"},
+    },
+    {
+        "title": "rewrite rectangle_area to multiply",
+        "tool": "file.write",
+        "args": {"path": "shapes.py", "content": SHAPES_FIXED},
+    },
+    {"title": "re-run the test suite", "tool": "bash", "args": {"cmd": "python -m pytest -q"}},
+]
+
 FIRST_PLAN = [
     {"title": "scaffold calc.py and test_calc.py", "tool": "bash", "args": {"cmd": WRITE_CMD}},
     {"title": "run the test suite", "tool": "bash", "args": {"cmd": "python -m pytest -q"}},
@@ -71,6 +125,8 @@ def classify(text: str) -> str:
 
 
 def plan_for(goal: str, is_replan: bool) -> str:
+    if "geometry" in goal.lower():
+        return json.dumps(GEOMETRY_REPLAN if is_replan else GEOMETRY_PLAN)
     if "calc" in goal.lower():
         return json.dumps(REPLAN if is_replan else FIRST_PLAN)
     steps = [
