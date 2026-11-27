@@ -30,14 +30,17 @@ LITELLM_PREFIX: dict[str, str] = {
     "groq": "groq/",
     "deepseek": "deepseek/",
     "ollama": "ollama/",
+    "kilo": "openai/",
     "custom": "openai/",
 }
 
-# providers that work without an api key (local runtimes only)
-KEYLESS_PROVIDERS = frozenset({"ollama"})
+# Providers that work without an api key. Ollama is a local runtime; Kilo's
+# gateway authenticates by ABSENCE — any Authorization header, even an empty
+# Bearer, is rejected, so keyless requests must send none at all.
+KEYLESS_PROVIDERS = frozenset({"ollama", "kilo"})
 
 # providers that must carry an explicit base_url (no native endpoint)
-BASEURL_REQUIRED = frozenset({"custom", "ollama"})
+BASEURL_REQUIRED = frozenset({"custom", "ollama", "kilo"})
 
 # role → agent config slot. Fixed by spec (llm/client.py ROLE_AGENTS maps
 # the same roles onto the DRAFT/FORGE/TEMPER identities).
@@ -135,7 +138,14 @@ def build_llm_client(
         # silent. One retry budget, one backoff, one place.
         kwargs.setdefault("num_retries", 0)  # litellm's own retry loop
         kwargs.setdefault("max_retries", 0)  # the provider SDK's (openai) retry loop
-        kwargs.setdefault("api_key", api_key)
+        if provider.name in KEYLESS_PROVIDERS and not api_key:
+            # The OpenAI client refuses to start without a key, so a
+            # placeholder goes in and the header is blanked: a keyless
+            # gateway must receive no Authorization at all.
+            kwargs.setdefault("api_key", "keyless")
+            kwargs.setdefault("extra_headers", {"Authorization": ""})
+        else:
+            kwargs.setdefault("api_key", api_key)
         if base_url:
             kwargs.setdefault("api_base", base_url)
         return litellm.completion(**kwargs)

@@ -40,7 +40,7 @@ Every step DRAFT plans, FORGE runs, and TEMPER checks streams to your terminal a
 Running `arcen serve` or `./scripts/dev.sh`? Set the `ARCEN_MODEL_*` variables before boot and the Settings page shows them already filled — no retyping, no "I need a model provider" on the first message:
 
 ```bash
-export ARCEN_MODEL_PROVIDER="custom"                                 # or groq / deepseek / openai / anthropic / ollama
+export ARCEN_MODEL_PROVIDER="custom"                                 # or groq / deepseek / openai / anthropic / ollama / kilo
 export ARCEN_MODEL_BASE_URL="https://inference.dahl.global/v1"       # your OpenAI-compatible endpoint (custom/ollama)
 export ARCEN_MODEL_API_KEY="dahl_..."                                # seeded into the masked key field
 export ARCEN_MODEL_NAME="deepseek-ai/DeepSeek-V4-Flash-0731"         # the model for all agents
@@ -249,8 +249,8 @@ ARCEN reads `~/.arcen/config.yaml` (seeded from `ARCEN_MODEL_*` env vars on firs
 
 ```yaml
 provider:
-  name: custom                                   # custom | groq | deepseek | openai | anthropic | ollama
-  base_url: https://inference.dahl.global/v1     # OpenAI-compatible endpoint (custom/ollama)
+  name: custom                                   # custom | groq | deepseek | openai | anthropic | ollama | kilo
+  base_url: https://inference.dahl.global/v1     # OpenAI-compatible endpoint (custom/ollama/kilo)
   api_key: $DAHL_API_KEY                         # literal (chmod 600 file) or $VAR vault reference
   model: deepseek-ai/DeepSeek-V4-Flash-0731      # the model for all agents
 
@@ -279,6 +279,20 @@ stream:
 ```
 
 Every value has an API equivalent (`PUT /api/config`). See [docs/BACKEND-SPEC.md](docs/BACKEND-SPEC.md) Part 4.
+
+### A provider with no key
+
+Kilo's gateway is keyless: it authenticates by *absence*, so any `Authorization` header — even an empty `Bearer` — is rejected with 401. `name: kilo` routes through the OpenAI-compatible client with no credential and a blanked auth header:
+
+```yaml
+provider:
+  name: kilo
+  base_url: https://api.kilocode.ai/api/openrouter/v1
+  api_key: ""
+  model: baidu/ernie-5.5-flash-preview:free
+```
+
+Ollama is keyless for a different reason (it is local); both work with the field empty.
 
 ## Skills
 

@@ -49,9 +49,8 @@ class _Server:
 
 @pytest.fixture()
 def cfg_client(tmp_path):
-    with _Server(tmp_path):
-        with httpx.Client(base_url=BASE, timeout=30.0) as c:
-            yield c
+    with _Server(tmp_path), httpx.Client(base_url=BASE, timeout=30.0) as c:
+        yield c
 
 
 def test_put_persists_to_config_yaml_and_reloads_bridge(cfg_client) -> None:
@@ -117,18 +116,106 @@ def test_provider_ready_requires_all_four_fields() -> None:
         assert field in reason  # the reason names the actual gap
 
     # native providers do not need a base_url; ollama needs no key
-    ok, _ = provider_ready(ArcenConfig.model_validate({"provider": {"name": "anthropic", "api_key": "k", "model": "m"}}))
+    ok, _ = provider_ready(
+        ArcenConfig.model_validate(
+            {"provider": {"name": "anthropic", "api_key": "k", "model": "m"}}
+        )
+    )
     assert ok
-    ok, _ = provider_ready(ArcenConfig.model_validate({"provider": {"name": "ollama", "base_url": "http://localhost:11434", "model": "llama3.2"}}))
+    ok, _ = provider_ready(
+        ArcenConfig.model_validate(
+            {
+                "provider": {
+                    "name": "ollama",
+                    "base_url": "http://localhost:11434",
+                    "model": "llama3.2",
+                }
+            }
+        )
+    )
     assert ok
+    # kilo is a remote gateway that authenticates by absence: no key required
+    ok, _ = provider_ready(
+        ArcenConfig.model_validate(
+            {
+                "provider": {
+                    "name": "kilo",
+                    "base_url": "https://api.kilocode.ai/api/openrouter/v1",
+                    "model": "x:free",
+                }
+            }
+        )
+    )
+    assert ok
+    # ... but its base_url is still mandatory
+    ok, reason = provider_ready(
+        ArcenConfig.model_validate({"provider": {"name": "kilo", "model": "x:free"}})
+    )
+    assert not ok and "base_url" in reason
 
 
-def test_bridge_offline_when_model_missing() -> None:
-    """A key without a model is OFFLINE — never claude-* against custom."""
+def _capture_completion(monkeypatch) -> dict:
+    """Record the kwargs the bridge hands to litellm for one completion."""
+    import litellm
+    from litellm import ModelResponse
+
+    captured: dict = {}
+
+    def fake(**kwargs):
+        captured.update(kwargs)
+        return ModelResponse(
+            choices=[{"message": {"role": "assistant", "content": "ok"}}],
+            model=kwargs.get("model", "m"),
+            usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        )
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    return captured
+
+
+def test_keyless_provider_sends_no_authorization_header(monkeypatch) -> None:
+    """The OpenAI client needs a key, so a placeholder goes in and the header
+    is blanked — Kilo rejects any Authorization value, even an empty Bearer."""
     from arcen.llm.bridge import build_llm_client
 
-    partial = {"name": "custom", "base_url": "https://x.invalid/v1", "api_key": "sk-1", "model": ""}
-    assert build_llm_client(ArcenConfig.model_validate({"provider": partial})) is None
+    captured = _capture_completion(monkeypatch)
+    config = ArcenConfig.model_validate(
+        {
+            "provider": {
+                "name": "kilo",
+                "base_url": "https://api.kilocode.ai/api/openrouter/v1",
+                "model": "baidu/ernie-5.5-flash-preview:free",
+            }
+        }
+    )
+    client = build_llm_client(config)
+    assert client is not None
+    client.complete("planner", [{"role": "user", "content": "hi"}])
+    assert captured["model"] == "openai/baidu/ernie-5.5-flash-preview:free"
+    assert captured["api_base"] == "https://api.kilocode.ai/api/openrouter/v1"
+    assert captured["extra_headers"] == {"Authorization": ""}
+    assert captured["api_key"]  # placeholder, never sent as a real credential
+
+
+def test_keyed_provider_keeps_its_authorization_header(monkeypatch) -> None:
+    from arcen.llm.bridge import build_llm_client
+
+    captured = _capture_completion(monkeypatch)
+    config = ArcenConfig.model_validate(
+        {
+            "provider": {
+                "name": "custom",
+                "base_url": "https://x.invalid/v1",
+                "api_key": "sk-real",
+                "model": "m-1",
+            }
+        }
+    )
+    client = build_llm_client(config)
+    assert client is not None
+    client.complete("planner", [{"role": "user", "content": "hi"}])
+    assert captured["api_key"] == "sk-real"
+    assert "extra_headers" not in captured
 
 
 def test_redacted_key_round_trip_never_wipes_a_key(cfg_client) -> None:

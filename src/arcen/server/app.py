@@ -753,7 +753,9 @@ def put_config(payload: dict = Body(...)) -> dict:
     return STATE.config.redacted()
 
 
-PROVIDERS = frozenset({"custom", "groq", "deepseek", "openai", "anthropic", "ollama"})
+PROVIDERS = frozenset(
+    {"custom", "groq", "deepseek", "openai", "anthropic", "ollama", "kilo"}
+)
 
 
 @app.post("/api/config/test")
@@ -813,6 +815,9 @@ def test_config(payload: dict = Body(...)) -> dict:
     }
     if api_key:
         kwargs["api_key"] = api_key
+    elif provider in KEYLESS_PROVIDERS:
+        kwargs["api_key"] = "keyless"
+        kwargs["extra_headers"] = {"Authorization": ""}
     if base_url:
         kwargs["api_base"] = base_url
     try:

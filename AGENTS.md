@@ -34,6 +34,25 @@ rewriting the module whole. `DEMO_DELAY=<seconds>` paces the provider so the pha
 are visible on screen; `scripts/capture_ui_demo.py` drives the UI with
 Playwright and writes `docs/screenshots/`.
 
+## A real model, no key (Kilo)
+`name: kilo` in the provider block talks to Kilo's gateway with **no
+credential**. The gateway authenticates by absence: any `Authorization`
+header — including an empty `Bearer` — returns 401 `INVALID_TOKEN`, while no
+header at all returns 200. The OpenAI client refuses to construct without a
+key, so `llm/bridge.py` injects a placeholder and blanks the header with
+`extra_headers={"Authorization": ""}`; the same trick is in the server's
+`POST /api/config/test`. Do not "clean up" either of those — removing them
+turns every kilo turn into a 401.
+```bash
+printf 'provider:\n  name: kilo\n  base_url: https://api.kilocode.ai/api/openrouter/v1\n  api_key: ""\n  model: baidu/ernie-5.5-flash-preview:free\n' > ~/.arcen/config.yaml
+.venv/bin/arcen run "the test in calc.py is failing, fix it" --workspace /tmp/calc --json
+```
+Free models on that gateway are rate-limited and some (e.g. `kilo-auto/free`)
+spend the whole `max_tokens` budget on reasoning and return empty content —
+`baidu/ernie-5.5-flash-preview:free` is the one that reliably returns the
+planner's JSON. `scripts/capture_live_model.py` drives the UI through a real
+model turn and writes the `08-live-*` screenshots.
+
 ## Sandbox (tool execution)
 FORGE/TEMPER fail closed without Docker. Start the daemon and make the socket
 reachable to the server user, then restart the backend (backend selection is

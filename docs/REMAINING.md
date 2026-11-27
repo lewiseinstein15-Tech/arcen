@@ -18,9 +18,23 @@ Real Docker verification has since been run (2026-11-25) on this working tree:
 the sandbox image builds locally, turns execute inside a `network=none`,
 read-only, capability-dropped container as uid 65534, TEMPER re-runs the suite
 there, and the exported patch applies to the host repo with a passing host
-suite. See `docs/TICKETS.md` A-01, A-03 and A-07 for the session IDs. No live
-provider has been used yet: every turn so far was planned by
-`scripts/demo_agent.py`, a scripted OpenAI-compatible provider.
+suite. See `docs/TICKETS.md` A-01, A-03 and A-07 for the session IDs.
+
+A live provider has since been used (2026-11-25): Kilo's keyless gateway with
+`baidu/ernie-5.5-flash-preview:free`. Two real-model turns ran end to end —
+one over the headless CLI (session `d9ea4711-952d-497f-b245-2437d037a586`,
+4 steps, patch `a - b` → `a + b` applied on the host, `2 passed`), one through
+the UI (3 steps, 7.66 s, `file.write` creating `words.py` and `test_words.py`,
+`unittest` 4/4 OK, TEMPER verified, 719 in / 928 out, cost 0.000). Token and
+cost numbers now come from a real provider response (`usage_source:
+provider`), which is the A-08 evidence that was missing — a paid model is
+still needed to prove non-zero cost accounting.
+
+What the live model exposed that the scripted planner could not: in the CLI
+run FORGE's own `python -m pytest -q calc.py || python calc.py` step reported
+`ok` because the `||` fallback swallowed the failure. TEMPER's independent
+re-run is what caught the truth, so verification — not the step exit code —
+remains the only thing to trust.
 
 ## Next: A-03b patch application
 

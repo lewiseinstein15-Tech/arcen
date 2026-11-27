@@ -65,7 +65,7 @@ describe('T-036: settings view', () => {
     // the provider select offers the ticket's dropdown values
     const select = screen.getByTestId('provider-select') as HTMLSelectElement;
     expect([...select.options].map((o) => o.value)).toEqual(
-      ['custom', 'groq', 'deepseek', 'openai', 'anthropic', 'ollama'],
+      ['custom', 'groq', 'deepseek', 'openai', 'anthropic', 'ollama', 'kilo'],
     );
   });
 

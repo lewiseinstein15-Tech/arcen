@@ -26,6 +26,17 @@ created by whole-file writes from inside the container.
 | `07-geometry-03-replan-fix.png` | DRAFT re-plans after the failure |
 | `07-geometry-04-verified.png` | `file.read`, whole-file rewrite, `2 passed`, TEMPER verified |
 
+The `08-live-*` set is not scripted at all: a real model planned it. Provider
+`kilo` (keyless gateway), model `baidu/ernie-5.5-flash-preview:free`, goal
+`create a module stats.py with mean, median and mode plus tests, run the tests
+and fix any failures`. Three steps, 16.12 s, 719 in / 3163 out, cost 0.000.
+
+| File | What it shows |
+| --- | --- |
+| `08-live-01-plan.png` | The model's own three-step plan, two `file.write` results, `unittest` 4/4 OK, TEMPER starting |
+| `08-live-03-verified.png` | TEMPER verified, turn `ok`, token and cost meters |
+| `08-live-04-provider.png` | Settings: provider `kilo`, base URL, "not required — this provider is keyless" |
+
 ## Reproducing
 
 ```bash
@@ -43,6 +54,7 @@ printf 'provider:\n  name: custom\n  base_url: http://127.0.0.1:9378/v1\n  api_k
 # 4. drive the UI and capture the frames
 .venv/bin/python scripts/capture_ui_demo.py          # the calc/edit run
 .venv/bin/python scripts/capture_ui_demo.py geometry # the file.write run
+.venv/bin/python scripts/capture_live_model.py       # a real-model turn (needs a provider)
 ```
 
 The headless path needs no browser:

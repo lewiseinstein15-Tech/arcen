@@ -12,8 +12,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Toast } from './Toast';
 
-const PROVIDERS = ['custom', 'groq', 'deepseek', 'openai', 'anthropic', 'ollama'] as const;
+const PROVIDERS = ['custom', 'groq', 'deepseek', 'openai', 'anthropic', 'ollama', 'kilo'] as const;
 type Provider = (typeof PROVIDERS)[number];
+
+// providers without a native endpoint: the user must supply the URL
+const BASEURL_PROVIDERS: readonly Provider[] = ['custom', 'ollama', 'kilo'];
+// providers that work with no credential at all
+const KEYLESS_PROVIDERS: readonly Provider[] = ['ollama', 'kilo'];
 
 const MODEL_SUGGESTIONS: Record<Provider, string[]> = {
   anthropic: ['claude-sonnet-4-5', 'claude-haiku-4-5', 'claude-opus-4-1'],
@@ -21,6 +26,7 @@ const MODEL_SUGGESTIONS: Record<Provider, string[]> = {
   groq: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'],
   deepseek: ['deepseek-chat', 'deepseek-reasoner'],
   ollama: ['llama3.2', 'qwen2.5-coder:7b', 'mistral'],
+  kilo: ['baidu/ernie-5.5-flash-preview:free', 'kilo-auto/free'],
   custom: ['gpt-4o-mini', 'llama-3.3-70b-versatile', 'deepseek-chat'],
 };
 
@@ -243,7 +249,7 @@ export function SettingsView() {
           </select>
         </label>
 
-        {(currentProvider === 'custom' || currentProvider === 'ollama') && (
+        {BASEURL_PROVIDERS.includes(currentProvider) && (
           <label className="field">
             <span className="field-label">Base URL</span>
             <input
@@ -261,7 +267,13 @@ export function SettingsView() {
           <input
             type="password"
             data-testid="api-key-input"
-            placeholder={String(provider.api_key ?? '') ? '•••• stored — leave blank to keep' : 'sk-…'}
+            placeholder={
+              KEYLESS_PROVIDERS.includes(currentProvider)
+                ? 'not required — this provider is keyless'
+                : String(provider.api_key ?? '')
+                  ? '•••• stored — leave blank to keep'
+                  : 'sk-…'
+            }
             value={keyDraft ?? ''}
             onChange={(e) => setKeyDraft(e.target.value)}
             autoComplete="off"
