@@ -1,342 +1,201 @@
 <div align="center">
 
-<img src="docs/logo.svg" width="120" alt="ARCEN logo" />
+<img src="docs/logo.svg" width="110" alt="ARCEN" />
 
 # ARCEN
 
 **Agentic reasoning. Code. Engineer.**
 
-[![CI](https://github.com/lewiseinstein15-Tech/arcen/actions/workflows/ci.yml/badge.svg)](https://github.com/lewiseinstein15-Tech/arcen/actions/workflows/ci.yml)
+An agentic engineer that plans, builds, and verifies — narrating every step.
+
+[![Harness validation](https://github.com/lewiseinstein15-Tech/arcen/actions/workflows/harness-validation.yml/badge.svg)](https://github.com/lewiseinstein15-Tech/arcen/actions/workflows/harness-validation.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](docs/TICKETS.md)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
+[![Tests](https://img.shields.io/badge/tests-1748%20backend%20%C2%B7%2093%20UI-brightgreen.svg)](#tests)
 
-*An agentic engineer that plans, builds, and verifies — with every action narrated in a live stream.*
-
-[What is ARCEN](#what-is-arcen) · [Quick Start](#quick-start) · [How it Works](#how-it-works) · [Installation](#installation) · [Configuration](#configuration) · [Docs](docs/ARCHITECTURE.md)
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Sandbox](#the-sandbox) · [Tools](#tools) · [Configuration](#configuration) · [Limits](#what-it-cannot-do-yet) · [Docs](#documentation)
 
 </div>
 
 ---
 
-## What is ARCEN?
+## What it is
 
-Most coding agents are black boxes: you submit a task, wait, and receive an answer with no way to see what happened in between — or to trust it when it breaks. ARCEN is an agentic engineer that plans with DRAFT, executes with FORGE, and verifies with TEMPER, narrating every thought, command, and result as it happens. The work is watchable: a live NDJSON stream shows every step, so you can audit, interrupt, or rerun anything.
-
-ARCEN does not invent. It pulls from the best open-source agent projects, edits only what it needs, wires it, and tests it.
-
-## Quick Start
-
-```bash
-pip install arcen
-export ANTHROPIC_API_KEY="sk-ant-..."   # or OPENAI_API_KEY, GROQ_API_KEY, ...
-arcen "fix the failing test in tests/test_pay.py"
-```
-
-Every step DRAFT plans, FORGE runs, and TEMPER checks streams to your terminal as one JSON object per line. When TEMPER fails the work, DRAFT re-plans — you watch it happen.
-
-### Pointing the server/UI at a model with env vars
-
-Running `arcen serve` or `./scripts/dev.sh`? Set the `ARCEN_MODEL_*` variables before boot and the Settings page shows them already filled — no retyping, no "I need a model provider" on the first message:
-
-```bash
-export ARCEN_MODEL_PROVIDER="custom"                                 # or groq / deepseek / openai / anthropic / ollama / kilo
-export ARCEN_MODEL_BASE_URL="https://inference.dahl.global/v1"       # your OpenAI-compatible endpoint (custom/ollama)
-export ARCEN_MODEL_API_KEY="dahl_..."                                # seeded into the masked key field
-export ARCEN_MODEL_NAME="deepseek-ai/DeepSeek-V4-Flash-0731"         # the model for all agents
-./scripts/dev.sh
-```
-
-On boot ARCEN seeds any EMPTY provider slot from these vars (a value already in `~/.arcen/config.yaml` always wins) and writes the seeded file once, logging one line with the key masked — `[config] seeded from env: provider=custom model=… base_url=… api_key=dahl_...a71b`. After that first boot the file is the source of truth: restarts don't re-seed, and unsetting the env vars won't unconfigure the server.
-
-### Running the dev stack (backend + UI)
-
-The UI proxies `/api/*` to the backend on port **3002** — so the backend must be up FIRST, or Vite spams `ECONNREFUSED`. Two shells:
-
-```bash
-# Shell 1 — backend first (health check: http://localhost:3002/api/health → {"ok": true})
-python -m uvicorn arcen.server.app:app --port 3002
-
-# Shell 2 — then the frontend
-cd ui && npm install && npm run dev      # UI at :5173
-```
-
-Or start both cleanly with one command — the script backgrounds the backend, traps it on exit, and brings up the UI:
-
-```bash
-./scripts/dev.sh
-```
-
-npm shortcuts are wired at the repo root too: `npm run dev:backend`, `npm run dev:frontend`, `npm run dev` (both).
-
-### Terminal UI (TUI)
-
-The optional Textual client streams the same ARCEN events in one terminal:
-
-```bash
-uv tool install 'arcen[tui]'   # or pipx, or a virtual environment
-arcen-tui                      # attaches or manages a local server
-arcen-tui --demo --replay      # offline recorded-event demo; no credentials
-```
-
-See [the TUI guide](docs/TUI.md) for shortcuts, sessions, server lifecycle,
-real-terminal screenshots and sandbox details.
-
-## Sandbox execution
-
-**Security notice:** Earlier versions could run planned tools on the host even when the UI reported a sandbox. Upgrade before running untrusted tasks.
-
-The server execution path now fails closed: FORGE and TEMPER use a per-turn Docker container, never the host tool registry. Docker must be running, the configured image must already exist locally, and `sandbox.network` must be `none`. Container creation or policy checks failing, an unavailable daemon/image, and `sandbox.backend=process` all disable tool execution; there is **no process fallback or automatic image pull**. Conversational turns that do not use tools can still run.
-
-Install the Docker SDK extra (`arcen[sandbox]`; combine with `arcen[tui,sandbox]` for the TUI), then prepare the image:
-
-```bash
-docker pull ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0
-# Or build the image locally:
-docker build -t ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0 docker/sandbox
-```
-
-**Current limitations:** the isolated turn executor ports `bash`, `file.read`, `file.edit`, `file.list`, `file.glob` and `search.text`. Every other tool is denied by the allowlist, not run on the host; there is no process fallback. Each turn has a new temporary `/workspace`; its files are discarded at the end, so no host repository is mounted and changes do not persist between turns. Docker presence in Settings is only a readiness check: the actual container policy is checked at turn start. Host process environment variables are not passed into it. Command output is limited to 256 KiB; excessive output stops the container.
-
-The sandbox is a defense-in-depth boundary, not a guarantee against Docker or kernel vulnerabilities. The Docker daemon, selected image and host plugins must be trusted; plugins run in the server process, outside the tool sandbox. Network-disabled commands can still expose any data visible inside the container through their output to the application and its model provider. Sessions, configuration and logs remain host-side. Standalone tool/agent modules and the older `SandboxRuntime` are not the server execution boundary and must not be used to run untrusted input.
-
-Live Docker isolation must be verified on a machine with a daemon and the image installed: `ARCEN_TEST_DOCKER_ISOLATION=1 pytest tests/test_turn_isolation.py -k real_docker`. Mocked tests alone do not prove real container isolation.
-
-## Headless runs
-
-Run one task without a terminal UI using `arcen run "goal" --json`. See the
-[headless guide](docs/HEADLESS.md) for the result schema, exit codes, workspace
-snapshot limits, and the not-yet-available harness references. The default
-model prompts are [file-based](docs/HARNESS-PROMPTS.md).
-
-## Features
-
-- **Narrated execution** — every thought, command, and result is one NDJSON event on the stream
-- **3 core agents** — DRAFT plans, FORGE executes, TEMPER verifies; nothing else decides
-- **Sub-agent pool** — task-named instances, depth- and concurrency-capped; no catalog of 500 agents
-- **Skills** — SKILL.md folders indexed at boot; the file is read fully during indexing
-- **Tool registry** — bash, file, search, browse and code schemas; isolated server turns enable bash plus the file/search tools above
-- **MCPs** — configured Model Context Protocol servers; none configured by default
-- **Plugins** — trusted opt-in hooks; none enabled by default: `before_tool`, `after_tool`, `on_spawn`, `on_error`
-- **Fail-closed server execution** — per-turn Docker container for supported tools; no unsafe process fallback
-- **Persistent memory** — entity graph in a single SQLite file with decay and consolidation
-- **Multi-provider** — one LiteLLM bridge: Anthropic, OpenAI, Groq, local models
-- **NDJSON streaming** — 17 frozen event types; resume with `Last-Event-ID`
-- **Local-first** — config, memory, and sessions live in `~/.arcen`; no cloud dependency
-
-## How it Works
+Ask for a change. Watch it get planned, made, and checked.
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                             YOU                              │
-│                 "fix the failing test in tests/"             │
-└──────────────────────────────┬───────────────────────────────┘
-                               ▼
-                   ┌───────────────────────┐
-                   │         DRAFT         │  plans. narrates.
-                   │  planner · opens turn │  spawns sub-agents.
-                   └───────────┬───────────┘  re-plans on fail.
-                               │ plan
-                               ▼
-                   ┌───────────────────────┐
-                   │         FORGE         │  executes. one step
-                   │ executor · tool calls │  at a time. returns
-                   └───────────┬───────────┘  observations.
-                               │ observation
-                               ▼
-                   ┌───────────────────────┐
-                   │        TEMPER         │  verifies. tests
-                   │ verifier · adversarial│  adversarially.
-                   └───────────┬───────────┘  reports pass/fail.
-                               │
-                    pass ✓ ────┴──── ✗ fail ──▶ back to DRAFT
-                               ▼
-                   ┌───────────────────────┐
-                   │        ANSWER         │  prose. every claim
-                   └───────────────────────┘  backed by a step.
+you ──▶ DRAFT ──plan──▶ FORGE ──observation──▶ TEMPER ──pass──▶ answer
+          ▲                                      │
+          └──────────── fail: re-plan ───────────┘
 ```
 
-Sub-agents fan out under DRAFT for parallel work (research, exploration, bulk edits) and report back into the same stream:
+Three agents, no fourth opinion. **DRAFT** breaks the goal into steps and names a tool for each. **FORGE** runs exactly one step at a time and returns the raw observation. **TEMPER** tries to break the result — it runs the tests, and when there is no test command it says so instead of claiming success.
 
-```ndjson
-{"type":"run.start","run_id":"r-01J9","goal":"fix the failing test","depth":0,"ts":1727500000.000}
-{"type":"think","agent":"DRAFT","text":"Goal: fix failing test. Read the test first, then the module under test.","ts":1727500000.104}
-{"type":"plan","agent":"DRAFT","steps":[{"id":1,"title":"read failing test","tool":"file.read"},{"id":2,"title":"run pytest -q","tool":"bash"},{"id":3,"title":"apply minimal fix","tool":"file.edit"}],"ts":1727500000.220}
-{"type":"spawn","parent":"DRAFT","name":"TEST-READER","task":"extract the failing assertion","depth":1,"ts":1727500000.410}
-{"type":"command","agent":"TEST-READER","step":1,"tool":"file.read","args":{"path":"tests/test_pay.py"},"ts":1727500000.655}
-{"type":"command.done","step":1,"ok":true,"result":{"stdout":"def test_pay(): assert calc(2, 2) == 5"},"duration_s":0.004,"ts":1727500000.659}
-{"type":"step.fail","step":1,"reason":"test expects 5, calc(2,2) returns 4 — test bug","retry":0,"ts":1727500001.002}
-{"type":"plan.update","agent":"DRAFT","reason":"test bug found; fix the assertion","steps":[{"id":1,"title":"edit test to expect 4","tool":"file.edit"},{"id":2,"title":"re-run suite","tool":"bash"}],"ts":1727500001.300}
-{"type":"command","agent":"FORGE","step":2,"tool":"file.edit","args":{"path":"tests/test_pay.py","find":"== 5","replace":"== 4"},"ts":1727500001.480}
-{"type":"command.done","step":2,"ok":true,"result":{"path":"tests/test_pay.py","bytes_changed":9},"duration_s":0.006,"ts":1727500001.486}
-{"type":"verify.start","agent":"TEMPER","target":"tests/","ts":1727500001.700}
-{"type":"step.pass","step":3,"checks":["pytest -q tests/  # 12 passed"],"ts":1727500004.010}
-{"type":"answer","text":"The test expected `calc(2, 2) == 5`; `calc` correctly returns 4. Fixed the assertion. Suite: 12 passed.","ts":1727500004.400}
-{"type":"usage","tokens":{"input":18432,"output":1204},"cost_usd":0.021,"ts":1727500004.410}
-{"type":"run.done","status":"ok","steps":3,"duration_s":4.5,"ts":1727500004.420}
-```
+Every thought, command, and result is one JSON line on an NDJSON stream. Nothing is summarized away, so you can audit a turn afterwards, resume a session, or stop watching and read the log.
 
-## Installation
+![A verified DRAFT → FORGE → TEMPER turn](docs/screenshots/10-loop-03-followup-verified.png)
 
-<details>
-<summary><strong>pip</strong> (recommended)</summary>
+*Three steps, `2 passed`, TEMPER verified, turn `ok` in 14 s — one process, no fake progress.*
 
-```bash
-pip install arcen
-arcen --version
-```
-
-</details>
-
-<details>
-<summary><strong>uv</strong></summary>
-
-```bash
-uv tool install arcen
-arcen --version
-```
-
-Or run without installing:
-
-```bash
-uvx arcen "summarize the failures in tests/"
-```
-
-</details>
-
-<details>
-<summary><strong>Docker</strong></summary>
-
-```bash
-docker pull ghcr.io/lewiseinstein15-tech/arcen:0.1.0
-docker run --rm -it \
-  -v ~/.arcen:/root/.arcen \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -e ANTHROPIC_API_KEY \
-  ghcr.io/lewiseinstein15-tech/arcen:0.1.0 "run pytest and fix failures"
-```
-
-The Docker socket lets ARCEN create per-turn sandboxes; access to that socket grants powerful control over the host Docker daemon. Without a reachable daemon and the installed sandbox image, tool execution is blocked, not run on the host. See [Sandbox execution](#sandbox-execution).
-
-</details>
-
-<details>
-<summary><strong>From source</strong></summary>
+## Quick start
 
 ```bash
 git clone https://github.com/lewiseinstein15-Tech/arcen
 cd arcen
-pip install -e ".[dev]"
-pytest -q
-arcen --version
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev,sandbox]"
 ```
 
-</details>
-
-## Usage
+Pick a model — any OpenAI-compatible endpoint works, including keyless gateways:
 
 ```bash
-arcen "fix the failing pytest suite in tests/"          # plan → build → verify
-arcen "refactor src/auth to use httpx" --dry-run        # stream the plan, change nothing
-arcen "review this repo against the spec" --mcp github  # pull tools from an MCP server
-arcen serve --port 3002                                 # NDJSON stream server for the UI
-arcen resume r-01J9                                     # replay or continue a session
+export ARCEN_MODEL_PROVIDER=kilo
+export ARCEN_MODEL_BASE_URL=https://api.kilocode.ai/api/openrouter/v1
+export ARCEN_MODEL_API_KEY=""
+export ARCEN_MODEL_NAME=baidu/ernie-5.5-flash-preview:free
 ```
 
-## Configuration
+Start the sandbox image once, then run:
 
-ARCEN reads `~/.arcen/config.yaml` (seeded from `ARCEN_MODEL_*` env vars on first boot — see Quick Start above). The provider block is four scalars; a literal API key is allowed (the file is chmod 600), and a `$VAR` reference is resolved from your environment at boot:
-
-```yaml
-provider:
-  name: custom                                   # custom | groq | deepseek | openai | anthropic | ollama | kilo
-  base_url: https://inference.dahl.global/v1     # OpenAI-compatible endpoint (custom/ollama/kilo)
-  api_key: $DAHL_API_KEY                         # literal (chmod 600 file) or $VAR vault reference
-  model: deepseek-ai/DeepSeek-V4-Flash-0731      # the model for all agents
-
-agents:
-  draft:
-    max_steps: 40
-    replan_on_fail: true
-    model: null                                  # null → inherit provider.model
-  forge:
-    step_timeout_s: 120
-    max_retries: 2
-    model: null                                  # null → inherit provider.model
-  temper:
-    adversarial: true
-    reruns: 1
-    model: null                                  # an explicit value overrides just this agent
-
-subagents:
-  max_depth: 2
-  max_concurrent: 8
-  default_model: null    # null → inherit provider.model
-
-stream:
-  port: 3002
-  content_type: application/x-ndjson
+```bash
+docker pull ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0
+npm --prefix ui install && npm --prefix ui run build   # build the web UI
+arcen serve                                            # http://localhost:3002
 ```
 
-Every value has an API equivalent (`PUT /api/config`). See [docs/BACKEND-SPEC.md](docs/BACKEND-SPEC.md) Part 4.
+Open the page, type a goal. Or stay in the terminal — each turn starts from an empty workspace, so a self-contained goal is the honest example:
 
-### A provider with no key
-
-Kilo's gateway is keyless: it authenticates by *absence*, so any `Authorization` header — even an empty `Bearer` — is rejected with 401. `name: kilo` routes through the OpenAI-compatible client with no credential and a blanked auth header:
-
-```yaml
-provider:
-  name: kilo
-  base_url: https://api.kilocode.ai/api/openrouter/v1
-  api_key: ""
-  model: baidu/ernie-5.5-flash-preview:free
+```bash
+arcen run "create calc.py with add(a, b), then test_calc.py asserting add(2,2)==4, then run pytest" --json
 ```
 
-Ollama is keyless for a different reason (it is local); both work with the field empty.
+> **Install note.** ARCEN is not on PyPI yet, so `pip install arcen` does not work — install from the repository as above. The sandbox image *is* published (`arcen-sandbox:0.1.0` and `:latest`), or build it locally with `docker build -t ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0 docker/sandbox`.
 
-## Skills
+### Development stack
 
-Skills are folders with a `SKILL.md`. Indexing reads each whole file but retains only frontmatter metadata; loading a matching skill reads the file again to return its body:
+Two shells, backend first — the Vite dev server proxies `/api/*` to port 3002 and will spam `ECONNREFUSED` if it starts first:
 
-```markdown
----
-name: pytest-repair
-version: 0.1.0
-description: Fix failing pytest suites with minimal diffs
-tools: [bash, file.read, file.edit]
----
+```bash
+python -m uvicorn arcen.server.app:app --port 3002   # shell 1
+npm --prefix ui run dev                              # shell 2 → http://localhost:5173
+```
 
-# Pytest Repair
+`./scripts/dev.sh` does both, refuses to start on occupied ports, and cleans up on exit.
 
-1. Run `pytest -q` and capture the first failure.
-2. Read the failing test and the module under test.
-3. Decide: test bug or code bug.
-4. Apply the minimal edit.
-5. Re-run the suite. Pass → report. Fail → escalate to DRAFT.
+### Terminal UI
+
+```bash
+pip install -e ".[tui]"         # textual client, from the same clone
+arcen-tui                       # attaches to a local server, or manages one
+arcen-tui --demo                # recorded events, no credentials, no Docker
+```
+
+See [docs/TUI.md](docs/TUI.md).
+
+## How it works
+
+### The turn
+
+1. **DRAFT** receives a brief: the tool catalog, the skills index, and one fact about the workspace (empty or imported — see [the sandbox](#the-sandbox)). It returns 1–6 steps, each naming a tool and carrying that tool's arguments.
+2. **FORGE** executes step *n*, in order, one at a time. A step that fails returns its failure — not a retry storm.
+3. **DRAFT** re-plans on failure, with the failure text in hand. This is where the interesting behaviour lives: a wrong assumption gets corrected instead of repeated.
+4. **TEMPER** verifies adversarially. It runs the project's tests. If it finds no test command, the turn is reported as `unverified` — never as a pass.
+5. The answer is prose, and every claim in it should trace back to a step in the stream.
+
+### The stream
+
+The event schema is frozen at 17 types, versioned with the UI (`src/arcen/stream/events.py`). One line per event, `Content-Type: application/x-ndjson`, resumable with `Last-Event-ID`:
+
+```ndjson
+{"seq":1,"type":"run.start","run_id":"r-01J9","goal":"create calc.py and a test for it, then run pytest","depth":0,"ts":1727500000.000}
+{"seq":2,"type":"think","agent":"DRAFT","text":"The workspace starts empty, so create calc.py first.","ts":1727500000.104}
+{"seq":3,"type":"plan","agent":"DRAFT","steps":[{"id":1,"title":"write calc.py","tool":"file.write"},{"id":2,"title":"write test_calc.py","tool":"file.write"},{"id":3,"title":"run pytest","tool":"bash"}],"ts":1727500000.220}
+{"seq":4,"type":"command","agent":"FORGE","step":1,"tool":"file.write","args":{"path":"/workspace/calc.py"},"ts":1727500000.655}
+{"seq":5,"type":"command.done","step":1,"ok":true,"result":{"bytes":32},"duration_s":0.095,"ts":1727500000.750}
+{"seq":9,"type":"verify.start","agent":"TEMPER","target":"/workspace","ts":1727500012.700}
+{"seq":10,"type":"step.pass","step":3,"checks":["pytest -q test_calc.py  # 2 passed"],"ts":1727500014.010}
+{"seq":11,"type":"answer","text":"Wrote calc.py and test_calc.py; pytest: 2 passed.","ts":1727500014.400}
+{"seq":12,"type":"run.done","status":"ok","steps":3,"duration_s":14.013,"ts":1727500014.420}
+```
+
+The UI renders the same stream you can `curl`, which is why the run trace and the terminal never disagree.
+
+## The sandbox
+
+FORGE and TEMPER never touch your host. Each turn gets a fresh container:
+
+| Property | Value |
+| --- | --- |
+| Image | `ghcr.io/lewiseinstein15-tech/arcen-sandbox:0.1.0` (pinned, must exist locally — no auto-pull) |
+| Network | `none` |
+| Root filesystem | read-only |
+| Capabilities | all dropped |
+| User | `65534:65534` (nobody) |
+| Writable paths | tmpfs `/workspace` (512 MB) and `/tmp` (128 MB) |
+| Host mounts | none |
+| Output cap | 256 KiB per command, then the container stops |
+
+The workspace is **disposable**. Files written in a turn are discarded when it ends, so turn 2 of a conversation does not see turn 1's `calc.py` — this is deliberate ([docs/AUDIT.md](docs/AUDIT.md)) and the planner is told so in its brief. If you want your code in there, use the local headless CLI, which snapshots a reviewed Git root and returns a host-generated patch:
+
+```bash
+arcen run "fix the failing test in tests/" --workspace . --json
+arcen apply SESSION --yes        # applies the exported patch; no commit
+```
+
+Server-side, `/api/run` rejects a `workspace` field on purpose: the web UI never reads your filesystem.
+
+**Fail-closed, not fail-open.** If Docker is missing, the image is absent, or policy validation fails, tool execution is disabled — there is no process fallback that quietly runs the plan on your host. This is a defence-in-depth boundary, not a guarantee against Docker or kernel bugs: the daemon, the image, and host-side plugins are trusted, and any data visible inside the container can leave through command output to your model provider.
+
+Real isolation is verified against a real daemon, not mocks:
+
+```bash
+ARCEN_TEST_DOCKER_ISOLATION=1 pytest tests/test_turn_isolation.py -k real_docker
 ```
 
 ## Tools
 
-Tools implement one Protocol. Schemas are generated from type hints — you never write JSON Schema by hand:
+Twenty tools, each with arguments generated from type hints and validated against the same schema the model was shown — the catalog cannot advertise an argument the executor refuses (there is a test for that).
 
-```python
-from typing import Protocol, runtime_checkable
+Seventeen run inside the sandbox. Three run host-side (`skill.list`, `skill.load`, `server.list`) because they only read ARCEN's own indexes, never your files.
 
-@runtime_checkable
-class Tool(Protocol):
-    name: str            # unique, dotted: "file.edit"
-    description: str     # shown to the model
-    schema: dict         # JSON Schema, auto-generated from execute() hints
+| Tool | Sandbox | What it does |
+| --- | --- | --- |
+| `bash` | rw | One shell command: stdout, stderr, exit code |
+| `file.read` · `file.list` · `file.glob` · `search.text` | read | Read a file, list a directory, expand a glob, regex search with line numbers |
+| `repo.map` | read | Ranked skeleton (paths, line counts, top symbols) for large repos |
+| `git.status` · `git.diff` · `git.log` · `git.show` | read | Inspect the workspace repository |
+| `file.write` · `file.edit` | write | Write a file (creating parents), or replace an exact string — ambiguous needles fail |
+| `git.add` · `git.commit` · `git.branch` · `git.checkout` | write | Stage, commit, branch, switch |
+| `patch.apply` | write | Apply a unified diff with `git apply`, or check it without applying |
 
-    def execute(self, args: dict) -> dict:
-        """Returns {"ok": bool, "result": Any, "error": str | None}."""
+Anything not covered is one `bash` call away — `git` works offline inside the turn, and the sandbox ships `pytest`, `git`, and a Python toolchain.
+
+Adding a tool is one class: a `name`, a `description`, and an `execute(args) -> {"ok", "result", "error"}`. The JSON Schema is derived from your signature; register it and FORGE, sub-agents, and any connected MCP client can call it. See [Tools](docs/BACKEND-SPEC.md).
+
+## Skills
+
+Eleven procedures ship in `skills/`, indexed at boot, loaded on demand:
+
+`api-design` · `code-review` · `debug-traceback` · `dockerize` · `git-workflow` · `large-codebase` · `pytest-repair` · `python-refactor` · `security-audit` · `sql-migration` · `test-generation`
+
+A skill is a folder with a `SKILL.md`. Indexing reads the whole file but keeps only frontmatter, so a hundred skills cost a hundred lines of context; the body loads only when the planner asks for it by name.
+
+```markdown
+---
+name: pytest-repair
+description: Fix failing pytest suites with minimal diffs
+tools: [bash, file.read, file.edit]
+---
+
+1. Run `pytest -q` and capture the first failure.
+2. Read the failing test and the module under test.
+3. Decide: test bug or code bug.
+4. Apply the minimal edit. Re-run. Pass → report. Fail → escalate to DRAFT.
 ```
 
-Register it once — it is then callable by FORGE, sub-agents, and any connected MCP client.
+## MCP, plugins, sub-agents
 
-## MCPs
-
-MCP servers are declared in config and connected lazily — no network I/O at boot:
+**MCP servers** are declared in config and connected lazily — no network I/O at boot. Remote tools are bridged into the turn and appear in the catalog like native ones.
 
 ```yaml
 mcps:
@@ -348,55 +207,115 @@ mcps:
   - name: github
     transport: http
     url: https://api.githubcopilot.com/mcp/
-    state: connected
-    headers:
-      Authorization: Bearer $GITHUB_PAT
+    headers: { Authorization: Bearer $GITHUB_PAT }
 ```
 
-## Plugins
+**Plugins** hook the loop: `on_boot`, `before_tool`, `after_tool`, `on_spawn`, `on_error`, `on_shutdown`. None are enabled by default, and they run in the server process — outside the sandbox, on trusted code only.
 
-Plugins hook every point in the loop:
+**Sub-agents** fan out under DRAFT for parallel exploration or bulk edits, capped by depth and concurrency, reporting into the same stream.
 
-```python
-from arcen.plugins import Plugin, hook
+**Memory** is a local SQLite entity graph (`~/.arcen/memory.db`) with fact consolidation and decay — no cloud, no vector database to run.
 
-class RedactSecrets(Plugin):
-    name = "redact-secrets"
+## Configuration
 
-    @hook("after_tool")
-    def scrub(self, event: dict) -> dict:
-        if event["tool"] in {"bash", "file.read"}:
-            event["result"] = redact(event["result"])
-        return event
+`~/.arcen/config.yaml`, seeded from `ARCEN_MODEL_*` environment variables on first boot (a value already in the file always wins, and the key is logged masked):
+
+```yaml
+provider:
+  name: kilo                                  # custom | openai | anthropic | groq | deepseek | ollama | kilo
+  base_url: https://api.kilocode.ai/api/openrouter/v1
+  api_key: ""                                 # literal (file is chmod 600) or $VAR
+  model: baidu/ernie-5.5-flash-preview:free
+
+agents:
+  draft:   { max_steps: 40, replan_on_fail: true, model: null }
+  forge:   { step_timeout_s: 120, max_retries: 2, model: null }
+  temper:  { adversarial: true, reruns: 1, model: null }
+
+subagents:
+  max_depth: 2
+  max_concurrent: 8
+
+stream:
+  port: 3002
 ```
 
-Available hooks: `on_boot`, `before_tool`, `after_tool`, `on_spawn`, `on_error`, `on_shutdown`.
+Every key has an API equivalent (`GET`/`PUT /api/config`), which is what the Settings page uses. `kilo` and `ollama` are keyless: they authenticate by absence, so an empty `api_key` is correct and any `Authorization` header must be omitted.
+
+## The web UI
+
+One process serves both the API and the built UI (`npm --prefix ui run build`, then `arcen serve`).
+
+| View | What it shows |
+| --- | --- |
+| Chat | The turn as it happens: plan, each tool call with its arguments and result, TEMPER's verdict, and a run trace (`3 steps · 14.0s · slowest: TEMPER verify`) |
+| Tools | All 20 tools split sandbox/host with real arguments, the skills index, MCP state, and the prompt inspector — the literal text the planner will read next turn |
+| Settings | Provider, model, sandbox readiness, and a live config test |
+
+![The Tools view](docs/screenshots/09-tools-01-tool-catalog.png)
+
+The prompt inspector exists because "the model is dumb" is usually "the model was told something false". When a turn behaves badly, read what it was actually given before blaming it.
+
+## API
+
+`GET /api/health` · `GET /api/stream` (NDJSON, `Last-Event-ID` resumable) · `POST /api/run` · `DELETE /api/run/{run_id}` · `GET /api/sessions` · `GET /api/sessions/{id}/events` · `GET`/`PUT /api/config` · `POST /api/config/test` · `GET /api/tools` · `GET /api/skills` · `GET /api/mcp` · `POST /api/mcp/{name}/connect` · `GET /api/prompt` · `GET /api/sandbox/status`
+
+Full schemas: [docs/BACKEND-SPEC.md](docs/BACKEND-SPEC.md), [docs/FRONTEND-SPEC.md](docs/FRONTEND-SPEC.md).
+
+## Tests
+
+```bash
+pytest -q                              # 1,748 backend tests
+npm --prefix ui run test               # 93 UI tests
+```
+
+The suite includes contract tests that pin things which have broken before: the catalog's advertised arguments against the executor's accepted ones, a real `git` round trip inside the sandbox helper, and container policy (network, mounts, capabilities, user) asserted on every turn.
+
+CI ([harness-validation.yml](.github/workflows/harness-validation.yml)) builds a wheel, installs it outside the checkout to prove nothing is shadowed by `src/`, and runs the harness and TUI suites against the installed package on Python 3.12 and 3.13. Lint is advisory: `ruff check src tests` still reports pre-existing findings.
+
+## What it cannot do yet
+
+Stated plainly, because a README that oversells is worse than a short one:
+
+- **No PyPI release.** Install from the repo.
+- **Server turns cannot see your files.** `/api/run` has no workspace parameter by design; use `arcen run --workspace .` for real code and `arcen apply` to take the patch back.
+- **No persistence between messages.** Each turn starts from an empty workspace, so a multi-message session re-creates what it needs. The planner is told this explicitly; it is a safety property, not a bug to be fixed by mounting your repo.
+- **`http.get` and the code-execution tools are not ported to the sandbox** — plans naming them fail and re-plan. `bash` covers the gap, and the turn has no network.
+- **`file.write` caps at 96,000 bytes** per call (arguments travel as one argv element; Linux caps an argument at 128 KiB).
+- **The Projects view is still a placeholder.**
+- **`arcen resume` is read-oriented** — it replays a session's events; it does not continue a half-finished turn.
+
+## Documentation
+
+| Document | Contents |
+| --- | --- |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Module map and data flow |
+| [BACKEND-SPEC.md](docs/BACKEND-SPEC.md) | Event schema, tool protocol, API contract |
+| [FRONTEND-SPEC.md](docs/FRONTEND-SPEC.md) | UI contract and view state |
+| [AUDIT.md](docs/AUDIT.md) | Security audit; the safety properties that must not be weakened |
+| [HEADLESS.md](docs/HEADLESS.md) | `arcen run` result schema, exit codes, workspace limits |
+| [TUI.md](docs/TUI.md) | Terminal client |
+| [TICKETS.md](docs/TICKETS.md) | Work items and their verification loops |
 
 ## Contributing
 
-The `.venv` directory is gitignored. Create it with `python -m venv .venv && source .venv/bin/activate`, then install the dev extras (`pip install -e ".[dev]"`) — CI and the GHCR image build are unaffected by local virtualenv provisioning.
-
 ```bash
-git clone https://github.com/lewiseinstein15-Tech/arcen
-cd arcen
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-pytest -q                      # full backend suite, must pass 3x back-to-back
-./scripts/dev.sh               # backend on :3002 + UI on :5173
-cd ui && npm install && npm run test   # frontend suite
+pip install -e ".[dev,sandbox]"
+pytest -q && npm --prefix ui run test
 ```
 
-Read [docs/BACKEND-SPEC.md](docs/BACKEND-SPEC.md) and [docs/FRONTEND-SPEC.md](docs/FRONTEND-SPEC.md) before your first PR. Pick a ticket from [docs/TICKETS.md](docs/TICKETS.md), follow its verification loop, and commit against it.
+Read [docs/BACKEND-SPEC.md](docs/BACKEND-SPEC.md) before a backend change and [docs/AUDIT.md](docs/AUDIT.md) before touching the sandbox. If your change alters what the planner is told, add a test that pins the new contract — the failures that shipped were all "the catalog said one thing, the executor did another".
 
 ## License
 
-[MIT](LICENSE) — © 2026 lewiseinstein15-Tech
+[MIT](LICENSE) © 2026 lewiseinstein15-Tech
 
 ---
 
 <div align="center">
 
-**Built from the best parts of the open-source agent ecosystem.**
+Built from the best parts of the open-source agent ecosystem.
 
 [Aider](https://github.com/Aider-AI/aider) ·
 [OpenHands](https://github.com/All-Hands-AI/OpenHands) ·
@@ -408,8 +327,6 @@ Read [docs/BACKEND-SPEC.md](docs/BACKEND-SPEC.md) and [docs/FRONTEND-SPEC.md](do
 [Letta](https://github.com/letta-ai/letta) ·
 [Graphiti](https://github.com/getzep/graphiti) ·
 [AG-UI](https://github.com/ag-ui-protocol/ag-ui) ·
-[OpenSandbox](https://github.com/alibaba/OpenSandbox) ·
 [Claude Code](https://github.com/anthropics/claude-code)
 
 </div>
-
