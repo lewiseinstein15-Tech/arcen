@@ -99,6 +99,28 @@ class _Merged:
         raise KeyError(name)
 
 
+def workspace_note(*, imported: bool) -> str:
+    """Tell the planner what the workspace contains before step one.
+
+    Each turn gets a disposable container (docs/AUDIT.md), so a goal like
+    "add a test next to calc.py" cannot rely on a file an earlier turn wrote.
+    Without this line the model plans a read of a file that is gone, and the
+    turn dies on a failure the user cannot see the cause of.
+    """
+    if imported:
+        return (
+            "## workspace\n"
+            "The sandbox workspace is a snapshot of the project the user attached. "
+            "Files in it exist before step one; anything you write lasts only for this turn."
+        )
+    return (
+        "## workspace\n"
+        "The sandbox workspace starts EMPTY on every turn. Files written by an "
+        "earlier turn of this conversation do not exist now. If the goal depends on "
+        "a file, create it in this turn before reading or testing it."
+    )
+
+
 def render_many(registries: Iterable, **kwargs) -> str:
     """Render a catalog over several registries (builtin + host-side tools)."""
     return render(_Merged(registries), **kwargs)

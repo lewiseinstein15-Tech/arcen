@@ -364,6 +364,7 @@ def run_turn(
         brief = "\n\n".join(
             part
             for part in (
+                catalog.workspace_note(imported=workspace is not None),
                 catalog.render_many(
                     (state.registry, getattr(state, "host_registry", None)),
                     available=plan_tools,
@@ -1003,8 +1004,14 @@ def inspect_prompt() -> dict:
     """
     prompts = default_prompts()
     available = _plannable_tools(STATE)
-    catalog_text = catalog.render_many(
-        (STATE.registry, getattr(STATE, "host_registry", None)), available=available
+    workspace_text = catalog.workspace_note(imported=False)
+    catalog_text = "\n\n".join(
+        (
+            workspace_text,
+            catalog.render_many(
+                (STATE.registry, getattr(STATE, "host_registry", None)), available=available
+            ),
+        )
     )
     skills_text = catalog.render_skills(getattr(STATE, "skill_index", {}))
     return {

@@ -157,3 +157,34 @@ def test_planner_still_nulls_a_tool_it_was_not_offered() -> None:
     planner = DraftPlanner(llm=llm, tool_catalog="bash [sandboxed] — shell", tool_names={"bash"})
     plan = planner.open_turn("teleport")
     assert plan[-1].steps[0]["tool"] is None
+
+
+# -- the planner must know the workspace is fresh each turn ----------------
+# A turn gets a disposable container (docs/AUDIT.md). A follow-up goal like
+# "add a test next to calc.py" refers to a file the previous turn wrote, and
+# that file is gone. Without this note the model plans the read anyway and the
+# turn dies three steps later with "no such file or directory" — a failure the
+# user reads as the product being broken.
+
+def test_workspace_note_says_a_fresh_turn_starts_empty() -> None:
+    note = catalog.workspace_note(imported=False)
+    assert note.startswith("## workspace")
+    assert "EMPTY" in note
+    assert "create it in this turn" in note
+
+
+def test_workspace_note_describes_an_imported_project() -> None:
+    note = catalog.workspace_note(imported=True)
+    assert note.startswith("## workspace")
+    assert "snapshot" in note
+    assert "EMPTY" not in note
+
+
+def test_prompt_payload_carries_the_workspace_note() -> None:
+    from fastapi.testclient import TestClient
+
+    from arcen.server.app import app
+
+    payload = TestClient(app).get("/api/prompt").json()
+    assert payload["catalog"].startswith("## workspace")
+    assert payload["chars"] >= len(payload["catalog"])

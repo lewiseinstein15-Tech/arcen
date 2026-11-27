@@ -84,3 +84,12 @@ port — no Vite in the loop).
 | `09-tools-03-prompt-inspector.png` | The exact catalog string the planner receives, plus the prompt templates |
 | `10-loop-01-draft-forge-temper-pass.png` | Live turn: `file.write` ×2, `python -m pytest -q` → `1 passed`, TEMPER verified, turn `ok`, trace strip reading `11 steps · 5.1s` |
 | `10-loop-02-git-tools-in-sandbox.png` | Live turn using `git.add`, `git.commit`, `git.log` with `root=/workspace`; commit `d3061a4b` on `master`, tree clean, TEMPER `unverified · no test command found` |
+
+`10-loop-03-followup-verified.png` is the second message of that same
+conversation, and the one that mattered: a turn gets a disposable container,
+so `calc.py` from the previous message was gone. Before the planner was told
+this, it planned `file.read calc.py`, re-planned twice, and the turn died with
+`no such file or directory`. Now the workspace note is part of the brief the
+planner receives (`## workspace`, also visible in the prompt inspector), so
+the same goal plans `file.write calc.py` → `file.write test_calc.py` →
+`pytest` → `2 passed`, TEMPER verified, turn `ok`, 3 steps · 14.01 s.
