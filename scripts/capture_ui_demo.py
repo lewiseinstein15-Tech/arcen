@@ -12,8 +12,28 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 URL = "https://work-1-skrtmjnssfqbhcsn.prod-runtime.all-hands.dev/"
-GOAL = "build a calc module with tests and make them pass"
 OUT = Path("/workspace/project/arcen/docs/screenshots")
+
+# Each scenario needs markers that only appear once the phase it proves is on
+# screen; they come from the demo planner's titles and the real pytest output.
+SCENARIOS = {
+    "calc": {
+        "goal": "build a calc module with tests and make them pass",
+        "plan": "scaffold",
+        "red": "test_add_positive",
+        "fix": "file.edit",
+        "prefix": "",
+        "settings": True,
+    },
+    "geometry": {
+        "goal": "create a geometry module with tests and make them pass",
+        "plan": "create shapes.py",
+        "red": "2 failed",
+        "fix": "rewrite rectangle_area",
+        "prefix": "07-geometry-",
+        "settings": False,
+    },
+}
 VIEWPORT = {"width": 1440, "height": 1100}
 
 
@@ -40,6 +60,8 @@ def shot(page, name: str, *, full: bool = True) -> None:
 
 
 def main() -> int:
+    name = sys.argv[1] if len(sys.argv) > 1 else "calc"
+    scenario = SCENARIOS[name]
     with sync_playwright() as pw:
         browser = pw.chromium.launch(executable_path="/usr/bin/chromium", args=["--no-sandbox"])
         page = browser.new_page(viewport=VIEWPORT, device_scale_factor=2)
@@ -51,24 +73,28 @@ def main() -> int:
         watcher = threading.Thread(target=watch_containers, args=(stop,), daemon=True)
         watcher.start()
 
-        page.fill("textarea", GOAL)
+        page.fill("textarea", scenario["goal"])
         page.keyboard.press("Enter")
 
-        page.wait_for_function("document.body.innerText.includes('scaffold')", timeout=120000)
+        page.wait_for_function(
+            f"document.body.innerText.includes({scenario['plan']!r})", timeout=120000
+        )
         page.evaluate("window.scrollTo(0, 0)")
-        shot(page, "01-plan.png", full=False)
+        shot(page, scenario["prefix"] + "01-plan.png", full=False)
 
         page.wait_for_function(
-            "document.body.innerText.includes('test_add_positive')", timeout=120000
+            f"document.body.innerText.includes({scenario['red']!r})", timeout=120000
         )
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         time.sleep(1)
-        shot(page, "02-red-tests.png")
+        shot(page, scenario["prefix"] + "02-red-tests.png")
 
-        page.wait_for_function("document.body.innerText.includes('file.edit')", timeout=120000)
+        page.wait_for_function(
+            f"document.body.innerText.includes({scenario['fix']!r})", timeout=120000
+        )
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         time.sleep(1)
-        shot(page, "03-replan-fix.png")
+        shot(page, scenario["prefix"] + "03-replan-fix.png")
 
         page.wait_for_function(
             "document.body.innerText.includes('Verification passed')", timeout=180000
@@ -76,10 +102,13 @@ def main() -> int:
         time.sleep(2)
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         time.sleep(1)
-        shot(page, "04-verified.png")
+        shot(page, scenario["prefix"] + "04-verified.png")
         print(page.inner_text("body")[-1200:], flush=True)
 
         stop.set()
+        if not scenario["settings"]:
+            browser.close()
+            return 0
         page.goto(URL, wait_until="domcontentloaded")
         page.wait_for_selector("button:has-text('Settings')", timeout=60000)
         page.click("button:has-text('Settings')")

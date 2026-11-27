@@ -14,6 +14,18 @@ file, the suite passed, and TEMPER signed off.
 | `05-sandbox-settings.png` | Settings page: provider, sandbox backend, isolation policy |
 | `06-terminal-proof.png` | Container isolation sampled mid-turn, exported patch, patch applied and tested on the host |
 
+The `07-geometry-*` set is the same app driven through `file.write` instead of
+`file.edit`: the goal was `create a geometry module with tests and make them
+pass`, nothing existed in the workspace, and both the module and its tests were
+created by whole-file writes from inside the container.
+
+| File | What it shows |
+| --- | --- |
+| `07-geometry-01-plan.png` | DRAFT plans two `file.write` steps plus a test run |
+| `07-geometry-02-red-tests.png` | Both writes land (`bytes: 85`, `bytes: 163`), pytest fails with `2 failed` |
+| `07-geometry-03-replan-fix.png` | DRAFT re-plans after the failure |
+| `07-geometry-04-verified.png` | `file.read`, whole-file rewrite, `2 passed`, TEMPER verified |
+
 ## Reproducing
 
 ```bash
@@ -29,7 +41,8 @@ printf 'provider:\n  name: custom\n  base_url: http://127.0.0.1:9378/v1\n  api_k
 (cd ui && npm run dev -- --port 12000 --host 0.0.0.0)
 
 # 4. drive the UI and capture the frames
-.venv/bin/python scripts/capture_ui_demo.py
+.venv/bin/python scripts/capture_ui_demo.py          # the calc/edit run
+.venv/bin/python scripts/capture_ui_demo.py geometry # the file.write run
 ```
 
 The headless path needs no browser:
